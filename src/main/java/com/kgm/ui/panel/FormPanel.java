@@ -66,7 +66,7 @@ public class FormPanel extends JPanel {
 
     // ================= LEFT PANEL =================
     private JPanel buildLeftPanel() {
-// image dimension
+
         JPanel left = new JPanel(new BorderLayout(10, 10));
 
         left.setPreferredSize(new Dimension(220, 250));
@@ -76,7 +76,7 @@ public class FormPanel extends JPanel {
         left.setBackground(Color.WHITE);
 
         photoPreview = new JLabel("No Image", SwingConstants.CENTER);
-// Image box dimensions fixed to prevent resizing issues when image is loaded
+
         photoPreview.setPreferredSize(new Dimension(220, 250));
         photoPreview.setMinimumSize(new Dimension(220, 250));
         photoPreview.setMaximumSize(new Dimension(220, 250));
@@ -85,7 +85,6 @@ public class FormPanel extends JPanel {
         photoPreview.setFont(labelFont);
         photoPreview.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        // CLICK ON IMAGE TO UPLOAD
         photoPreview.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 chooseImage(photoPreview);
@@ -106,7 +105,6 @@ public class FormPanel extends JPanel {
         bottom.setBackground(Color.WHITE);
         bottom.setLayout(new BoxLayout(bottom, BoxLayout.Y_AXIS));
 
-        // FILE SIZE INFO MOVED ABOVE IMAGE
         JLabel sizeInfo = new JLabel("File size allowed (400KB, JPEG only)");
         sizeInfo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
 
@@ -138,13 +136,13 @@ public class FormPanel extends JPanel {
         y = addRow(form, gbc, y, "Phone", "Email");
         y = addRow(form, gbc, y, "Department", "Designation");
 
-        y = addGenderAndDate(form, gbc, y);
-        y = addDateAndEmpty(form, gbc, y);
+        y = addGenderAndReason(form, gbc, y);
+        y = addDateRow(form, gbc, y);
 
         gbc.gridy = y;
         gbc.gridx = 0;
         gbc.gridwidth = 2;
-        form.add(createFieldSingle("Address"), gbc);
+        form.add(createFieldSingle("Permanent Address"), gbc);
 
         return form;
     }
@@ -209,8 +207,8 @@ public class FormPanel extends JPanel {
         return p;
     }
 
-    // ================= GENDER =================
-    private int addGenderAndDate(JPanel panel, GridBagConstraints gbc, int y) {
+    // ================= GENDER + REASON =================
+    private int addGenderAndReason(JPanel panel, GridBagConstraints gbc, int y) {
 
         gbc.gridy = y;
 
@@ -218,20 +216,7 @@ public class FormPanel extends JPanel {
         panel.add(createGender(), gbc);
 
         gbc.gridx = 1;
-        panel.add(createDate("Date of Appointment"), gbc);
-
-        return y + 1;
-    }
-
-    private int addDateAndEmpty(JPanel panel, GridBagConstraints gbc, int y) {
-
-        gbc.gridy = y;
-
-        gbc.gridx = 0;
-        panel.add(createDate("Date of Leaving"), gbc);
-
-        gbc.gridx = 1;
-        panel.add(new JLabel(""), gbc);
+        panel.add(createReason(), gbc);
 
         return y + 1;
     }
@@ -244,13 +229,46 @@ public class FormPanel extends JPanel {
         JLabel lbl = new JLabel("Gender");
         lbl.setFont(labelFont);
 
-        JComboBox<String> combo = new JComboBox<>(new String[]{"Male", "Female", "Other"});
+        JComboBox<String> combo = new JComboBox<>(new String[] { "Male", "Female", "Other" });
         combo.setPreferredSize(new Dimension(240, 32));
 
         p.add(lbl, BorderLayout.NORTH);
         p.add(combo, BorderLayout.CENTER);
 
         return p;
+    }
+
+    // NEW DROPDOWN
+    private JPanel createReason() {
+
+        JPanel p = new JPanel(new BorderLayout(5, 5));
+        p.setBackground(Color.WHITE);
+
+        JLabel lbl = new JLabel("Reason of Leaving");
+        lbl.setFont(labelFont);
+
+        JComboBox<String> combo = new JComboBox<>(new String[] { "Layoff", "Retirement", "Others" });
+        combo.setSelectedItem("Retirement");
+        combo.setPreferredSize(new Dimension(240, 32));
+
+        p.add(lbl, BorderLayout.NORTH);
+        p.add(combo, BorderLayout.CENTER);
+
+        return p;
+    }
+
+    // ================= DATE ROW =================
+    private int addDateRow(JPanel panel, GridBagConstraints gbc, int y) {
+
+        gbc.gridy = y;
+
+        gbc.gridx = 0;
+        panel.add(createDate("Date of Appointment"), gbc);
+
+        gbc.gridx = 1;
+        panel.add(createDate("Date of Leaving"), gbc);
+
+        return y + 1;
     }
 
     private JPanel createDate(String labelText) {
@@ -281,13 +299,11 @@ public class FormPanel extends JPanel {
 
             File file = fc.getSelectedFile();
 
-            // SIZE CHECK
             if (file.length() > 400 * 1024) {
                 JOptionPane.showMessageDialog(this, "File must be 400KB or less");
                 return;
             }
 
-            // FORMAT CHECK (JPEG ONLY)
             String name = file.getName().toLowerCase();
             if (!(name.endsWith(".jpg") || name.endsWith(".jpeg"))) {
                 JOptionPane.showMessageDialog(this, "Only JPEG format is allowed");
