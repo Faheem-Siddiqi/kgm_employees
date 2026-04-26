@@ -149,10 +149,13 @@ public class Employee {
 
     public Employee() {}
 
-    // ================= GETTERS & SETTERS (sample core only) =================
+    // ================= BASIC GETTERS =================
 
     public int getID() { return ID; }
     public void setID(int ID) { this.ID = ID; }
+
+    public String getNID() { return NID; }
+    public void setNID(String NID) { this.NID = NID; }
 
     public String getEMPLOYEE_CODE() { return EMPLOYEE_CODE; }
     public void setEMPLOYEE_CODE(String EMPLOYEE_CODE) { this.EMPLOYEE_CODE = EMPLOYEE_CODE; }
@@ -171,6 +174,15 @@ public class Employee {
 
     public String getJOINING_DATE() { return JOINING_DATE; }
     public void setJOINING_DATE(String JOINING_DATE) { this.JOINING_DATE = JOINING_DATE; }
+
+    public String getRESIGN_DATE() { return RESIGN_DATE; }
+    public void setRESIGN_DATE(String RESIGN_DATE) { this.RESIGN_DATE = RESIGN_DATE; }
+
+    public String getRESIGN_REASON() { return RESIGN_REASON; }
+    public void setRESIGN_REASON(String RESIGN_REASON) { this.RESIGN_REASON = RESIGN_REASON; }
+
+    public String getUNT_CODE() { return UNT_CODE; }
+    public void setUNT_CODE(String UNT_CODE) { this.UNT_CODE = UNT_CODE; }
 
     public String getEMP_STATUS() { return EMP_STATUS; }
     public void setEMP_STATUS(String EMP_STATUS) { this.EMP_STATUS = EMP_STATUS; }
@@ -196,6 +208,127 @@ public class Employee {
     public String getEMERGENCY_NO() { return EMERGENCY_NO; }
     public void setEMERGENCY_NO(String EMERGENCY_NO) { this.EMERGENCY_NO = EMERGENCY_NO; }
 
+    public String getPERMANENT_ADR() { return PERMANENT_ADR; }
+    public void setPERMANENT_ADR(String PERMANENT_ADR) { this.PERMANENT_ADR = PERMANENT_ADR; }
+
+    // ================= DOCUMENT GETTERS =================
+
+    public String getCNIC_COPY() { return CNIC_COPY; }
+    public void setCNIC_COPY(String CNIC_COPY) { this.CNIC_COPY = CNIC_COPY; }
+
+    public String getSS_CARD_COPY() { return SS_CARD_COPY; }
+    public void setSS_CARD_COPY(String SS_CARD_COPY) { this.SS_CARD_COPY = SS_CARD_COPY; }
+
+    public String getEOBI_CARD_COPY() { return EOBI_CARD_COPY; }
+    public void setEOBI_CARD_COPY(String EOBI_CARD_COPY) { this.EOBI_CARD_COPY = EOBI_CARD_COPY; }
+
     public String getEMP_IMG() { return EMP_IMG; }
     public void setEMP_IMG(String EMP_IMG) { this.EMP_IMG = EMP_IMG; }
+
+
+
+    public String getFINAL_SETTLEMENT() {
+    return FINAL_SETTLEMENT;
+}
+public void setFINAL_SETTLEMENT(String FINAL_SETTLEMENT) {
+    this.FINAL_SETTLEMENT = FINAL_SETTLEMENT;
+}
+
+public String getCLEARANCE_CERT() {
+    return CLEARANCE_CERT;
+}
+public void setCLEARANCE_CERT(String CLEARANCE_CERT) {
+    this.CLEARANCE_CERT = CLEARANCE_CERT;
+}
+
+public String getJOB_APPOINTMENT() {
+    return JOB_APPOINTMENT;
+}
+public void setJOB_APPOINTMENT(String JOB_APPOINTMENT) {
+    this.JOB_APPOINTMENT = JOB_APPOINTMENT;
+}
+
+public String getAPPLICATION_DOC() {
+    return APPLICATION_DOC;
+}
+public void setAPPLICATION_DOC(String APPLICATION_DOC) {
+    this.APPLICATION_DOC = APPLICATION_DOC;
+}
+
+public String getISSUANCE_DOC() {
+    return ISSUANCE_DOC;
+}
+public void setISSUANCE_DOC(String ISSUANCE_DOC) {
+    this.ISSUANCE_DOC = ISSUANCE_DOC;
+}
+
+public String getSETTLEMENT_DOC() {
+    return SETTLEMENT_DOC;
+}
+public void setSETTLEMENT_DOC(String SETTLEMENT_DOC) {
+    this.SETTLEMENT_DOC = SETTLEMENT_DOC;
+}
+
+public String getTRIAL_CARD() {
+    return TRIAL_CARD;
+}
+public void setTRIAL_CARD(String TRIAL_CARD) {
+    this.TRIAL_CARD = TRIAL_CARD;
+}
+
+public String getINTERVIEW_DOC() {
+    return INTERVIEW_DOC;
+}
+public void setINTERVIEW_DOC(String INTERVIEW_DOC) {
+    this.INTERVIEW_DOC = INTERVIEW_DOC;
+}
+
+public String getSERVICE_LETTER() {
+    return SERVICE_LETTER;
+}
+public void setSERVICE_LETTER(String SERVICE_LETTER) {
+    this.SERVICE_LETTER = SERVICE_LETTER;
+}
+
+public String getEXTENSION_LETTER() {
+    return EXTENSION_LETTER;
+}
+public void setEXTENSION_LETTER(String EXTENSION_LETTER) {
+    this.EXTENSION_LETTER = EXTENSION_LETTER;
+}
+
+public String getRETIREMENT_LETTER() {
+    return RETIREMENT_LETTER;
+}
+public void setRETIREMENT_LETTER(String RETIREMENT_LETTER) {
+    this.RETIREMENT_LETTER = RETIREMENT_LETTER;
+}
+
+public String getCOVID_CERT() {
+    return COVID_CERT;
+}
+public void setCOVID_CERT(String COVID_CERT) {
+    this.COVID_CERT = COVID_CERT;
+}
+
+public String getDISCIPLINARY_I() {
+    return DISCIPLINARY_I;
+}
+public void setDISCIPLINARY_I(String DISCIPLINARY_I) {
+    this.DISCIPLINARY_I = DISCIPLINARY_I;
+}
+
+public String getDISCIPLINARY_II() {
+    return DISCIPLINARY_II;
+}
+public void setDISCIPLINARY_II(String DISCIPLINARY_II) {
+    this.DISCIPLINARY_II = DISCIPLINARY_II;
+}
+
+public String getDISCIPLINARY_III() {
+    return DISCIPLINARY_III;
+}
+public void setDISCIPLINARY_III(String DISCIPLINARY_III) {
+    this.DISCIPLINARY_III = DISCIPLINARY_III;
+}
 }

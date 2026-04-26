@@ -105,7 +105,7 @@ public class DatabaseInitializer {
             );
         """;
 
-        // ================= BANK / LEGAL =================
+        // ================= BANKING =================
         String banking = """
             CREATE TABLE IF NOT EXISTS banking (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,7 +116,7 @@ public class DatabaseInitializer {
                 EOBI_NO TEXT,
                 TAX_NO TEXT,
                 PFUND_DEDUCTION TEXT,
-                PF_INTREST TEXT,
+                PF_INTEREST TEXT,   -- FIXED (was PF_INTREST)
                 PFUND_CODE TEXT,
                 CLIPPER_PFUND_CODE TEXT,
                 EFU TEXT,
