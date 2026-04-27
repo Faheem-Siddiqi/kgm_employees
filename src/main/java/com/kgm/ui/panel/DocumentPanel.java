@@ -221,11 +221,10 @@ public class DocumentPanel extends JPanel {
     // ================= ACTION RENDERER =================
     class ActionRenderer extends JPanel implements TableCellRenderer {
 
-        public ActionRenderer() {
-            setLayout(new FlowLayout(FlowLayout.CENTER, 5, 0));
-            setOpaque(false);
-        }
-
+public ActionRenderer() {
+    setLayout(new GridBagLayout());
+    setOpaque(false);
+}
         @Override
         public Component getTableCellRendererComponent(
                 JTable table, Object value, boolean isSelected,

@@ -110,7 +110,7 @@ public class EmployeeInduction extends JFrame {
                             out.write(buffer, 0, len);
                         }
 
-                        emp.setEMP_IMG("employees/" + empCode + "/photo.jpg");
+                        emp.setEMP_IMG("employees/" + empCode + "/EMP_IMG.jpg");
                     }
                 }
 
