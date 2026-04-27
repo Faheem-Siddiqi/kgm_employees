@@ -135,7 +135,12 @@ public class EmployeeInduction extends JFrame {
                             "SERVICE_LETTER.jpg",
                             "EXTENSION_LETTER.jpg",
                             "RETIREMENT_LETTER.jpg",
-                            "COVID_CERT.jpg"
+                            "COVID_CERT.jpg",
+
+                            // ================= NEW =================
+                            "DISCIPLINARY_I.jpg",
+                            "DISCIPLINARY_II.jpg",
+                            "DISCIPLINARY_III.jpg"
                     };
 
                     // ================= COPY FILES =================
@@ -155,7 +160,6 @@ public class EmployeeInduction extends JFrame {
                                 }
                             }
 
-                            // ================= DB PATH =================
                             String dbPath = "employees/" + empCode + "/documents/" + fileNames[i];
 
                             switch (i) {
@@ -174,6 +178,11 @@ public class EmployeeInduction extends JFrame {
                                 case 12 -> emp.setEXTENSION_LETTER(dbPath);
                                 case 13 -> emp.setRETIREMENT_LETTER(dbPath);
                                 case 14 -> emp.setCOVID_CERT(dbPath);
+
+                                // ================= NEW =================
+                                case 15 -> emp.setDISCIPLINARY_I(dbPath);
+                                case 16 -> emp.setDISCIPLINARY_II(dbPath);
+                                case 17 -> emp.setDISCIPLINARY_III(dbPath);
                             }
                         }
                     }

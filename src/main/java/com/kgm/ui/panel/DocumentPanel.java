@@ -25,7 +25,7 @@ public class DocumentPanel extends JPanel {
             "Clearance Certificate", "Job Appointment Letter", "Application Letter",
             "Issuance Form", "Settlement Document", "Trial Card",
             "Interview Form", "Service Letter", "Extension Letter",
-            "Retirement Letter", "Covid Certification"
+            "Retirement Letter", "Covid Certification", "DISCIPLINARY_I","DISCIPLINARY_II","DISCIPLINARY_III"
     };
 
     public DocumentPanel() {
