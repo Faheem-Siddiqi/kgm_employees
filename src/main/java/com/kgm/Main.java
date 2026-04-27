@@ -5,11 +5,9 @@ import javax.swing.SwingUtilities;
 public class Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-              DatabaseInitializer.init();
-             new LoginView().setVisible(true);
-
+            DatabaseInitializer.init();
+            new LoginView().setVisible(true);
             System.out.println("App started");
-             
         });
     }
-}   
+}

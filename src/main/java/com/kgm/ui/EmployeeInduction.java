@@ -4,7 +4,6 @@ import javax.swing.*;
 import java.awt.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.FormPanel;
@@ -13,6 +12,8 @@ import com.kgm.ui.panel.DocumentPanel;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.dao.EmployeeDao;
 import com.kgm.model.Employee;
+
+import java.io.File;
 
 public class EmployeeInduction extends JFrame {
 
@@ -29,7 +30,6 @@ public class EmployeeInduction extends JFrame {
 
         add(new HeaderPanel("Employee Induction"), BorderLayout.NORTH);
 
-        // ================= CENTER =================
         JPanel centerWrapper = new JPanel(new BorderLayout());
         centerWrapper.setBorder(new EmptyBorder(10, 20, 10, 20));
         centerWrapper.setOpaque(false);
@@ -45,20 +45,19 @@ public class EmployeeInduction extends JFrame {
         centerWrapper.add(tabs, BorderLayout.CENTER);
         add(centerWrapper, BorderLayout.CENTER);
 
-        // ================= FOOTER =================
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         footer.setBackground(Color.WHITE);
 
         nextBackBtn = new JButton("Next");
         submitBtn = new JButton("Submit");
-        submitBtn.setEnabled(false); // disabled initially
+        submitBtn.setEnabled(false);
 
         footer.add(nextBackBtn);
         footer.add(submitBtn);
 
         add(footer, BorderLayout.SOUTH);
 
-        // ================= TAB CHANGE LOGIC =================
+        // ================= TAB CHANGE =================
         tabs.addChangeListener((ChangeEvent e) -> {
             int index = tabs.getSelectedIndex();
 
@@ -71,7 +70,6 @@ public class EmployeeInduction extends JFrame {
             }
         });
 
-        // ================= NAVIGATION BUTTON =================
         nextBackBtn.addActionListener(e -> {
             int index = tabs.getSelectedIndex();
 
@@ -82,33 +80,121 @@ public class EmployeeInduction extends JFrame {
             }
         });
 
-        // ================= SUBMIT BUTTON (IMPORTANT PART) =================
-       submitBtn.addActionListener(e -> {
+        // ================= SUBMIT =================
+        submitBtn.addActionListener(e -> {
 
-    try {
-        Employee emp = formPanel.getEmployeeFromForm();
+            try {
+                Employee emp = formPanel.getEmployeeFromForm();
 
-        EmployeeDao dao = new EmployeeDao(
-                DatabaseConnection.getConnection()
-        );
+                String empCode = emp.getEMPLOYEE_CODE();
 
-        dao.insertEmployee(emp);
+                // ================= ROOT FOLDER =================
+                String basePath = System.getProperty("user.dir") + "/employees/";
+                File empDir = new File(basePath + empCode);
+                File docDir = new File(empDir, "documents");
 
-        JOptionPane.showMessageDialog(
-                this,
-                "Employee Saved Successfully!"
-        );
+                if (!docDir.exists()) docDir.mkdirs();
 
-    } catch (Exception ex) {
+                // ================= PROFILE IMAGE =================
+                File img = formPanel.getSelectedImage();
 
-        JOptionPane.showMessageDialog(
-                this,
-                "Failed to Save Employee:\n" + ex.getMessage(),
-                "Error",
-                JOptionPane.ERROR_MESSAGE
-        );
-    }
-});
+                if (img != null) {
+                    File dest = new File(empDir, "EMP_IMG.jpg");
+
+                    try (java.io.InputStream in = new java.io.FileInputStream(img);
+                         java.io.OutputStream out = new java.io.FileOutputStream(dest)) {
+
+                        byte[] buffer = new byte[1024];
+                        int len;
+                        while ((len = in.read(buffer)) > 0) {
+                            out.write(buffer, 0, len);
+                        }
+
+                        emp.setEMP_IMG("employees/" + empCode + "/photo.jpg");
+                    }
+                }
+
+                // ================= DOCUMENTS SAVE =================
+                DocumentPanel docPanel = documentPanel;
+                String[] docs = docPanel.getAllDocumentPaths();
+
+                if (docs != null) {
+
+                    String[] fileNames = {
+                            "CNIC_COPY.jpg",
+                            "EOBI_CARD_COPY.jpg",
+                            "SS_CARD_COPY.jpg",
+                            "FINAL_SETTLEMENT.jpg",
+                            "CLEARANCE_CERT.jpg",
+                            "JOB_APPOINTMENT.jpg",
+                            "APPLICATION_DOC.jpg",
+                            "ISSUANCE_DOC.jpg",
+                            "SETTLEMENT_DOC.jpg",
+                            "TRIAL_CARD.jpg",
+                            "INTERVIEW_DOC.jpg",
+                            "SERVICE_LETTER.jpg",
+                            "EXTENSION_LETTER.jpg",
+                            "RETIREMENT_LETTER.jpg",
+                            "COVID_CERT.jpg"
+                    };
+
+                    // ================= COPY FILES =================
+                    for (int i = 0; i < docs.length; i++) {
+                        if (docs[i] != null) {
+
+                            File src = new File(docs[i]);
+                            File dest = new File(docDir, fileNames[i]);
+
+                            try (java.io.InputStream in = new java.io.FileInputStream(src);
+                                 java.io.OutputStream out = new java.io.FileOutputStream(dest)) {
+
+                                byte[] buffer = new byte[1024];
+                                int len;
+                                while ((len = in.read(buffer)) > 0) {
+                                    out.write(buffer, 0, len);
+                                }
+                            }
+
+                            // ================= DB PATH =================
+                            String dbPath = "employees/" + empCode + "/documents/" + fileNames[i];
+
+                            switch (i) {
+                                case 0 -> emp.setCNIC_COPY(dbPath);
+                                case 1 -> emp.setEOBI_CARD_COPY(dbPath);
+                                case 2 -> emp.setSS_CARD_COPY(dbPath);
+                                case 3 -> emp.setFINAL_SETTLEMENT(dbPath);
+                                case 4 -> emp.setCLEARANCE_CERT(dbPath);
+                                case 5 -> emp.setJOB_APPOINTMENT(dbPath);
+                                case 6 -> emp.setAPPLICATION_DOC(dbPath);
+                                case 7 -> emp.setISSUANCE_DOC(dbPath);
+                                case 8 -> emp.setSETTLEMENT_DOC(dbPath);
+                                case 9 -> emp.setTRIAL_CARD(dbPath);
+                                case 10 -> emp.setINTERVIEW_DOC(dbPath);
+                                case 11 -> emp.setSERVICE_LETTER(dbPath);
+                                case 12 -> emp.setEXTENSION_LETTER(dbPath);
+                                case 13 -> emp.setRETIREMENT_LETTER(dbPath);
+                                case 14 -> emp.setCOVID_CERT(dbPath);
+                            }
+                        }
+                    }
+                }
+
+                // ================= DB INSERT =================
+                EmployeeDao dao = new EmployeeDao(DatabaseConnection.getConnection());
+                dao.insertEmployee(emp);
+
+                JOptionPane.showMessageDialog(this, "Employee Saved Successfully!");
+
+            } catch (Exception ex) {
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Failed to Save Employee:\n" + ex.getMessage(),
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
+            }
+        });
 
         setVisible(true);
     }
