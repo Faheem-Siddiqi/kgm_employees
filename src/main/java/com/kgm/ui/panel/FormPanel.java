@@ -1,5 +1,4 @@
 package com.kgm.ui.panel;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -7,325 +6,249 @@ import java.io.File;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import java.util.Date;
-
+import com.kgm.model.Employee; // ✔ ADD THIS
 public class FormPanel extends JPanel {
-
+    // ================= IMAGE =================
     private JLabel photoPreview;
     private JLabel uploadLabel;
-
     private final Font labelFont = new Font("Segoe UI", Font.PLAIN, 13);
     private final Font inputFont = new Font("Segoe UI", Font.PLAIN, 13);
-
     private final int PHOTO_SIZE = 200;
-
+    // ================= ALL DB FIELDS (EXPLICIT) =================
+    private JTextField empIdField;
+    private JTextField nameField;
+    private JTextField fatherNameField;
+    private JTextField cnicField;
+    private JTextField phoneField;
+    private JTextField emailField;
+    private JTextField departmentField;
+    private JTextField designationField;
+    private JComboBox<String> genderCombo;
+    private JComboBox<String> reasonCombo;
+    private JSpinner appointmentSpinner;
+    private JSpinner leavingSpinner;
+    private JTextArea addressArea;
     public FormPanel() {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
-        setBorder(new EmptyBorder(20, 20, 20, 20));
-
-        add(new JScrollPane(buildForm()), BorderLayout.CENTER);
+        JScrollPane scroll = new JScrollPane(buildForm());
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        scroll.getViewport().setBackground(Color.WHITE);
+        add(scroll, BorderLayout.CENTER);
     }
-
-    // ================= ROOT LAYOUT FIXED =================
+    // ================= ROOT =================
     private JPanel buildForm() {
-
         JPanel root = new JPanel(new GridBagLayout());
         root.setBackground(Color.WHITE);
-
-        root.setBorder(new EmptyBorder(24, 24, 24, 24));
-
+        root.setBorder(new EmptyBorder(20, 20, 20, 20));
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridy = 0;
-        gbc.insets = new Insets(0, 0, 0, 0);
+        gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.BOTH;
-
-        // LEFT IMAGE
+        gbc.weightx = 1.0;
+        // ================= LEFT IMAGE =================
+        gbc.gridy = 0;
         gbc.gridx = 0;
         gbc.weightx = 0;
-        gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
         gbc.anchor = GridBagConstraints.NORTH;
         root.add(buildLeftPanel(), gbc);
-
-        // GAP
+        // ================= RIGHT FORM =================
         gbc.gridx = 1;
-        gbc.weightx = 0;
-        gbc.weighty = 0;
-        gbc.fill = GridBagConstraints.NONE;
-        root.add(Box.createRigidArea(new Dimension(35, 1)), gbc);
-
-        // FORM
-        gbc.gridx = 2;
         gbc.weightx = 1.0;
-        gbc.weighty = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
-        root.add(buildRightForm(), gbc);
-
+        JPanel form = buildRightForm();
+        root.add(form, gbc);
         return root;
     }
-
-    // ================= LEFT PANEL =================
+    // ================= IMAGE PANEL =================
     private JPanel buildLeftPanel() {
-
-        JPanel left = new JPanel(new BorderLayout(10, 10));
-
-        left.setPreferredSize(new Dimension(220, 250));
-        left.setMinimumSize(new Dimension(220, 250));
-        left.setMaximumSize(new Dimension(220, 250));
-
+        JPanel left = new JPanel(new BorderLayout());
+        left.setPreferredSize(new Dimension(240, 300));
         left.setBackground(Color.WHITE);
-
-        photoPreview = new JLabel("No Image", SwingConstants.CENTER);
-
-        photoPreview.setPreferredSize(new Dimension(220, 250));
-        photoPreview.setMinimumSize(new Dimension(220, 250));
-        photoPreview.setMaximumSize(new Dimension(220, 250));
-
-        photoPreview.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
-        photoPreview.setFont(labelFont);
-        photoPreview.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
+        photoPreview = new JLabel("Photo", SwingConstants.CENTER);
+        photoPreview.setPreferredSize(new Dimension(220, 220));
+        photoPreview.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
         photoPreview.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 chooseImage(photoPreview);
             }
         });
-
-        uploadLabel = new JLabel("Upload");
+        uploadLabel = new JLabel("Upload / Replace");
         uploadLabel.setForeground(new Color(0, 102, 204));
         uploadLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
-
         uploadLabel.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 chooseImage(photoPreview);
             }
         });
-
         JPanel bottom = new JPanel();
         bottom.setBackground(Color.WHITE);
         bottom.setLayout(new BoxLayout(bottom, BoxLayout.Y_AXIS));
-
-        JLabel sizeInfo = new JLabel("File size allowed (400KB, JPEG only)");
-        sizeInfo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-
-        bottom.add(sizeInfo);
+        JLabel info = new JLabel("JPEG only • Max 400KB");
+        info.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        bottom.add(info);
         bottom.add(Box.createVerticalStrut(5));
         bottom.add(uploadLabel);
-
         left.add(photoPreview, BorderLayout.CENTER);
         left.add(bottom, BorderLayout.SOUTH);
-
         return left;
     }
-
-    // ================= FORM =================
+    // ================= RIGHT FORM =================
     private JPanel buildRightForm() {
-
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setBackground(Color.WHITE);
-
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(235, 235, 235)),
+                new EmptyBorder(20, 20, 20, 20)));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
-
         int y = 0;
-
-        y = addRow(form, gbc, y, "Employee ID", "Name");
-        y = addRow(form, gbc, y, "Father Name", "CNIC");
-        y = addRow(form, gbc, y, "Phone", "Email");
-        y = addRow(form, gbc, y, "Department", "Designation");
-
-        y = addGenderAndReason(form, gbc, y);
-        y = addDateRow(form, gbc, y);
-
+        empIdField = new JTextField();
+        nameField = new JTextField();
+        addRow(panel, gbc, y++, "Employee ID", empIdField, "Name", nameField);
+        fatherNameField = new JTextField();
+        cnicField = new JTextField();
+        addRow(panel, gbc, y++, "Father Name", fatherNameField, "CNIC", cnicField);
+        phoneField = new JTextField();
+        emailField = new JTextField();
+        addRow(panel, gbc, y++, "Phone", phoneField, "Email", emailField);
+        departmentField = new JTextField();
+        designationField = new JTextField();
+        addRow(panel, gbc, y++, "Department", departmentField, "Designation", designationField);
+        genderCombo = new JComboBox<>(new String[] { "Male", "Female", "Other" });
+        reasonCombo = new JComboBox<>(new String[] { "Layoff", "Retirement", "Others" });
+        addRow(panel, gbc, y++, "Gender", genderCombo, "Reason", reasonCombo);
+        appointmentSpinner = new JSpinner(
+                new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
+        leavingSpinner = new JSpinner(new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
+        addRow(panel, gbc, y++, "Appointment Date", appointmentSpinner, "Leaving Date", leavingSpinner);
         gbc.gridy = y;
         gbc.gridx = 0;
         gbc.gridwidth = 2;
-        form.add(createFieldSingle("Permanent Address"), gbc);
-
-        return form;
+        addressArea = new JTextArea(4, 20);
+        addressArea.setLineWrap(true);
+        addressArea.setWrapStyleWord(true);
+        JScrollPane scroll = new JScrollPane(addressArea);
+        scroll.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
+        panel.add(new FormField("Permanent Address", scroll), gbc);
+        return panel;
     }
-
-    // ================= ROW =================
-    private int addRow(JPanel panel, GridBagConstraints gbc, int y, String l1, String l2) {
-
+    private void addRow(JPanel panel, GridBagConstraints gbc, int y,
+            String l1, JComponent c1,
+            String l2, JComponent c2) {
         gbc.gridy = y;
-
         gbc.gridx = 0;
-        panel.add(createField(l1), gbc);
-
+        panel.add(new FormField(l1, c1), gbc);
         gbc.gridx = 1;
-        panel.add(createField(l2), gbc);
-
-        return y + 1;
+        panel.add(new FormField(l2, c2), gbc);
     }
-
-    // ================= FIELD =================
-    private JPanel createField(String labelText) {
-
-        JPanel p = new JPanel(new BorderLayout(5, 5));
-        p.setBackground(Color.WHITE);
-
-        JLabel lbl = new JLabel(labelText);
-        lbl.setFont(labelFont);
-
-        JTextField field = new JTextField();
-        field.setFont(inputFont);
-        field.setPreferredSize(new Dimension(240, 32));
-
-        field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200)),
-                new EmptyBorder(5, 8, 5, 8)));
-
-        p.add(lbl, BorderLayout.NORTH);
-        p.add(field, BorderLayout.CENTER);
-
-        return p;
-    }
-
-    // ================= FULL WIDTH =================
-    private JPanel createFieldSingle(String labelText) {
-
-        JPanel p = new JPanel(new BorderLayout(5, 5));
-        p.setBackground(Color.WHITE);
-
-        JLabel lbl = new JLabel(labelText);
-        lbl.setFont(labelFont);
-
-        JTextArea area = new JTextArea(3, 20);
-        area.setFont(inputFont);
-        area.setLineWrap(true);
-        area.setWrapStyleWord(true);
-
-        JScrollPane scroll = new JScrollPane(area);
-        scroll.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
-
-        p.add(lbl, BorderLayout.NORTH);
-        p.add(scroll, BorderLayout.CENTER);
-
-        return p;
-    }
-
-    // ================= GENDER + REASON =================
-    private int addGenderAndReason(JPanel panel, GridBagConstraints gbc, int y) {
-
-        gbc.gridy = y;
-
-        gbc.gridx = 0;
-        panel.add(createGender(), gbc);
-
-        gbc.gridx = 1;
-        panel.add(createReason(), gbc);
-
-        return y + 1;
-    }
-
-    private JPanel createGender() {
-
-        JPanel p = new JPanel(new BorderLayout(5, 5));
-        p.setBackground(Color.WHITE);
-
-        JLabel lbl = new JLabel("Gender");
-        lbl.setFont(labelFont);
-
-        JComboBox<String> combo = new JComboBox<>(new String[] { "Male", "Female", "Other" });
-        combo.setPreferredSize(new Dimension(240, 32));
-
-        p.add(lbl, BorderLayout.NORTH);
-        p.add(combo, BorderLayout.CENTER);
-
-        return p;
-    }
-
-    // NEW DROPDOWN
-    private JPanel createReason() {
-
-        JPanel p = new JPanel(new BorderLayout(5, 5));
-        p.setBackground(Color.WHITE);
-
-        JLabel lbl = new JLabel("Reason of Leaving");
-        lbl.setFont(labelFont);
-
-        JComboBox<String> combo = new JComboBox<>(new String[] { "Layoff", "Retirement", "Others" });
-        combo.setSelectedItem("Retirement");
-        combo.setPreferredSize(new Dimension(240, 32));
-
-        p.add(lbl, BorderLayout.NORTH);
-        p.add(combo, BorderLayout.CENTER);
-
-        return p;
-    }
-
-    // ================= DATE ROW =================
-    private int addDateRow(JPanel panel, GridBagConstraints gbc, int y) {
-
-        gbc.gridy = y;
-
-        gbc.gridx = 0;
-        panel.add(createDate("Date of Appointment"), gbc);
-
-        gbc.gridx = 1;
-        panel.add(createDate("Date of Leaving"), gbc);
-
-        return y + 1;
-    }
-
-    private JPanel createDate(String labelText) {
-
-        JPanel p = new JPanel(new BorderLayout(5, 5));
-        p.setBackground(Color.WHITE);
-
-        JLabel lbl = new JLabel(labelText);
-        lbl.setFont(labelFont);
-
-        JSpinner spinner = new JSpinner(new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
-        JSpinner.DateEditor editor = new JSpinner.DateEditor(spinner, "dd/MM/yyyy");
-        spinner.setEditor(editor);
-        spinner.setPreferredSize(new Dimension(240, 32));
-
-        p.add(lbl, BorderLayout.NORTH);
-        p.add(spinner, BorderLayout.CENTER);
-
-        return p;
-    }
-
     // ================= IMAGE =================
     private void chooseImage(JLabel target) {
-
         JFileChooser fc = new JFileChooser();
-
         if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-
             File file = fc.getSelectedFile();
-
             if (file.length() > 400 * 1024) {
-                JOptionPane.showMessageDialog(this, "File must be 400KB or less");
+                JOptionPane.showMessageDialog(this, "Max 400KB allowed");
                 return;
             }
-
-            String name = file.getName().toLowerCase();
-            if (!(name.endsWith(".jpg") || name.endsWith(".jpeg"))) {
-                JOptionPane.showMessageDialog(this, "Only JPEG format is allowed");
-                return;
+            try {
+                BufferedImage img = ImageIO.read(file);
+                Image scaled = img.getScaledInstance(PHOTO_SIZE, PHOTO_SIZE, Image.SCALE_SMOOTH);
+                target.setIcon(new ImageIcon(scaled));
+                target.setText("");
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Invalid Image");
             }
-
-            setImage(target, file);
-            uploadLabel.setText("Replace");
         }
     }
-
-    private void setImage(JLabel label, File file) {
-
-        try {
-            BufferedImage img = ImageIO.read(file);
-            Image scaled = img.getScaledInstance(PHOTO_SIZE, PHOTO_SIZE, Image.SCALE_SMOOTH);
-
-            label.setIcon(new ImageIcon(scaled));
-            label.setText("");
-
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Invalid Image File");
+    // ================= FORM FIELD =================
+    class FormField extends JPanel {
+        JLabel label;
+        JComponent input;
+        public FormField(String text, JComponent comp) {
+            setLayout(new BorderLayout(6, 4));
+            setBackground(Color.WHITE);
+            label = new JLabel(text);
+            label.setFont(labelFont);
+            label.setForeground(new Color(70, 70, 70));
+            input = comp;
+            input.setFont(inputFont);
+            input.setPreferredSize(new Dimension(240, 34));
+            add(label, BorderLayout.NORTH);
+            add(input, BorderLayout.CENTER);
         }
+    }
+    // ================= ✔ ADD THIS (STEP FOR DAO INSERT) =================
+    public Employee getEmployeeFromForm() {
+        Employee e = new Employee();
+        try {
+            e.setEMPLOYEE_CODE(empIdField.getText());
+        } catch (Exception ex) {
+            e.setEMPLOYEE_CODE("");
+        }
+        try {
+            e.setEMP_NAME(nameField.getText());
+        } catch (Exception ex) {
+            e.setEMP_NAME("");
+        }
+        try {
+            e.setFATHER_NAME(fatherNameField.getText());
+        } catch (Exception ex) {
+            e.setFATHER_NAME("");
+        }
+        try {
+            e.setNID(cnicField.getText());
+        } catch (Exception ex) {
+            e.setNID("");
+        }
+        try {
+            e.setEMP_CONTNO(phoneField.getText());
+        } catch (Exception ex) {
+            e.setEMP_CONTNO("");
+        }
+        try {
+            e.setPERSONAL_EMAIL(emailField.getText());
+        } catch (Exception ex) {
+            e.setPERSONAL_EMAIL("");
+        }
+        try {
+            e.setDEPARTMENT(departmentField.getText());
+        } catch (Exception ex) {
+            e.setDEPARTMENT("");
+        }
+        try {
+            e.setDESIGNATION(designationField.getText());
+        } catch (Exception ex) {
+            e.setDESIGNATION("");
+        }
+        try {
+            e.setGENDER(genderCombo.getSelectedItem().toString());
+        } catch (Exception ex) {
+            e.setGENDER("");
+        }
+        try {
+            e.setRESIGN_REASON(reasonCombo.getSelectedItem().toString());
+        } catch (Exception ex) {
+            e.setRESIGN_REASON("");
+        }
+        try {
+            e.setJOINING_DATE(appointmentSpinner.getValue().toString());
+        } catch (Exception ex) {
+            e.setJOINING_DATE("");
+        }
+        try {
+            e.setRESIGN_DATE(leavingSpinner.getValue().toString());
+        } catch (Exception ex) {
+            e.setRESIGN_DATE("");
+        }
+        try {
+            e.setPERMANENT_ADR(addressArea.getText());
+        } catch (Exception ex) {
+            e.setPERMANENT_ADR("");
+        }
+        return e;
     }
 }

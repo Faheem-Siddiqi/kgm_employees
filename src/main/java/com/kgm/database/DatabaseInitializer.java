@@ -1,5 +1,4 @@
 package com.kgm.database;
-
 import com.kgm.config.DatabaseConnection;
 import java.sql.Connection;
 import java.sql.Statement;
@@ -10,250 +9,166 @@ public class DatabaseInitializer {
 
     public static void init() {
 
-        // ================= EMPLOYEE CORE =================
         String employees = """
             CREATE TABLE IF NOT EXISTS employees (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                UNT_CODE TEXT,
-                EMPLOYEE_CODE TEXT UNIQUE,
-                EMP_NAME TEXT,
-                FATHER_NAME TEXT,
-                MOTHER_NAME TEXT,
-                GENDER TEXT,
-                DOB TEXT,
-                CITY_OF_BIRTH TEXT,
-                NATIONALITY TEXT,
-                RELIGION TEXT,
-                BLOOD_GROUP TEXT,
-                M_STATUS TEXT,
-                NID TEXT
-            );
-        """;
 
-        // ================= EMPLOYMENT =================
-        String employment = """
-            CREATE TABLE IF NOT EXISTS employment (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                DEPARTMENT TEXT,
-                DESIG_CODE TEXT,
-                DESIGNATION TEXT,
-                GRADE TEXT,
-                JOINING_DATE TEXT,
-                CONFIRMING_ON TEXT,
-                EMP_STATUS TEXT,
-                SHIFT TEXT,
-                PROB_PERIOD TEXT,
-                EXP_IN_KTML TEXT,
-                APPLICATION_DATE TEXT,
-                RESIGN_REASON TEXT,
-                RESIGN_DATE TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
-            );
-        """;
+                -- CORE
+                UNT_CODE TEXT DEFAULT '',
+                EMPLOYEE_CODE TEXT UNIQUE DEFAULT '',
+                EMP_NAME TEXT DEFAULT '',
+                FATHER_NAME TEXT DEFAULT '',
+                MOTHER_NAME TEXT DEFAULT '',
+                GENDER TEXT DEFAULT '',
+                DOB TEXT DEFAULT '',
+                CITY_OF_BIRTH TEXT DEFAULT '',
+                NATIONALITY TEXT DEFAULT '',
+                RELIGION TEXT DEFAULT '',
+                BLOOD_GROUP TEXT DEFAULT '',
+                M_STATUS TEXT DEFAULT '',
+                NID TEXT DEFAULT '',
 
-        // ================= ORGANIZATION =================
-        String organization = """
-            CREATE TABLE IF NOT EXISTS organization (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                ORG_ID TEXT,
-                DIVISION TEXT,
-                BRANCH_CODE TEXT,
-                BRANCH_NAME TEXT,
-                UNT_CODE TEXT,
-                DESCR TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
-            );
-        """;
+                -- EMPLOYMENT
+                DEPARTMENT TEXT DEFAULT '',
+                DESIG_CODE TEXT DEFAULT '',
+                DESIGNATION TEXT DEFAULT '',
+                GRADE TEXT DEFAULT '',
+                JOINING_DATE TEXT DEFAULT '',
+                CONFIRMING_ON TEXT DEFAULT '',
+                EMP_STATUS TEXT DEFAULT '',
+                SHIFT TEXT DEFAULT '',
+                PROB_PERIOD TEXT DEFAULT '',
+                EXP_IN_KTML TEXT DEFAULT '',
+                APPLICATION_DATE TEXT DEFAULT '',
+                RESIGN_REASON TEXT DEFAULT '',
+                RESIGN_DATE TEXT DEFAULT '',
 
-        // ================= PAYROLL =================
-        String payroll = """
-            CREATE TABLE IF NOT EXISTS payroll (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                GROSS_SALARY TEXT,
-                PAY_CATEGORY TEXT,
-                BASIC TEXT,
-                COLA1 TEXT,
-                COLA2 TEXT,
-                COLA3 TEXT,
-                COLA4 TEXT,
-                COLA5 TEXT,
-                COLA6_7 TEXT,
-                COLA8 TEXT,
-                COLA9 TEXT,
-                COLA10 TEXT,
-                COLA11 TEXT,
-                PB_SPECIAL1_2 TEXT,
-                PB_SPECIAL3 TEXT,
-                PB_SPECIAL4 TEXT,
-                SPECIAL TEXT,
-                OTHER1 TEXT,
-                OTHER2 TEXT,
-                OTHER3 TEXT,
-                MEDICAL TEXT,
-                CONVEYANCE TEXT,
-                UTILITY TEXT,
-                ENTERTAINMENT TEXT,
-                PAY_GROUP TEXT,
-                PAY_GROUP_DESC TEXT,
-                PAY_AT_JOINING TEXT,
-                EXTRA_DUTY TEXT,
-                PAYROLL_FLAG TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
-            );
-        """;
+                -- ORGANIZATION
+                ORG_ID TEXT DEFAULT '',
+                DIVISION TEXT DEFAULT '',
+                BRANCH_CODE TEXT DEFAULT '',
+                BRANCH_NAME TEXT DEFAULT '',
+                DESCR TEXT DEFAULT '',
 
-        // ================= BANKING =================
-        String banking = """
-            CREATE TABLE IF NOT EXISTS banking (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                BANK_NAME TEXT,
-                BANK_AC_NO TEXT,
-                SS_NO TEXT,
-                EOBI_NO TEXT,
-                TAX_NO TEXT,
-                PFUND_DEDUCTION TEXT,
-                PF_INTEREST TEXT,   -- FIXED (was PF_INTREST)
-                PFUND_CODE TEXT,
-                CLIPPER_PFUND_CODE TEXT,
-                EFU TEXT,
-                EFU_NO TEXT,
-                EOBI_STATUS TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
-            );
-        """;
+                -- PAYROLL
+                GROSS_SALARY TEXT DEFAULT '',
+                PAY_CATEGORY TEXT DEFAULT '',
+                BASIC TEXT DEFAULT '',
+                COLA1 TEXT DEFAULT '',
+                COLA2 TEXT DEFAULT '',
+                COLA3 TEXT DEFAULT '',
+                COLA4 TEXT DEFAULT '',
+                COLA5 TEXT DEFAULT '',
+                COLA6_7 TEXT DEFAULT '',
+                COLA8 TEXT DEFAULT '',
+                COLA9 TEXT DEFAULT '',
+                COLA10 TEXT DEFAULT '',
+                COLA11 TEXT DEFAULT '',
+                PB_SPECIAL1_2 TEXT DEFAULT '',
+                PB_SPECIAL3 TEXT DEFAULT '',
+                PB_SPECIAL4 TEXT DEFAULT '',
+                SPECIAL TEXT DEFAULT '',
+                OTHER1 TEXT DEFAULT '',
+                OTHER2 TEXT DEFAULT '',
+                OTHER3 TEXT DEFAULT '',
+                MEDICAL TEXT DEFAULT '',
+                CONVEYANCE TEXT DEFAULT '',
+                UTILITY TEXT DEFAULT '',
+                ENTERTAINMENT TEXT DEFAULT '',
+                PAY_GROUP TEXT DEFAULT '',
+                PAY_GROUP_DESC TEXT DEFAULT '',
+                PAY_AT_JOINING TEXT DEFAULT '',
+                EXTRA_DUTY TEXT DEFAULT '',
+                PAYROLL_FLAG TEXT DEFAULT '',
 
-        // ================= CONTACT =================
-        String contact = """
-            CREATE TABLE IF NOT EXISTS contact (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                EMP_CONTNO TEXT,
-                CURRENT_ADR TEXT,
-                PERMANENT_ADR TEXT,
-                PERSONAL_EMAIL TEXT,
-                OFFICIAL_EMAIL TEXT,
-                EMERGENCY_NO TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
-            );
-        """;
+                -- BANKING
+                BANK_NAME TEXT DEFAULT '',
+                BANK_AC_NO TEXT DEFAULT '',
+                SS_NO TEXT DEFAULT '',
+                EOBI_NO TEXT DEFAULT '',
+                TAX_NO TEXT DEFAULT '',
+                PFUND_DEDUCTION TEXT DEFAULT '',
+                PF_INTEREST TEXT DEFAULT '',
+                PFUND_CODE TEXT DEFAULT '',
+                CLIPPER_PFUND_CODE TEXT DEFAULT '',
+                EFU TEXT DEFAULT '',
+                EFU_NO TEXT DEFAULT '',
+                EOBI_STATUS TEXT DEFAULT '',
 
-        // ================= REPORTING =================
-        String reporting = """
-            CREATE TABLE IF NOT EXISTS reporting (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                REP_UNT TEXT,
-                REP_EMP_ID TEXT,
-                REP_EMP_DESIG_CODE TEXT,
-                REP_EMP_DEPT_CODE TEXT,
-                REP_EMP_TYPE TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
-            );
-        """;
+                -- CONTACT
+                EMP_CONTNO TEXT DEFAULT '',
+                CURRENT_ADR TEXT DEFAULT '',
+                PERMANENT_ADR TEXT DEFAULT '',
+                PERSONAL_EMAIL TEXT DEFAULT '',
+                OFFICIAL_EMAIL TEXT DEFAULT '',
+                EMERGENCY_NO TEXT DEFAULT '',
 
-        // ================= COMPLIANCE =================
-        String compliance = """
-            CREATE TABLE IF NOT EXISTS compliance (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                FLAG TEXT,
-                CLEARANCE_STATUS TEXT,
-                HOD_CHECK TEXT,
-                SEC_HEAD_CHK TEXT,
-                NIC_VERIFY TEXT,
-                NIC_VERIFY_DATE TEXT,
-                ATT_CATEG TEXT,
-                DIS_CERTIFICATE TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
-            );
-        """;
+                -- REPORTING
+                REP_UNT TEXT DEFAULT '',
+                REP_EMP_ID TEXT DEFAULT '',
+                REP_EMP_DESIG_CODE TEXT DEFAULT '',
+                REP_EMP_DEPT_CODE TEXT DEFAULT '',
+                REP_EMP_TYPE TEXT DEFAULT '',
 
-        // ================= BENEFITS =================
-        String benefits = """
-            CREATE TABLE IF NOT EXISTS benefits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                WELLNESS_CLUB TEXT,
-                WELLNESS_CARD_ISSUE TEXT,
-                WELLNESS_CARD_NO TEXT,
-                WELLNESS_CLUB_VALID_DATE TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
-            );
-        """;
+                -- COMPLIANCE
+                FLAG TEXT DEFAULT '',
+                CLEARANCE_STATUS TEXT DEFAULT '',
+                HOD_CHECK TEXT DEFAULT '',
+                SEC_HEAD_CHK TEXT DEFAULT '',
+                NIC_VERIFY TEXT DEFAULT '',
+                NIC_VERIFY_DATE TEXT DEFAULT '',
+                ATT_CATEG TEXT DEFAULT '',
+                DIS_CERTIFICATE TEXT DEFAULT '',
 
-        // ================= VACCINATION =================
-        String vaccination = """
-            CREATE TABLE IF NOT EXISTS vaccination (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                FIRST_DOSE TEXT,
-                SECOND_DOSE TEXT,
-                FIRST_VACC_DATE TEXT,
-                SECOND_VACC_DATE TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
-            );
-        """;
+                -- BENEFITS
+                WELLNESS_CLUB TEXT DEFAULT '',
+                WELLNESS_CARD_ISSUE TEXT DEFAULT '',
+                WELLNESS_CARD_NO TEXT DEFAULT '',
+                WELLNESS_CLUB_VALID_DATE TEXT DEFAULT '',
 
-        // ================= DOCUMENTS =================
-        String documents = """
-            CREATE TABLE IF NOT EXISTS documents (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                EMPLOYEE_CODE TEXT,
-                CNIC_COPY TEXT,
-                SS_CARD_COPY TEXT,
-                EOBI_CARD_COPY TEXT,
-                FINAL_SETTLEMENT TEXT,
-                CLEARANCE_CERT TEXT,
-                JOB_APPOINTMENT TEXT,
-                APPLICATION_DOC TEXT,
-                ISSUANCE_DOC TEXT,
-                SETTLEMENT_DOC TEXT,
-                TRIAL_CARD TEXT,
-                INTERVIEW_DOC TEXT,
-                SERVICE_LETTER TEXT,
-                EXTENSION_LETTER TEXT,
-                RETIREMENT_LETTER TEXT,
-                COVID_CERT TEXT,
-                DISCIPLINARY_I TEXT,
-                DISCIPLINARY_II TEXT,
-                DISCIPLINARY_III TEXT,
-                EMP_IMG TEXT,
-                FOREIGN KEY (EMPLOYEE_CODE) REFERENCES employees(EMPLOYEE_CODE)
+                -- VACCINATION
+                FIRST_DOSE TEXT DEFAULT '',
+                SECOND_DOSE TEXT DEFAULT '',
+                FIRST_VACC_DATE TEXT DEFAULT '',
+                SECOND_VACC_DATE TEXT DEFAULT '',
+
+                -- DOCUMENTS
+                CNIC_COPY TEXT DEFAULT '',
+                SS_CARD_COPY TEXT DEFAULT '',
+                EOBI_CARD_COPY TEXT DEFAULT '',
+                FINAL_SETTLEMENT TEXT DEFAULT '',
+                CLEARANCE_CERT TEXT DEFAULT '',
+                JOB_APPOINTMENT TEXT DEFAULT '',
+                APPLICATION_DOC TEXT DEFAULT '',
+                ISSUANCE_DOC TEXT DEFAULT '',
+                SETTLEMENT_DOC TEXT DEFAULT '',
+                TRIAL_CARD TEXT DEFAULT '',
+                INTERVIEW_DOC TEXT DEFAULT '',
+                SERVICE_LETTER TEXT DEFAULT '',
+                EXTENSION_LETTER TEXT DEFAULT '',
+                RETIREMENT_LETTER TEXT DEFAULT '',
+                COVID_CERT TEXT DEFAULT '',
+                DISCIPLINARY_I TEXT DEFAULT '',
+                DISCIPLINARY_II TEXT DEFAULT '',
+                DISCIPLINARY_III TEXT DEFAULT '',
+                EMP_IMG TEXT DEFAULT ''
             );
         """;
 
         try (Connection conn = DatabaseConnection.getConnection();
              Statement stmt = conn.createStatement()) {
 
-            boolean exists;
-            try (ResultSet rs = stmt.executeQuery(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='employees'")) {
-                exists = rs.next();
-            }
+            ResultSet rs = stmt.executeQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='employees'"
+            );
+            boolean exists = rs.next();
+            rs.close();
 
             stmt.execute(employees);
-            stmt.execute(employment);
-            stmt.execute(organization);
-            stmt.execute(payroll);
-            stmt.execute(banking);
-            stmt.execute(contact);
-            stmt.execute(reporting);
-            stmt.execute(compliance);
-            stmt.execute(benefits);
-            stmt.execute(vaccination);
-            stmt.execute(documents);
 
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_emp_code ON employees(EMPLOYEE_CODE);");
 
-            if (!exists) {
-                System.out.println("=> Schema created.");
-            } else {
-                System.out.println("=> Schema already exists.");
-            }
+            System.out.println(exists ? "=> Schema already exists." : "=> Schema created.");
 
         } catch (SQLException e) {
             System.out.println("=> Schema failed!");
