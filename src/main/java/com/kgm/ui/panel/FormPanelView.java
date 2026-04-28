@@ -7,6 +7,7 @@ import java.io.File;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import java.util.Date;
+import com.kgm.model.Employee;
 
 public class FormPanelView extends JPanel {
 
@@ -17,9 +18,10 @@ public class FormPanelView extends JPanel {
     private final Font inputFont = new Font("Segoe UI", Font.PLAIN, 13);
     private final int PHOTO_SIZE = 200;
 
+    // ✔ ADDED (ONLY CHANGE)
     private File selectedImage;
 
-    // ================= FIELDS =================
+    // ================= ALL DB FIELDS (EXPLICIT) =================
     private JTextField empIdField;
     private JTextField nameField;
     private JTextField fatherNameField;
@@ -34,19 +36,14 @@ public class FormPanelView extends JPanel {
     private JSpinner leavingSpinner;
     private JTextArea addressArea;
 
-    public FormPanelView() {
+    public FormPanel() {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
-
         JScrollPane scroll = new JScrollPane(buildForm());
         scroll.setBorder(null);
         scroll.getVerticalScrollBar().setUnitIncrement(16);
         scroll.getViewport().setBackground(Color.WHITE);
-
         add(scroll, BorderLayout.CENTER);
-
-        // dummy data for now
-        loadDummyData();
     }
 
     // ================= ROOT =================
@@ -85,9 +82,21 @@ public class FormPanelView extends JPanel {
         photoPreview.setPreferredSize(new Dimension(220, 220));
         photoPreview.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
 
+        photoPreview.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                chooseImage(photoPreview);
+            }
+        });
+
         uploadLabel = new JLabel("Upload / Replace");
         uploadLabel.setForeground(new Color(0, 102, 204));
         uploadLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        uploadLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                chooseImage(photoPreview);
+            }
+        });
 
         JPanel bottom = new JPanel();
         bottom.setBackground(Color.WHITE);
@@ -141,8 +150,11 @@ public class FormPanelView extends JPanel {
         reasonCombo = new JComboBox<>(new String[]{"Layoff", "Retirement", "Others"});
         addRow(panel, gbc, y++, "Gender", genderCombo, "Reason", reasonCombo);
 
-        appointmentSpinner = new JSpinner(new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
-        leavingSpinner = new JSpinner(new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
+        appointmentSpinner = new JSpinner(
+                new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
+
+        leavingSpinner = new JSpinner(
+                new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
 
         addRow(panel, gbc, y++, "Appointment Date", appointmentSpinner, "Leaving Date", leavingSpinner);
 
@@ -174,39 +186,96 @@ public class FormPanelView extends JPanel {
         panel.add(new FormField(l2, c2), gbc);
     }
 
-    // ================= DUMMY DATA =================
-    public void loadDummyData() {
+    // ================= IMAGE HANDLING (ONLY FIXED PART) =================
+  private void chooseImage(JLabel target) {
+    JFileChooser fc = new JFileChooser();
 
-        empIdField.setText("EMP-1001");
-        nameField.setText("Ali Raza");
-        fatherNameField.setText("Muhammad Raza");
-        cnicField.setText("35202-1234567-8");
-        phoneField.setText("03001234567");
-        emailField.setText("ali@example.com");
-        departmentField.setText("IT");
-        designationField.setText("Software Engineer");
+    // ✅ ADD THIS (JPEG FILTER ONLY)
+    javax.swing.filechooser.FileNameExtensionFilter filter =
+            new javax.swing.filechooser.FileNameExtensionFilter(
+                    "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg");
+    fc.setFileFilter(filter);
+    fc.setAcceptAllFileFilterUsed(false);
 
-        genderCombo.setSelectedItem("Male");
-        reasonCombo.setSelectedItem("Others");
+    if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+        File file = fc.getSelectedFile();
 
-        addressArea.setText("Rawalpindi, Pakistan");
+        if (file.length() > 400 * 1024) {
+            JOptionPane.showMessageDialog(this, "Max 400KB allowed");
+            return;
+        }
+
+        try {
+            BufferedImage img = ImageIO.read(file);
+
+            if (img == null) {
+                JOptionPane.showMessageDialog(this, "Invalid Image");
+                return;
+            }
+
+            // ✔ STORE FOR MAIN PANEL
+            selectedImage = file;
+
+            Image scaled = img.getScaledInstance(
+                    PHOTO_SIZE,
+                    PHOTO_SIZE,
+                    Image.SCALE_SMOOTH
+            );
+
+            target.setIcon(new ImageIcon(scaled));
+            target.setText("");
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Invalid Image");
+        }
     }
+}
 
     // ================= FORM FIELD =================
     class FormField extends JPanel {
+        JLabel label;
+        JComponent input;
+
         public FormField(String text, JComponent comp) {
             setLayout(new BorderLayout(6, 4));
             setBackground(Color.WHITE);
 
-            JLabel label = new JLabel(text);
+            label = new JLabel(text);
             label.setFont(labelFont);
             label.setForeground(new Color(70, 70, 70));
 
-            comp.setFont(inputFont);
-            comp.setPreferredSize(new Dimension(240, 34));
+            input = comp;
+            input.setFont(inputFont);
+            input.setPreferredSize(new Dimension(240, 34));
 
             add(label, BorderLayout.NORTH);
-            add(comp, BorderLayout.CENTER);
+            add(input, BorderLayout.CENTER);
         }
+    }
+
+    // ================= DAO SUPPORT =================
+    public Employee getEmployeeFromForm() {
+        Employee e = new Employee();
+
+        e.setEMPLOYEE_CODE(empIdField.getText());
+        e.setEMP_NAME(nameField.getText());
+        e.setFATHER_NAME(fatherNameField.getText());
+        e.setNID(cnicField.getText());
+        e.setEMP_CONTNO(phoneField.getText());
+        e.setPERSONAL_EMAIL(emailField.getText());
+        e.setDEPARTMENT(departmentField.getText());
+        e.setDESIGNATION(designationField.getText());
+        e.setGENDER(genderCombo.getSelectedItem().toString());
+        e.setRESIGN_REASON(reasonCombo.getSelectedItem().toString());
+        e.setJOINING_DATE(appointmentSpinner.getValue().toString());
+        e.setRESIGN_DATE(leavingSpinner.getValue().toString());
+        e.setPERMANENT_ADR(addressArea.getText());
+
+        return e;
+    }
+
+    // ✔ ADDED (ONLY NEW METHOD FOR MAIN FILE)
+    public File getSelectedImage() {
+        return selectedImage;
     }
 }

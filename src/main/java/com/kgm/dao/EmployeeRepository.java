@@ -26,11 +26,11 @@ public class EmployeeRepository {
     }
 
     // ==============================
-    // 🔹 PAGINATED LIST (LIMIT FIXED = 25)
+    // 🔹 PAGINATED LIST (LIMIT FIXED = 2500)
     // ==============================
     public List<Employee> getEmployees(int offset) {
 
-        int limit = 25; // FIXED PAGE SIZE
+        int limit = 2500; // FIXED PAGE SIZE
 
         List<Employee> list = new ArrayList<>();
 

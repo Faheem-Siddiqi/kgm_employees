@@ -3,6 +3,7 @@ package com.kgm.ui;
 import javax.swing.*;
 import java.awt.*;
 
+import com.kgm.dao.EmployeeRepository;
 import com.kgm.ui.panel.EmployeeTablePanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.ExcelImportButton;
@@ -46,7 +47,6 @@ public class HomeView extends JFrame {
                 BorderFactory.createEmptyBorder(5, 10, 5, 10)
         ));
 
-        // ================= FIXED DISPOSE =================
         addBtn.addActionListener(e -> {
             new com.kgm.ui.EmployeeInduction().setVisible(true);
             dispose();
@@ -64,7 +64,10 @@ public class HomeView extends JFrame {
         body.setBackground(Color.WHITE);
         body.setBorder(BorderFactory.createEmptyBorder(10, 25, 0, 25));
 
-        EmployeeTablePanel tablePanel = new EmployeeTablePanel();
+        // ================= DAO INJECTION =================
+        EmployeeRepository repo = new EmployeeRepository();
+        EmployeeTablePanel tablePanel = new EmployeeTablePanel(repo);
+
         body.add(tablePanel, BorderLayout.CENTER);
 
         add(body, BorderLayout.CENTER);
