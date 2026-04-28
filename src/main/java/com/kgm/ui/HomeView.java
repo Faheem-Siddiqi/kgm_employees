@@ -23,7 +23,7 @@ public class HomeView extends JFrame {
 
         top.add(new HeaderPanel("Home Dashboard"), BorderLayout.NORTH);
 
-        // ================= RIGHT BUTTON AREA ONLY =================
+        // ================= BUTTON ROW =================
         JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
         btnRow.setBorder(BorderFactory.createEmptyBorder(20, 15, 0, 15));
         btnRow.setOpaque(false);
@@ -46,9 +46,11 @@ public class HomeView extends JFrame {
                 BorderFactory.createEmptyBorder(5, 10, 5, 10)
         ));
 
-        addBtn.addActionListener(e ->
-                new com.kgm.ui.EmployeeInduction().setVisible(true)
-        );
+        // ================= FIXED DISPOSE =================
+        addBtn.addActionListener(e -> {
+            new com.kgm.ui.EmployeeInduction().setVisible(true);
+            dispose();
+        });
 
         btnRow.add(excelBtn);
         btnRow.add(addBtn);
@@ -60,7 +62,7 @@ public class HomeView extends JFrame {
         // ================= BODY =================
         JPanel body = new JPanel(new BorderLayout());
         body.setBackground(Color.WHITE);
-        body.setBorder(BorderFactory.createEmptyBorder(10, 25, 0, 25)); // 12 margin all sides
+        body.setBorder(BorderFactory.createEmptyBorder(10, 25, 0, 25));
 
         EmployeeTablePanel tablePanel = new EmployeeTablePanel();
         body.add(tablePanel, BorderLayout.CENTER);

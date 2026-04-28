@@ -43,7 +43,7 @@ public class EmployeeTablePanel extends JPanel {
                 "Reason",
                 "Joining Date",
                 "Leaving Date",
-                "Address"
+                
         });
 
         table = new JTable(model);
