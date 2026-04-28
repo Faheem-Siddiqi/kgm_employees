@@ -7,7 +7,6 @@ import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
-
 import com.kgm.dao.EmployeeRepository;
 import com.kgm.model.Employee;
 
@@ -17,7 +16,6 @@ public class EmployeeTablePanel extends JPanel {
     private DefaultTableModel model;
 
     private JPanel paginationPanel;
-    private JLabel pageInfoLabel;
 
     private final List<Employee> allData = new ArrayList<>();
 
@@ -26,17 +24,21 @@ public class EmployeeTablePanel extends JPanel {
 
     private final EmployeeRepository repo;
 
-    // ================= CONSTRUCTOR =================
+    // ================= NEW LABEL =================
+    private JLabel showingLabel;
+
+    // ================= DAO CONSTRUCTOR =================
     public EmployeeTablePanel(EmployeeRepository repo) {
 
         this.repo = repo;
 
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
+        setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
 
         model = new DefaultTableModel();
 
-        model.setColumnIdentifiers(new String[] {
+        model.setColumnIdentifiers(new String[]{
                 "Employee ID",
                 "Name",
                 "Father Name",
@@ -52,6 +54,7 @@ public class EmployeeTablePanel extends JPanel {
         });
 
         table = new JTable(model);
+
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         table.setFillsViewportHeight(true);
 
@@ -61,43 +64,53 @@ public class EmployeeTablePanel extends JPanel {
         scrollPane.setBorder(null);
         scrollPane.getViewport().setBackground(Color.WHITE);
 
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+
         add(scrollPane, BorderLayout.CENTER);
 
-        // ===== PAGINATION PANEL =====
-        paginationPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 5));
+        // ================= PAGINATION PANEL =================
+        paginationPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 10));
         paginationPanel.setBackground(Color.WHITE);
+        paginationPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
-        // ===== PAGE INFO LABEL =====
-        pageInfoLabel = new JLabel();
-        pageInfoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        pageInfoLabel.setForeground(new Color(100, 100, 100));
-        pageInfoLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        pageInfoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        // ================= NEW LABEL PANEL (ABOVE PAGINATION) =================
+        showingLabel = new JLabel();
+        // showingLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        showingLabel.setForeground(Color.BLACK);
 
-        // ===== BOTTOM CONTAINER (VERTICAL) =====
         JPanel bottom = new JPanel();
         bottom.setLayout(new BoxLayout(bottom, BoxLayout.Y_AXIS));
         bottom.setBackground(Color.WHITE);
-        bottom.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12)); // margin 12
 
-        JPanel infoWrapper = new JPanel(new BorderLayout());
-        infoWrapper.setBackground(Color.WHITE);
-        infoWrapper.add(pageInfoLabel, BorderLayout.CENTER);
+        JPanel labelPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        labelPanel.setBackground(Color.WHITE);
+        labelPanel.add(showingLabel);
 
-        paginationPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        bottom.add(infoWrapper);
-        bottom.add(Box.createVerticalStrut(8));
+        bottom.add(labelPanel);
         bottom.add(paginationPanel);
 
         add(bottom, BorderLayout.SOUTH);
 
-        // INIT
+        // INIT LOAD
         loadPage(1);
         buildPagination();
     }
 
-    // ================= STYLE TABLE =================
+    // ================= UPDATE LABEL =================
+    private void updateShowingLabel(int totalRecords) {
+
+        int start = ((currentPage - 1) * rowsPerPage) + 1;
+        int end = Math.min(currentPage * rowsPerPage, totalRecords);
+
+        if (totalRecords == 0) {
+            showingLabel.setText("Showing 0 /  0");
+        } else {
+            showingLabel.setText("Showing " + start + " - " + end + " /  " + totalRecords);
+        }
+    }
+
+    // ================= TABLE STYLE =================
     private void styleTable() {
 
         table.setRowHeight(42);
@@ -113,6 +126,7 @@ public class EmployeeTablePanel extends JPanel {
         header.setForeground(new Color(60, 60, 60));
 
         DefaultTableCellRenderer renderer = new DefaultTableCellRenderer() {
+
             @Override
             public Component getTableCellRendererComponent(
                     JTable table, Object value, boolean isSelected,
@@ -122,12 +136,17 @@ public class EmployeeTablePanel extends JPanel {
                         table, value, isSelected, hasFocus, row, column);
 
                 label.setOpaque(true);
-                label.setBackground(isSelected ? new Color(232, 244, 255) : Color.WHITE);
+
+                label.setBackground(isSelected
+                        ? new Color(232, 244, 255)
+                        : Color.WHITE);
+
                 label.setForeground(new Color(50, 50, 50));
 
                 label.setBorder(BorderFactory.createCompoundBorder(
                         BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(235, 235, 235)),
-                        BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+                        BorderFactory.createEmptyBorder(6, 10, 6, 10)
+                ));
 
                 return label;
             }
@@ -138,7 +157,7 @@ public class EmployeeTablePanel extends JPanel {
         }
     }
 
-    // ================= LOAD PAGE =================
+    // ================= LOAD PAGE FROM DAO =================
     private void loadPage(int page) {
 
         model.setRowCount(0);
@@ -151,7 +170,8 @@ public class EmployeeTablePanel extends JPanel {
         allData.addAll(list);
 
         for (Employee e : list) {
-            model.addRow(new Object[] {
+
+            model.addRow(new Object[]{
                     e.getEMPLOYEE_CODE(),
                     e.getEMP_NAME(),
                     e.getFATHER_NAME(),
@@ -167,6 +187,9 @@ public class EmployeeTablePanel extends JPanel {
             });
         }
 
+        // ================= UPDATE LABEL HERE =================
+        updateShowingLabel(repo.countEmployees());
+
         SwingUtilities.invokeLater(this::autoResizeColumns);
     }
 
@@ -178,8 +201,12 @@ public class EmployeeTablePanel extends JPanel {
             int width = 60;
 
             for (int row = 0; row < table.getRowCount(); row++) {
+
                 Component comp = table.prepareRenderer(
-                        table.getCellRenderer(row, col), row, col);
+                        table.getCellRenderer(row, col),
+                        row, col
+                );
+
                 width = Math.max(comp.getPreferredSize().width + 20, width);
             }
 
@@ -188,7 +215,8 @@ public class EmployeeTablePanel extends JPanel {
                     .getTableCellRendererComponent(
                             table,
                             table.getColumnName(col),
-                            false, false, 0, col);
+                            false, false, 0, col
+                    );
 
             width = Math.max(width, headerComp.getPreferredSize().width + 20);
 
@@ -204,25 +232,13 @@ public class EmployeeTablePanel extends JPanel {
         int totalRecords = repo.countEmployees();
 
         int totalPages = Math.max(1,
-                (int) Math.ceil(totalRecords / (double) rowsPerPage));
-
-        int showing = Math.min(rowsPerPage,
-                totalRecords - ((currentPage - 1) * rowsPerPage));
-
-        pageInfoLabel.setText("Showing " + showing + " / " + totalRecords);
-
-        JButton prev = new JButton("<");
-        prev.setEnabled(currentPage > 1);
-        prev.addActionListener(e -> {
-            currentPage--;
-            loadPage(currentPage);
-            buildPagination();
-        });
-        paginationPanel.add(prev);
+                (int) Math.ceil(totalRecords / (double) rowsPerPage)
+        );
 
         for (int i = 1; i <= totalPages; i++) {
 
             JButton btn = new JButton(String.valueOf(i));
+
             btn.setPreferredSize(new Dimension(38, 32));
             btn.setFocusPainted(false);
             btn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
@@ -246,21 +262,18 @@ public class EmployeeTablePanel extends JPanel {
             paginationPanel.add(btn);
         }
 
-        JButton next = new JButton(">");
-        next.setEnabled(currentPage < totalPages);
-        next.addActionListener(e -> {
-            currentPage++;
-            loadPage(currentPage);
-            buildPagination();
-        });
-        paginationPanel.add(next);
-
         paginationPanel.revalidate();
         paginationPanel.repaint();
     }
 
-    // ================= API =================
+    // ================= PUBLIC API =================
     public void clearTable() {
         model.setRowCount(0);
+    }
+
+    public void reload() {
+        currentPage = 1;
+        loadPage(currentPage);
+        buildPagination();
     }
 }

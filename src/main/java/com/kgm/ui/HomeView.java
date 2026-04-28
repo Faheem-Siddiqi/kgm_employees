@@ -29,6 +29,9 @@ public class HomeView extends JFrame {
         btnRow.setBorder(BorderFactory.createEmptyBorder(20, 15, 0, 15));
         btnRow.setOpaque(false);
 
+        // DAO
+        EmployeeRepository repo = new EmployeeRepository();
+
         // Excel Button
         ExcelImportButton excelBtn = new ExcelImportButton(() -> {
             System.out.println("Import Excel clicked");
@@ -52,8 +55,20 @@ public class HomeView extends JFrame {
             dispose();
         });
 
+        // ================= REFRESH BUTTON =================
+        JButton refreshBtn = new JButton("Refresh");
+        refreshBtn.setPreferredSize(new Dimension(100, 32));
+        refreshBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        refreshBtn.setFocusPainted(false);
+        refreshBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        refreshBtn.setForeground(Color.WHITE);
+        refreshBtn.setBackground(new Color(0, 38, 77)); // navy blue
+
+        refreshBtn.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+
         btnRow.add(excelBtn);
         btnRow.add(addBtn);
+        btnRow.add(refreshBtn);
 
         top.add(btnRow, BorderLayout.SOUTH);
 
@@ -64,9 +79,12 @@ public class HomeView extends JFrame {
         body.setBackground(Color.WHITE);
         body.setBorder(BorderFactory.createEmptyBorder(10, 25, 0, 25));
 
-        // ================= DAO INJECTION =================
-        EmployeeRepository repo = new EmployeeRepository();
         EmployeeTablePanel tablePanel = new EmployeeTablePanel(repo);
+
+        // ================= REFRESH ACTION =================
+          refreshBtn.addActionListener(e -> {
+             tablePanel.reload(); // ensure this method re-fetches from DB using repo
+         });
 
         body.add(tablePanel, BorderLayout.CENTER);
 
