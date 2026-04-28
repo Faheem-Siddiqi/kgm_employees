@@ -83,9 +83,9 @@ public class LoginView extends JFrame {
                 SessionManager.startSession(user);
                 SessionWatcher.start();
                 SessionWatcher.closeAllWindows();
-                //  new HomeView().setVisible(true);
+                 new HomeView().setVisible(true);
                 // new EmployeeFormView().setVisible(true);
-                new EmployeeInduction().setVisible(true);
+                //  new EmployeeInduction().setVisible(true);
 
             } else {
                 JOptionPane.showMessageDialog(this, "Invalid Login");

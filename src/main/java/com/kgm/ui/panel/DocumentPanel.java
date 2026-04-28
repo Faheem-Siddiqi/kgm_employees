@@ -21,7 +21,7 @@ public class DocumentPanel extends JPanel {
     private JLabel uploadedCountLabel;
 
     private final String[] documents = {
-            "CNIC *", "EOBI Card *", "Experience Letter *", "Final Settlement",
+            "CNIC *", "EOBI Card *", "SS_CARD_COPY*", "Final Settlement",
             "Clearance Certificate", "Job Appointment Letter", "Application Letter",
             "Issuance Form", "Settlement Document", "Trial Card",
             "Interview Form", "Service Letter", "Extension Letter",

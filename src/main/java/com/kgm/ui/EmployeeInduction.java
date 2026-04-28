@@ -25,7 +25,7 @@ public class EmployeeInduction extends JFrame {
         setTitle("Employee Form");
         setSize(1100, 650);
         setLocationRelativeTo(null);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+       setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
 
         add(new HeaderPanel("Employee Induction"), BorderLayout.NORTH);

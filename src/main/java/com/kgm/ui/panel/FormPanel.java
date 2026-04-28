@@ -187,42 +187,49 @@ public class FormPanel extends JPanel {
     }
 
     // ================= IMAGE HANDLING (ONLY FIXED PART) =================
-    private void chooseImage(JLabel target) {
-        JFileChooser fc = new JFileChooser();
+  private void chooseImage(JLabel target) {
+    JFileChooser fc = new JFileChooser();
 
-        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            File file = fc.getSelectedFile();
+    // ✅ ADD THIS (JPEG FILTER ONLY)
+    javax.swing.filechooser.FileNameExtensionFilter filter =
+            new javax.swing.filechooser.FileNameExtensionFilter(
+                    "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg");
+    fc.setFileFilter(filter);
+    fc.setAcceptAllFileFilterUsed(false);
 
-            if (file.length() > 400 * 1024) {
-                JOptionPane.showMessageDialog(this, "Max 400KB allowed");
+    if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+        File file = fc.getSelectedFile();
+
+        if (file.length() > 400 * 1024) {
+            JOptionPane.showMessageDialog(this, "Max 400KB allowed");
+            return;
+        }
+
+        try {
+            BufferedImage img = ImageIO.read(file);
+
+            if (img == null) {
+                JOptionPane.showMessageDialog(this, "Invalid Image");
                 return;
             }
 
-            try {
-                BufferedImage img = ImageIO.read(file);
+            // ✔ STORE FOR MAIN PANEL
+            selectedImage = file;
 
-                if (img == null) {
-                    JOptionPane.showMessageDialog(this, "Invalid Image");
-                    return;
-                }
+            Image scaled = img.getScaledInstance(
+                    PHOTO_SIZE,
+                    PHOTO_SIZE,
+                    Image.SCALE_SMOOTH
+            );
 
-                // ✔ STORE FOR MAIN PANEL (ONLY ADDITION)
-                selectedImage = file;
+            target.setIcon(new ImageIcon(scaled));
+            target.setText("");
 
-                Image scaled = img.getScaledInstance(
-                        PHOTO_SIZE,
-                        PHOTO_SIZE,
-                        Image.SCALE_SMOOTH
-                );
-
-                target.setIcon(new ImageIcon(scaled));
-                target.setText("");
-
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Invalid Image");
-            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Invalid Image");
         }
     }
+}
 
     // ================= FORM FIELD =================
     class FormField extends JPanel {
