@@ -114,7 +114,7 @@ public class EmployeeInduction extends JFrame {
                         while ((len = in.read(buffer)) > 0) {
                             out.write(buffer, 0, len);
                         }
-                        emp.setEMP_IMG("employees/" + empCode + "/photo.jpg");
+                        emp.setEMP_IMG("employees/" + empCode + "/EMP_IMG.jpg");
                     }
                 }
                 // ================= DOCUMENTS SAVE =================

@@ -35,6 +35,7 @@ public class FormPanel extends JPanel {
     private JSpinner appointmentSpinner;
     private JSpinner leavingSpinner;
     private JTextArea addressArea;
+     private JTextArea addressArea;
 
     public FormPanel() {
         setLayout(new BorderLayout());
