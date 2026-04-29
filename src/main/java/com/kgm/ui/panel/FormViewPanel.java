@@ -29,6 +29,7 @@ public class FormViewPanel extends JPanel {
     private JSpinner appointmentSpinner;
     private JSpinner leavingSpinner;
     private JTextArea addressArea;
+    private JTextArea current_address;
 
 
     //   private String CURRENT_ADR;
@@ -66,6 +67,7 @@ public class FormViewPanel extends JPanel {
         if (employee.getRESIGN_REASON() != null)
             reasonCombo.setSelectedItem(employee.getRESIGN_REASON());
         addressArea.setText(employee.getPERMANENT_ADR());
+        current_address.setText(employee.getCURRENT_ADR());
         if (employee.getEMP_IMG() != null
                 && !employee.getEMP_IMG().trim().isEmpty()) {
             try {
@@ -176,28 +178,19 @@ public class FormViewPanel extends JPanel {
         leavingSpinner = new JSpinner(
                 new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
         addRow(panel, gbc, y++, "Appointment Date", appointmentSpinner, "Leaving Date", leavingSpinner);
-        gbc.gridy = y;
-        gbc.gridx = 0;
-        gbc.gridwidth = 2;
         addressArea = new JTextArea(4, 20);
         addressArea.setLineWrap(true);
         addressArea.setWrapStyleWord(true);
         addressArea.setFont(inputFont);
-    
-    
-       addressArea = new JTextArea(4, 20);
-addressArea.setLineWrap(true);
-addressArea.setWrapStyleWord(true);
-addressArea.setFont(inputFont);
-addressArea.setPreferredSize(new Dimension(240, 90)); // fixed height
+        addressArea.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
 
+        current_address = new JTextArea(4, 20);
+        current_address.setLineWrap(true);
+        current_address.setWrapStyleWord(true);
+        current_address.setFont(inputFont);
+        current_address.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
 
-
-        addressArea.setLineWrap(true);
-        addressArea.setWrapStyleWord(true);
-        JScrollPane scroll = new JScrollPane(addressArea);
-        scroll.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
-        panel.add(new FormField("Permanent Address", scroll), gbc);
+        addRow(panel, gbc, y++, "Permanent Address", addressArea, "Current Address", current_address);
         return panel;
     }
     private void addRow(JPanel panel, GridBagConstraints gbc, int y,
@@ -250,7 +243,9 @@ addressArea.setPreferredSize(new Dimension(240, 90)); // fixed height
             label.setForeground(new Color(70, 70, 70));
             input = comp;
             input.setFont(inputFont);
-            input.setPreferredSize(new Dimension(240, 34));
+            if (!(input instanceof JTextArea)) {
+                input.setPreferredSize(new Dimension(240, 34));
+            }
             add(label, BorderLayout.NORTH);
             add(input, BorderLayout.CENTER);
         }
