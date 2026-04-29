@@ -1,5 +1,6 @@
 package com.kgm.ui.panel;
 import javax.swing.*;
+// upon clickig any row of soecific user it lead to this page passing EMPLOYEE_CODE to package com.kgm.ui; EmployeeDetailView
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -81,7 +82,7 @@ public class EmployeeTablePanel extends JPanel {
                 e.getNID(),
                 e.getEMP_CONTNO(),
                 e.getPERSONAL_EMAIL(),
-                e.getDESIGNATION(),
+               e.getDEPARTMENT(),
                 e.getDESIGNATION(),
                 e.getGENDER(),
                 e.getRESIGN_REASON(),
@@ -149,7 +150,7 @@ public class EmployeeTablePanel extends JPanel {
                     e.getNID(),
                     e.getEMP_CONTNO(),
                     e.getPERSONAL_EMAIL(),
-                    e.getDESIGNATION(),
+                    e.getDEPARTMENT(),
                     e.getDESIGNATION(),
                     e.getGENDER(),
                     e.getRESIGN_REASON(),

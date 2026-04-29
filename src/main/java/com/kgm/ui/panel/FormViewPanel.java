@@ -9,7 +9,7 @@ import javax.imageio.ImageIO;
 import java.util.Date;
 import com.kgm.model.Employee;
 
-public class FormPanelView extends JPanel {
+public class FormViewPanel extends JPanel {
 
     // ================= IMAGE =================
     private JLabel photoPreview;
@@ -36,7 +36,7 @@ public class FormPanelView extends JPanel {
     private JSpinner leavingSpinner;
     private JTextArea addressArea;
 
-    public FormPanel() {
+    public FormViewPanel() {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
         JScrollPane scroll = new JScrollPane(buildForm());

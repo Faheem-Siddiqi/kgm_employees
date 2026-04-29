@@ -33,6 +33,7 @@ public class EmployeeRepositoryDao {
                         NID,
                         EMP_CONTNO,
                         PERSONAL_EMAIL,
+                        DEPARTMENT,
                         DESIGNATION,
                         GENDER,
                         RESIGN_REASON,
@@ -55,6 +56,7 @@ public class EmployeeRepositoryDao {
                 e.setNID(safe(rs.getString("NID")));
                 e.setEMP_CONTNO(safe(rs.getString("EMP_CONTNO")));
                 e.setPERSONAL_EMAIL(safe(rs.getString("PERSONAL_EMAIL")));
+                e.setDEPARTMENT(safe(rs.getString("DEPARTMENT")));
                 e.setDESIGNATION(safe(rs.getString("DESIGNATION")));
                 e.setGENDER(safe(rs.getString("GENDER")));
                 e.setRESIGN_REASON(safe(rs.getString("RESIGN_REASON")));
