@@ -18,10 +18,9 @@ public class FormViewPanel extends JPanel {
     private final Font inputFont = new Font("Segoe UI", Font.PLAIN, 13);
     private final int PHOTO_SIZE = 200;
 
-    // ✔ ADDED (ONLY CHANGE)
     private File selectedImage;
+    private Employee employee;
 
-    // ================= ALL DB FIELDS (EXPLICIT) =================
     private JTextField empIdField;
     private JTextField nameField;
     private JTextField fatherNameField;
@@ -36,6 +35,9 @@ public class FormViewPanel extends JPanel {
     private JSpinner leavingSpinner;
     private JTextArea addressArea;
 
+    // ✔ ADDED (ONLY CHANGE)
+    private JLabel infoLabel;
+
     public FormViewPanel() {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
@@ -46,7 +48,71 @@ public class FormViewPanel extends JPanel {
         add(scroll, BorderLayout.CENTER);
     }
 
-    // ================= ROOT =================
+    public FormViewPanel(Employee employee) {
+        this();
+        this.employee = employee;
+        loadEmployeeData();
+    }
+
+    private void loadEmployeeData() {
+        if (employee == null) {
+            System.out.println("FormViewPanel: Employee is NULL");
+            return;
+        }
+
+        empIdField.setText(employee.getEMPLOYEE_CODE());
+        nameField.setText(employee.getEMP_NAME());
+        fatherNameField.setText(employee.getFATHER_NAME());
+        cnicField.setText(employee.getNID());
+        phoneField.setText(employee.getEMP_CONTNO());
+        emailField.setText(employee.getPERSONAL_EMAIL());
+        departmentField.setText(employee.getDEPARTMENT());
+        designationField.setText(employee.getDESIGNATION());
+
+        if (employee.getGENDER() != null)
+            genderCombo.setSelectedItem(employee.getGENDER());
+
+        if (employee.getRESIGN_REASON() != null)
+            reasonCombo.setSelectedItem(employee.getRESIGN_REASON());
+
+        addressArea.setText(employee.getPERMANENT_ADR());
+
+        if (employee.getEMP_IMG() != null 
+                && !employee.getEMP_IMG().trim().isEmpty()) {
+
+            try {
+                File imgFile = new File(employee.getEMP_IMG());
+                System.err.println("Attempting to load image from: " + imgFile.getAbsolutePath());
+
+                if (imgFile.exists()) {
+                    BufferedImage img = ImageIO.read(imgFile);
+
+                    Image scaled = img.getScaledInstance(
+                            PHOTO_SIZE,
+                            PHOTO_SIZE,
+                            Image.SCALE_SMOOTH
+                    );
+
+                    photoPreview.setIcon(new ImageIcon(scaled));
+                    photoPreview.setText("");
+
+                    // ✔ HIDE BOTH UI ELEMENTS
+                    uploadLabel.setVisible(false);
+                    if (infoLabel != null) {
+                        infoLabel.setVisible(false);
+                    }
+
+                    System.out.println("Image loaded: " + employee.getEMP_IMG());
+                } else {
+                    System.out.println("Image not found: " + employee.getEMP_IMG());
+                }
+
+            } catch (Exception ex) {
+                System.out.println("Image load error: " + ex.getMessage());
+            }
+        }
+    }
+
     private JPanel buildForm() {
         JPanel root = new JPanel(new GridBagLayout());
         root.setBackground(Color.WHITE);
@@ -72,7 +138,6 @@ public class FormViewPanel extends JPanel {
         return root;
     }
 
-    // ================= IMAGE PANEL =================
     private JPanel buildLeftPanel() {
         JPanel left = new JPanel(new BorderLayout());
         left.setPreferredSize(new Dimension(240, 300));
@@ -102,10 +167,10 @@ public class FormViewPanel extends JPanel {
         bottom.setBackground(Color.WHITE);
         bottom.setLayout(new BoxLayout(bottom, BoxLayout.Y_AXIS));
 
-        JLabel info = new JLabel("JPEG only • Max 400KB");
-        info.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        infoLabel = new JLabel("JPEG only • Max 400KB");
+        infoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
 
-        bottom.add(info);
+        bottom.add(infoLabel);
         bottom.add(Box.createVerticalStrut(5));
         bottom.add(uploadLabel);
 
@@ -115,7 +180,6 @@ public class FormViewPanel extends JPanel {
         return left;
     }
 
-    // ================= RIGHT FORM =================
     private JPanel buildRightForm() {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBackground(Color.WHITE);
@@ -186,52 +250,48 @@ public class FormViewPanel extends JPanel {
         panel.add(new FormField(l2, c2), gbc);
     }
 
-    // ================= IMAGE HANDLING (ONLY FIXED PART) =================
-  private void chooseImage(JLabel target) {
-    JFileChooser fc = new JFileChooser();
+    private void chooseImage(JLabel target) {
+        JFileChooser fc = new JFileChooser();
 
-    // ✅ ADD THIS (JPEG FILTER ONLY)
-    javax.swing.filechooser.FileNameExtensionFilter filter =
-            new javax.swing.filechooser.FileNameExtensionFilter(
-                    "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg");
-    fc.setFileFilter(filter);
-    fc.setAcceptAllFileFilterUsed(false);
+        javax.swing.filechooser.FileNameExtensionFilter filter =
+                new javax.swing.filechooser.FileNameExtensionFilter(
+                        "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg");
+        fc.setFileFilter(filter);
+        fc.setAcceptAllFileFilterUsed(false);
 
-    if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-        File file = fc.getSelectedFile();
+        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File file = fc.getSelectedFile();
 
-        if (file.length() > 400 * 1024) {
-            JOptionPane.showMessageDialog(this, "Max 400KB allowed");
-            return;
-        }
-
-        try {
-            BufferedImage img = ImageIO.read(file);
-
-            if (img == null) {
-                JOptionPane.showMessageDialog(this, "Invalid Image");
+            if (file.length() > 400 * 1024) {
+                JOptionPane.showMessageDialog(this, "Max 400KB allowed");
                 return;
             }
 
-            // ✔ STORE FOR MAIN PANEL
-            selectedImage = file;
+            try {
+                BufferedImage img = ImageIO.read(file);
 
-            Image scaled = img.getScaledInstance(
-                    PHOTO_SIZE,
-                    PHOTO_SIZE,
-                    Image.SCALE_SMOOTH
-            );
+                if (img == null) {
+                    JOptionPane.showMessageDialog(this, "Invalid Image");
+                    return;
+                }
 
-            target.setIcon(new ImageIcon(scaled));
-            target.setText("");
+                selectedImage = file;
 
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Invalid Image");
+                Image scaled = img.getScaledInstance(
+                        PHOTO_SIZE,
+                        PHOTO_SIZE,
+                        Image.SCALE_SMOOTH
+                );
+
+                target.setIcon(new ImageIcon(scaled));
+                target.setText("");
+
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Invalid Image");
+            }
         }
     }
-}
 
-    // ================= FORM FIELD =================
     class FormField extends JPanel {
         JLabel label;
         JComponent input;
@@ -253,7 +313,6 @@ public class FormViewPanel extends JPanel {
         }
     }
 
-    // ================= DAO SUPPORT =================
     public Employee getEmployeeFromForm() {
         Employee e = new Employee();
 
@@ -274,7 +333,6 @@ public class FormViewPanel extends JPanel {
         return e;
     }
 
-    // ✔ ADDED (ONLY NEW METHOD FOR MAIN FILE)
     public File getSelectedImage() {
         return selectedImage;
     }
