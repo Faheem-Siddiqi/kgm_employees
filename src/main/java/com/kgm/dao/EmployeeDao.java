@@ -18,7 +18,7 @@ public class EmployeeDao {
         String sql = "INSERT INTO employees (" +
                 "NID, EMP_NAME, DEPARTMENT, DESIGNATION, PERSONAL_EMAIL, " +
                 "RESIGN_DATE, JOINING_DATE, EMP_CONTNO, PERMANENT_ADR, EMPLOYEE_CODE, " +
-                "GENDER, RESIGN_REASON, " +   // ✅ ADDED
+                "GENDER, RESIGN_REASON, " +   
 
                 "CNIC_COPY, SS_CARD_COPY, EOBI_CARD_COPY, FINAL_SETTLEMENT, CLEARANCE_CERT, " +
                 "JOB_APPOINTMENT, APPLICATION_DOC, ISSUANCE_DOC, SETTLEMENT_DOC, TRIAL_CARD, " +

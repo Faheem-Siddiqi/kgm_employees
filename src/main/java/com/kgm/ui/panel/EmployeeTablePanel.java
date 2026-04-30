@@ -16,7 +16,8 @@ public class EmployeeTablePanel extends JPanel {
     private DefaultTableModel model;
     private JPanel paginationPanel;
     private final List<Employee> allData = new ArrayList<>();
-    private final int rowsPerPage = 2500;
+    // pagination editable
+    private final int rowsPerPage = 25;
     private int currentPage = 1;
     private final EmployeeRepositoryDao repo;
     private JLabel showingLabel;
