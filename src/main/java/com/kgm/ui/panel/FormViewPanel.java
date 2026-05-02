@@ -49,25 +49,80 @@ public class FormViewPanel extends JPanel {
         this.employee = employee;
         loadEmployeeData();
     }
+    
+    /**
+     * Checks if a value is considered "empty" (null, empty string, whitespace, N/A, n/na)
+     * @param value The value to check
+     * @return true if the value is empty/null/N/A, false otherwise
+     */
+    private boolean isEmpty(String value) {
+        if (value == null) return true;
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) return true;
+        String upper = trimmed.toUpperCase();
+        return upper.equals("N/A") || upper.equals("N/A");
+    }
+    
+    /**
+     * Sets a field as editable only if the value is empty/null/N/A
+     * @param field The component to set editability
+     * @param value The value to check
+     */
+    private void setFieldEditability(JComponent field, String value) {
+        boolean editable = isEmpty(value);
+        if (field instanceof JTextField) {
+            ((JTextField) field).setEditable(editable);
+        } else if (field instanceof JTextArea) {
+            ((JTextArea) field).setEditable(editable);
+        } else if (field instanceof JComboBox || field instanceof JSpinner) {
+            field.setEnabled(editable);
+        }
+    }
+    
     private void loadEmployeeData() {
         if (employee == null) {
             System.out.println("FormViewPanel: Employee is NULL");
             return;
         }
         empIdField.setText(employee.getEMPLOYEE_CODE());
+        setFieldEditability(empIdField, employee.getEMPLOYEE_CODE());
+        
         nameField.setText(employee.getEMP_NAME());
+        setFieldEditability(nameField, employee.getEMP_NAME());
+        
         fatherNameField.setText(employee.getFATHER_NAME());
+        setFieldEditability(fatherNameField, employee.getFATHER_NAME());
+        
         cnicField.setText(employee.getNID());
+        setFieldEditability(cnicField, employee.getNID());
+        
         phoneField.setText(employee.getEMP_CONTNO());
+        setFieldEditability(phoneField, employee.getEMP_CONTNO());
+        
         emailField.setText(employee.getPERSONAL_EMAIL());
+        setFieldEditability(emailField, employee.getPERSONAL_EMAIL());
+        
         departmentField.setText(employee.getDEPARTMENT());
+        setFieldEditability(departmentField, employee.getDEPARTMENT());
+        
         designationField.setText(employee.getDESIGNATION());
-        if (employee.getGENDER() != null)
+        setFieldEditability(designationField, employee.getDESIGNATION());
+        
+        if (employee.getGENDER() != null) {
             genderCombo.setSelectedItem(employee.getGENDER());
-        if (employee.getRESIGN_REASON() != null)
+            setFieldEditability(genderCombo, employee.getGENDER());
+        }
+        if (employee.getRESIGN_REASON() != null) {
             reasonCombo.setSelectedItem(employee.getRESIGN_REASON());
+            setFieldEditability(reasonCombo, employee.getRESIGN_REASON());
+        }
+        
         addressArea.setText(employee.getPERMANENT_ADR());
+        setFieldEditability(addressArea, employee.getPERMANENT_ADR());
+        
         current_address.setText(employee.getCURRENT_ADR());
+        setFieldEditability(current_address, employee.getCURRENT_ADR());
+        
         if (employee.getEMP_IMG() != null
                 && !employee.getEMP_IMG().trim().isEmpty()) {
             try {
