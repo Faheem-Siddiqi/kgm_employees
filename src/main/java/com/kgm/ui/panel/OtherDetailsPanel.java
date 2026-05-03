@@ -1,22 +1,23 @@
 package com.kgm.ui.panel;
 
+import com.kgm.model.Employee;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import com.kgm.model.Employee;
 
 public class OtherDetailsPanel extends JPanel {
 
-    private Employee employee;
+    private Employee data;
 
-    // ================= SAFE EMPTY CONSTRUCTOR =================
+    // ================= EMPTY =================
     public OtherDetailsPanel() {
         this(null);
     }
 
-    // ================= MAIN CONSTRUCTOR =================
-    public OtherDetailsPanel(Employee employee) {
-        this.employee = employee;
+    // ================= WITH DATA =================
+    public OtherDetailsPanel(Employee data) {
+        this.data = data;
 
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
@@ -29,7 +30,7 @@ public class OtherDetailsPanel extends JPanel {
         add(scroll, BorderLayout.CENTER);
     }
 
-    // ================= UI BUILDER =================
+    // ================= UI =================
     private JPanel buildUI() {
 
         JPanel root = new JPanel();
@@ -49,8 +50,6 @@ public class OtherDetailsPanel extends JPanel {
                         {"REP DESIG CODE", get("REP_EMP_DESIG_CODE")},
                         {"REP DEPT CODE", get("REP_EMP_DEPT_CODE")},
                         {"REP TYPE", get("REP_EMP_TYPE")},
-                        {"REPORT TO EMP", get("REPORT_TO_EMP_ID")},
-                        {"REPORT TO UNIT", get("REPORT_TO_UNT")},
                         {"BRANCH CODE", get("BRANCH_CODE")},
                         {"BRANCH NAME", get("BRANCH_NAME")}
                 }));
@@ -87,8 +86,6 @@ public class OtherDetailsPanel extends JPanel {
         root.add(createSection("Compliance / Status",
                 new String[][]{
                         {"EOBI Status", get("EOBI_STATUS")},
-                        {"Union Deduction", get("DED_UNION")},
-                        {"Rehiring Status", get("REHIRING_STATUS")},
                         {"NIC Verify", get("NIC_VERIFY")},
                         {"NIC Verify Date", get("NIC_VERIFY_DATE")},
                         {"HOD Check", get("HOD_CHECK")},
@@ -101,10 +98,7 @@ public class OtherDetailsPanel extends JPanel {
         root.add(createSection("Emergency / Misc",
                 new String[][]{
                         {"Emergency No", get("EMERGENCY_NO")},
-                        {"Family CNIC", get("CNIC_FAMILY_NO")},
-                        {"House No", get("COLONY_HOUSE_NUMBER")},
-                        {"Attendance Category", get("ATT_CATEG")},
-                        {"Reference", get("REFERENCE")}
+                        {"Attendance Category", get("ATT_CATEG")}
                 }));
 
         root.add(Box.createVerticalStrut(10));
@@ -118,14 +112,13 @@ public class OtherDetailsPanel extends JPanel {
                         {"First Dose", get("FIRST_DOSE")},
                         {"Second Dose", get("SECOND_DOSE")},
                         {"First Vacc Date", get("FIRST_VACC_DATE")},
-                        {"Second Vacc Date", get("SECOND_VACC_DATE")},
-                        {"Vaccine ID", get("VAC_ID")}
+                        {"Second Vacc Date", get("SECOND_VACC_DATE")}
                 }));
 
         return root;
     }
 
-    // ================= SAP STYLE SECTION =================
+    // ================= SECTION =================
     private JPanel createSection(String title, String[][] data) {
 
         JPanel section = new JPanel(new BorderLayout());
@@ -137,7 +130,6 @@ public class OtherDetailsPanel extends JPanel {
 
         JLabel header = new JLabel(title);
         header.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        header.setHorizontalAlignment(SwingConstants.LEFT);
         header.setForeground(new Color(60, 60, 60));
 
         section.add(header, BorderLayout.NORTH);
@@ -146,7 +138,7 @@ public class OtherDetailsPanel extends JPanel {
         return section;
     }
 
-    // ================= 2-COLUMN GRID =================
+    // ================= GRID =================
     private JPanel buildGrid(String[][] data) {
 
         JPanel grid = new JPanel(new GridBagLayout());
@@ -187,12 +179,10 @@ public class OtherDetailsPanel extends JPanel {
 
         JLabel lbl = new JLabel(label);
         lbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        lbl.setHorizontalAlignment(SwingConstants.LEFT);
 
         JTextField field = new JTextField(value);
         field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-
-        setFieldEditability(field, value);
+        field.setEditable(isEmpty(value));
 
         field.setPreferredSize(new Dimension(200, 30));
 
@@ -202,84 +192,70 @@ public class OtherDetailsPanel extends JPanel {
         return p;
     }
 
-    // ================= DATA ACCESS =================
-    private String get(String field) {
-        if (employee == null) return "";
+    // ================= DATA GETTER =================
+    private String get(String key) {
+        if (data == null) return "";
 
-        try {
-            return switch (field) {
-                case "ORG_ID" -> employee.getORG_ID();
-                case "DIVISION" -> employee.getDIVISION();
-                case "SHIFT" -> employee.getSHIFT();
-                case "PROB_PERIOD" -> employee.getPROB_PERIOD();
-                case "CONFIRMING_ON" -> employee.getCONFIRMING_ON();
-                case "REP_UNT" -> employee.getREP_UNT();
-                case "REP_EMP_ID" -> employee.getREP_EMP_ID();
-                case "REP_EMP_DESIG_CODE" -> employee.getREP_EMP_DESIG_CODE();
-                case "REP_EMP_DEPT_CODE" -> employee.getREP_EMP_DEPT_CODE();
-                case "REP_EMP_TYPE" -> employee.getREP_EMP_TYPE();
-                case "REPORT_TO_EMP_ID" -> employee.getREPORT_TO_EMP_ID();
-                case "REPORT_TO_UNT" -> employee.getREPORT_TO_UNT();
-                case "BRANCH_CODE" -> employee.getBRANCH_CODE();
-                case "BRANCH_NAME" -> employee.getBRANCH_NAME();
+        switch (key) {
 
-                case "DOB" -> employee.getDOB();
-                case "CITY_OF_BIRTH" -> employee.getCITY_OF_BIRTH();
-                case "NATIONALITY" -> employee.getNATIONALITY();
-                case "RELIGION" -> employee.getRELIGION();
-                case "BLOOD_GROUP" -> employee.getBLOOD_GROUP();
-                case "M_STATUS" -> employee.getM_STATUS();
-                case "MOTHER_NAME" -> employee.getMOTHER_NAME();
+            case "ORG_ID": return data.getORG_ID();
+            case "DIVISION": return data.getDIVISION();
+            case "SHIFT": return data.getSHIFT();
+            case "PROB_PERIOD": return data.getPROB_PERIOD();
+            case "CONFIRMING_ON": return data.getCONFIRMING_ON();
 
-                case "BANK_NAME" -> employee.getBANK_NAME();
-                case "BANK_AC_NO" -> employee.getBANK_AC_NO();
-                case "SS_NO" -> employee.getSS_NO();
-                case "EOBI_NO" -> employee.getEOBI_NO();
-                case "TAX_NO" -> employee.getTAX_NO();
-                case "EFU" -> employee.getEFU();
-                case "EFU_NO" -> employee.getEFU_NO();
-                case "CLIPPER_PFUND_CODE" -> employee.getCLIPPER_PFUND_CODE();
+            case "REP_UNT": return data.getREP_UNT();
+            case "REP_EMP_ID": return data.getREP_EMP_ID();
+            case "REP_EMP_DESIG_CODE": return data.getREP_EMP_DESIG_CODE();
+            case "REP_EMP_DEPT_CODE": return data.getREP_EMP_DEPT_CODE();
+            case "REP_EMP_TYPE": return data.getREP_EMP_TYPE();
 
-                case "EOBI_STATUS" -> employee.getEOBI_STATUS();
-                case "DED_UNION" -> employee.getDED_UNION();
-                case "REHIRING_STATUS" -> employee.getREHIRING_STATUS();
-                case "NIC_VERIFY" -> employee.getNIC_VERIFY();
-                case "NIC_VERIFY_DATE" -> employee.getNIC_VERIFY_DATE();
-                case "HOD_CHECK" -> employee.getHOD_CHECK();
-                case "CLEARANCE_STATUS" -> employee.getCLEARANCE_STATUS();
-                case "DIS_CERTIFICATE" -> employee.getDIS_CERTIFICATE();
+            case "BRANCH_CODE": return data.getBRANCH_CODE();
+            case "BRANCH_NAME": return data.getBRANCH_NAME();
 
-                case "EMERGENCY_NO" -> employee.getEMERGENCY_NO();
-                case "CNIC_FAMILY_NO" -> employee.getCNIC_FAMILY_NO();
-                case "COLONY_HOUSE_NUMBER" -> employee.getCOLONY_HOUSE_NUMBER();
-                case "ATT_CATEG" -> employee.getATT_CATEG();
-                case "REFERENCE" -> employee.getREFERENCE();
+            case "DOB": return data.getDOB();
+            case "CITY_OF_BIRTH": return data.getCITY_OF_BIRTH();
+            case "NATIONALITY": return data.getNATIONALITY();
+            case "RELIGION": return data.getRELIGION();
+            case "BLOOD_GROUP": return data.getBLOOD_GROUP();
+            case "M_STATUS": return data.getM_STATUS();
+            case "MOTHER_NAME": return data.getMOTHER_NAME();
 
-                case "WELLNESS_CLUB" -> employee.getWELLNESS_CLUB();
-                case "WELLNESS_CARD_ISSUE" -> employee.getWELLNESS_CARD_ISSUE();
-                case "WELLNESS_CARD_NO" -> employee.getWELLNESS_CARD_NO();
-                case "WELLNESS_CLUB_VALID_DATE" -> employee.getWELLNESS_CLUB_VALID_DATE();
-                case "FIRST_DOSE" -> employee.getFIRST_DOSE();
-                case "SECOND_DOSE" -> employee.getSECOND_DOSE();
-                case "FIRST_VACC_DATE" -> employee.getFIRST_VACC_DATE();
-                case "SECOND_VACC_DATE" -> employee.getSECOND_VACC_DATE();
-                case "VAC_ID" -> employee.getVAC_ID();
+            case "BANK_NAME": return data.getBANK_NAME();
+            case "BANK_AC_NO": return data.getBANK_AC_NO();
+            case "SS_NO": return data.getSS_NO();
+            case "EOBI_NO": return data.getEOBI_NO();
+            case "TAX_NO": return data.getTAX_NO();
+            case "EFU": return data.getEFU();
+            case "EFU_NO": return data.getEFU_NO();
+            case "CLIPPER_PFUND_CODE": return data.getCLIPPER_PFUND_CODE();
 
-                default -> "";
-            };
-        } catch (Exception e) {
-            return "";
+            case "EOBI_STATUS": return data.getEOBI_STATUS();
+            case "NIC_VERIFY": return data.getNIC_VERIFY();
+            case "NIC_VERIFY_DATE": return data.getNIC_VERIFY_DATE();
+            case "HOD_CHECK": return data.getHOD_CHECK();
+            case "CLEARANCE_STATUS": return data.getCLEARANCE_STATUS();
+            case "DIS_CERTIFICATE": return data.getDIS_CERTIFICATE();
+
+            case "EMERGENCY_NO": return data.getEMERGENCY_NO();
+            case "ATT_CATEG": return data.getATT_CATEG();
+
+            case "WELLNESS_CLUB": return data.getWELLNESS_CLUB();
+            case "WELLNESS_CARD_ISSUE": return data.getWELLNESS_CARD_ISSUE();
+            case "WELLNESS_CARD_NO": return data.getWELLNESS_CARD_NO();
+            case "WELLNESS_CLUB_VALID_DATE": return data.getWELLNESS_CLUB_VALID_DATE();
+
+            case "FIRST_DOSE": return data.getFIRST_DOSE();
+            case "SECOND_DOSE": return data.getSECOND_DOSE();
+            case "FIRST_VACC_DATE": return data.getFIRST_VACC_DATE();
+            case "SECOND_VACC_DATE": return data.getSECOND_VACC_DATE();
+
+            default: return "";
         }
     }
 
-    // ================= YOUR LOGIC =================
+    // ================= EMPTY CHECK =================
     private boolean isEmpty(String value) {
-        if (value == null) return true;
-        String t = value.trim();
-        return t.isEmpty() || t.equalsIgnoreCase("N/A");
-    }
-
-    private void setFieldEditability(JTextField field, String value) {
-        field.setEditable(isEmpty(value));
+        return value == null || value.trim().isEmpty() || value.equalsIgnoreCase("N/A");
     }
 }
