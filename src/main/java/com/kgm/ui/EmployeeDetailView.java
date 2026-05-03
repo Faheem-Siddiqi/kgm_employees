@@ -16,7 +16,6 @@ public class EmployeeDetailView extends JFrame {
     private JButton backBtn;
     private JButton updateBtn;
 
-    // 🔹 Constructor with employee code
     public EmployeeDetailView(String empCode) {
 
         this.empCode = (empCode != null) ? empCode.trim() : null;
@@ -32,19 +31,16 @@ public class EmployeeDetailView extends JFrame {
                     null,
                     "An unexpected error occurred.\nPlease contact the administrator.",
                     "Error",
-                    JOptionPane.ERROR_MESSAGE
-            );
+                    JOptionPane.ERROR_MESSAGE);
         }
 
         initializeUI(emp, true);
     }
 
-    // 🔹 Default constructor
     public EmployeeDetailView() {
         initializeUI(null, false);
     }
 
-    // 🔹 Common UI method (removes duplication)
     private void initializeUI(Employee emp, boolean isWithData) {
 
         setTitle("Employee Form");
@@ -55,28 +51,61 @@ public class EmployeeDetailView extends JFrame {
 
         // 🔸 Header
         JPanel topContainer = new JPanel(new BorderLayout());
-        String title = (empCode != null)
-                ? "Employee Record - " + empCode
-                : "Employee Record";
+        topContainer.setBackground(Color.WHITE);
 
-        topContainer.add(new HeaderPanel(title), BorderLayout.NORTH);
+        topContainer.add(new HeaderPanel("Employee Record"), BorderLayout.NORTH);
 
-        JPanel backRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        backRow.setBackground(Color.WHITE);
+        // 🔹 UPDATED SECOND ROW (ONLY THIS PART CHANGED)
+        JPanel secondRow = new JPanel(new BorderLayout());
+        secondRow.setBackground(Color.WHITE);
+        secondRow.setBorder(new EmptyBorder(10, 16,0,16));
 
-        backBtn = new JButton("← Back");
+        // Left: Back button (styled text)
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        left.setBackground(Color.WHITE);
+
+        backBtn = new JButton("Back");
         backBtn.setBorderPainted(false);
         backBtn.setContentAreaFilled(false);
         backBtn.setFocusPainted(false);
         backBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        backBtn.setForeground(new Color(0, 102, 204));
+        backBtn.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
 
         backBtn.addActionListener(e -> {
             this.dispose();
             new HomeView();
         });
 
-        backRow.add(backBtn);
-        topContainer.add(backRow, BorderLayout.CENTER);
+        left.add(backBtn);
+
+        // Right: Employee details (right aligned)
+        JPanel right = new JPanel();
+        right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
+        right.setBackground(Color.WHITE);
+
+        String nameValue = (emp != null) ? emp.getEMP_NAME() : "";
+        String codeValue = (emp != null) ? emp.getEMPLOYEE_CODE() : "";
+
+        JLabel name = new JLabel(nameValue);
+        name.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        name.setForeground(new Color(40, 40, 40));
+        name.setAlignmentX(Component.RIGHT_ALIGNMENT);
+
+        JLabel code = new JLabel("Code: " + codeValue);
+        code.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        code.setForeground(new Color(90, 90, 90));
+        code.setAlignmentX(Component.RIGHT_ALIGNMENT);
+
+        right.add(name);
+        right.add(Box.createVerticalStrut(2));
+        right.add(code);
+
+        secondRow.add(left, BorderLayout.WEST);
+        secondRow.add(right, BorderLayout.EAST);
+
+        topContainer.add(secondRow, BorderLayout.CENTER);
+
         add(topContainer, BorderLayout.NORTH);
 
         // 🔸 Center Tabs

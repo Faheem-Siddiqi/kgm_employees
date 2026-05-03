@@ -20,7 +20,7 @@ public class HeaderPanel extends JPanel {
         JLabel company = new JLabel("Koohinoor Textile Mills");
         company.setFont(new Font("Segoe UI", Font.BOLD, 14));
         JLabel screen = new JLabel(title);
-        screen.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+       screen.setFont(new Font("Segoe UI ", Font.PLAIN, 16));
         screen.setForeground(new Color(90, 90, 90));
         JPanel textPanel = new JPanel();
         textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
