@@ -307,19 +307,51 @@ public class BasicDetailsPanel extends JPanel {
     }
     public Employee getEmployeeFromForm() {
         Employee e = new Employee();
-        e.setEMPLOYEE_CODE(empIdField.getText());
-        e.setEMP_NAME(nameField.getText());
-        e.setFATHER_NAME(fatherNameField.getText());
-        e.setNID(cnicField.getText());
-        e.setEMP_CONTNO(phoneField.getText());
-        e.setPERSONAL_EMAIL(emailField.getText());
-        e.setDEPARTMENT(departmentField.getText());
-        e.setDESIGNATION(designationField.getText());
-        e.setGENDER(genderCombo.getSelectedItem().toString());
-        e.setRESIGN_REASON(reasonCombo.getSelectedItem().toString());
-        e.setJOINING_DATE(appointmentSpinner.getValue().toString());
-        e.setRESIGN_DATE(leavingSpinner.getValue().toString());
-        e.setPERMANENT_ADR(addressArea.getText());
+
+        if (empIdField.isEditable() && !isEmpty(empIdField.getText())) {
+            e.setEMPLOYEE_CODE(empIdField.getText());
+        }
+        if (nameField.isEditable() && !isEmpty(nameField.getText())) {
+            e.setEMP_NAME(nameField.getText());
+        }
+        if (fatherNameField.isEditable() && !isEmpty(fatherNameField.getText())) {
+            e.setFATHER_NAME(fatherNameField.getText());
+        }
+        if (cnicField.isEditable() && !isEmpty(cnicField.getText())) {
+            e.setNID(cnicField.getText());
+        }
+        if (phoneField.isEditable() && !isEmpty(phoneField.getText())) {
+            e.setEMP_CONTNO(phoneField.getText());
+        }
+        if (emailField.isEditable() && !isEmpty(emailField.getText())) {
+            e.setPERSONAL_EMAIL(emailField.getText());
+        }
+        if (departmentField.isEditable() && !isEmpty(departmentField.getText())) {
+            e.setDEPARTMENT(departmentField.getText());
+        }
+        if (designationField.isEditable() && !isEmpty(designationField.getText())) {
+            e.setDESIGNATION(designationField.getText());
+        }
+        if (genderCombo.isEnabled() && genderCombo.getSelectedItem() != null
+                && !isEmpty(genderCombo.getSelectedItem().toString())) {
+            e.setGENDER(genderCombo.getSelectedItem().toString());
+        }
+        if (reasonCombo.isEnabled() && reasonCombo.getSelectedItem() != null
+                && !isEmpty(reasonCombo.getSelectedItem().toString())) {
+            e.setRESIGN_REASON(reasonCombo.getSelectedItem().toString());
+        }
+        if (appointmentSpinner.isEnabled() && appointmentSpinner.getValue() != null) {
+            e.setJOINING_DATE(appointmentSpinner.getValue().toString());
+        }
+        if (leavingSpinner.isEnabled() && leavingSpinner.getValue() != null) {
+            e.setRESIGN_DATE(leavingSpinner.getValue().toString());
+        }
+        if (addressArea.isEditable() && !isEmpty(addressArea.getText())) {
+            e.setPERMANENT_ADR(addressArea.getText());
+        }
+        if (current_address.isEditable() && !isEmpty(current_address.getText())) {
+            e.setCURRENT_ADR(current_address.getText());
+        }
         return e;
     }
     public File getSelectedImage() {
