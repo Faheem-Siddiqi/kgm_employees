@@ -5,10 +5,15 @@ import com.kgm.model.Employee;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class OtherDetailsPanel extends JPanel {
 
     private Employee data;
+
+    // 🔥 NEW: store fields
+    private Map<String, JTextField> fieldMap = new HashMap<>();
 
     // ================= EMPTY =================
     public OtherDetailsPanel() {
@@ -180,11 +185,23 @@ public class OtherDetailsPanel extends JPanel {
         JLabel lbl = new JLabel(label);
         lbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
 
+        // 🔥 normalize empty -> N/A
+        if (isEmpty(value)) {
+            value = "N/A";
+        }
+
         JTextField field = new JTextField(value);
         field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        field.setEditable(isEmpty(value));
 
+        boolean editable = isEmpty(value);
+
+        field.setEditable(editable);
+        field.setBackground(Color.WHITE);
+        field.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220)));
         field.setPreferredSize(new Dimension(200, 30));
+
+        // 🔥 store field
+        fieldMap.put(label, field);
 
         p.add(lbl, BorderLayout.NORTH);
         p.add(field, BorderLayout.CENTER);
@@ -197,7 +214,6 @@ public class OtherDetailsPanel extends JPanel {
         if (data == null) return "";
 
         switch (key) {
-
             case "ORG_ID": return data.getORG_ID();
             case "DIVISION": return data.getDIVISION();
             case "SHIFT": return data.getSHIFT();
@@ -254,8 +270,86 @@ public class OtherDetailsPanel extends JPanel {
         }
     }
 
+    // ================= EXTRACT UPDATED =================
+    public Employee getUpdatedOtherDetails() {
+
+        Employee emp = new Employee();
+
+        fieldMap.forEach((label, field) -> {
+
+            if (!field.isEditable()) return;
+
+            String val = field.getText();
+
+            if (isEmpty(val)) return;
+
+            switch (label) {
+
+                case "ORG ID": emp.setORG_ID(val); break;
+                case "DIVISION": emp.setDIVISION(val); break;
+                case "SHIFT": emp.setSHIFT(val); break;
+                case "PROB PERIOD": emp.setPROB_PERIOD(val); break;
+                case "CONFIRMING ON": emp.setCONFIRMING_ON(val); break;
+
+                case "REP UNIT": emp.setREP_UNT(val); break;
+                case "REP EMP ID": emp.setREP_EMP_ID(val); break;
+                case "REP DESIG CODE": emp.setREP_EMP_DESIG_CODE(val); break;
+                case "REP DEPT CODE": emp.setREP_EMP_DEPT_CODE(val); break;
+                case "REP TYPE": emp.setREP_EMP_TYPE(val); break;
+
+                case "BRANCH CODE": emp.setBRANCH_CODE(val); break;
+                case "BRANCH NAME": emp.setBRANCH_NAME(val); break;
+
+                case "DOB": emp.setDOB(val); break;
+                case "City of Birth": emp.setCITY_OF_BIRTH(val); break;
+                case "Nationality": emp.setNATIONALITY(val); break;
+                case "Religion": emp.setRELIGION(val); break;
+                case "Blood Group": emp.setBLOOD_GROUP(val); break;
+                case "Marital Status": emp.setM_STATUS(val); break;
+                case "Mother Name": emp.setMOTHER_NAME(val); break;
+
+                case "Bank Name": emp.setBANK_NAME(val); break;
+                case "Account No": emp.setBANK_AC_NO(val); break;
+                case "SS No": emp.setSS_NO(val); break;
+                case "EOBI No": emp.setEOBI_NO(val); break;
+                case "Tax No": emp.setTAX_NO(val); break;
+                case "EFU": emp.setEFU(val); break;
+                case "EFU No": emp.setEFU_NO(val); break;
+                case "PFUND Code": emp.setCLIPPER_PFUND_CODE(val); break;
+
+                case "EOBI Status": emp.setEOBI_STATUS(val); break;
+                case "NIC Verify": emp.setNIC_VERIFY(val); break;
+                case "NIC Verify Date": emp.setNIC_VERIFY_DATE(val); break;
+                case "HOD Check": emp.setHOD_CHECK(val); break;
+                case "Clearance Status": emp.setCLEARANCE_STATUS(val); break;
+                case "Dis Certificate": emp.setDIS_CERTIFICATE(val); break;
+
+                case "Emergency No": emp.setEMERGENCY_NO(val); break;
+                case "Attendance Category": emp.setATT_CATEG(val); break;
+
+                case "Wellness Club": emp.setWELLNESS_CLUB(val); break;
+                case "Card Issue": emp.setWELLNESS_CARD_ISSUE(val); break;
+                case "Card No": emp.setWELLNESS_CARD_NO(val); break;
+                case "Valid Date": emp.setWELLNESS_CLUB_VALID_DATE(val); break;
+
+                case "First Dose": emp.setFIRST_DOSE(val); break;
+                case "Second Dose": emp.setSECOND_DOSE(val); break;
+                case "First Vacc Date": emp.setFIRST_VACC_DATE(val); break;
+                case "Second Vacc Date": emp.setSECOND_VACC_DATE(val); break;
+            }
+        });
+
+        return emp;
+    }
+
     // ================= EMPTY CHECK =================
     private boolean isEmpty(String value) {
-        return value == null || value.trim().isEmpty() || value.equalsIgnoreCase("N/A");
+        if (value == null) return true;
+
+        String v = value.trim();
+
+        return v.isEmpty()
+                || v.equalsIgnoreCase("N/A")
+                || v.equalsIgnoreCase("NA");
     }
 }

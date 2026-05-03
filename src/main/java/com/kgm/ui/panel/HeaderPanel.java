@@ -10,7 +10,7 @@ public class HeaderPanel extends JPanel {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
         setBorder(new CompoundBorder(
-                new MatteBorder(0, 0, 1, 0, new Color(220, 220, 220)),
+                new MatteBorder(0, 0, 1, 0, new Color(222, 226, 230)),
                 new EmptyBorder(10, 20, 10, 20)));
         // ================= LEFT (LOGO + TEXT) =================
         JLabel logo = new JLabel();
@@ -18,7 +18,7 @@ public class HeaderPanel extends JPanel {
         Image img = logoIcon.getImage().getScaledInstance(75, 60, Image.SCALE_SMOOTH);
         logo.setIcon(new ImageIcon(img));
         JLabel company = new JLabel("Koohinoor Textile Mills");
-        company.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        company.setFont(new Font("Segoe UI", Font.BOLD, 12));
         JLabel screen = new JLabel(title);
        screen.setFont(new Font("Segoe UI ", Font.PLAIN, 16));
         screen.setForeground(new Color(90, 90, 90));

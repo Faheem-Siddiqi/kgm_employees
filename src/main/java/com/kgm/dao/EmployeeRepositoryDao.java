@@ -317,4 +317,60 @@ public class EmployeeRepositoryDao {
 
         return null;
     }
-}
+
+
+
+    // ==============================
+// 🔹 GENERIC OBJECT-BASED UPDATE
+// ==============================
+public void updateEmployeeDynamic(Employee emp) throws Exception {
+
+    StringBuilder sql = new StringBuilder("UPDATE employees SET ");
+    List<Object> values = new ArrayList<>();
+
+    // 🔥 reflect all fields of Employee class
+    java.lang.reflect.Field[] fields = Employee.class.getDeclaredFields();
+
+    for (java.lang.reflect.Field field : fields) {
+
+        field.setAccessible(true);
+        String column = field.getName();
+
+        // ❌ skip ID and primary key
+        if (column.equalsIgnoreCase("ID") || column.equalsIgnoreCase("EMPLOYEE_CODE")) {
+            continue;
+        }
+
+        Object value = field.get(emp);
+
+        // only update if value is NOT empty
+        if (value != null) {
+            String strVal = value.toString().trim();
+
+            if (!strVal.isEmpty() && !strVal.equalsIgnoreCase("N/A")) {
+
+                sql.append(column).append(" = ?, ");
+                values.add(strVal);
+            }
+        }
+    }
+
+    // remove last comma
+    if (values.isEmpty()) {
+        return; // nothing to update
+    }
+
+    sql.setLength(sql.length() - 2);
+
+    sql.append(" WHERE EMPLOYEE_CODE = ?");
+    values.add(emp.getEMPLOYEE_CODE());
+
+    try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+
+        for (int i = 0; i < values.size(); i++) {
+            ps.setObject(i + 1, values.get(i));
+        }
+
+        ps.executeUpdate();
+    }
+}}

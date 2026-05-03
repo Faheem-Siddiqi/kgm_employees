@@ -55,12 +55,11 @@ public class EmployeeDetailView extends JFrame {
 
         topContainer.add(new HeaderPanel("Employee Record"), BorderLayout.NORTH);
 
-        // 🔹 UPDATED SECOND ROW (ONLY THIS PART CHANGED)
+        // 🔹 SECOND ROW
         JPanel secondRow = new JPanel(new BorderLayout());
         secondRow.setBackground(Color.WHITE);
-        secondRow.setBorder(new EmptyBorder(10, 20,0,16));
+        secondRow.setBorder(new EmptyBorder(10, 20, 0, 16));
 
-        // Left: Back button (styled text)
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         left.setBackground(Color.WHITE);
 
@@ -79,7 +78,6 @@ public class EmployeeDetailView extends JFrame {
 
         left.add(backBtn);
 
-        // Right: Employee details (right aligned)
         JPanel right = new JPanel();
         right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
         right.setBackground(Color.WHITE);
@@ -109,7 +107,7 @@ public class EmployeeDetailView extends JFrame {
 
         add(topContainer, BorderLayout.NORTH);
 
-        // 🔸 Center Tabs
+        // 🔸 CENTER
         JPanel centerWrapper = new JPanel(new BorderLayout());
         centerWrapper.setBorder(new EmptyBorder(10, 20, 10, 20));
         centerWrapper.setBackground(Color.WHITE);
@@ -129,33 +127,137 @@ public class EmployeeDetailView extends JFrame {
         centerWrapper.add(tabs, BorderLayout.CENTER);
         add(centerWrapper, BorderLayout.CENTER);
 
-        // 🔸 Footer
+        // 🔸 FOOTER
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         footer.setBackground(Color.WHITE);
 
         updateBtn = new JButton("Update");
-
-        Dimension btnSize = new Dimension(110, 32);
-        updateBtn.setPreferredSize(btnSize);
+        updateBtn.setPreferredSize(new Dimension(110, 32));
         updateBtn.setFocusPainted(false);
         updateBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         updateBtn.setForeground(Color.WHITE);
         updateBtn.setBackground(new Color(0, 38, 77));
-        updateBtn.setEnabled(false);
 
         footer.add(updateBtn);
         add(footer, BorderLayout.SOUTH);
 
-        // 🔸 Tab behavior
-        tabs.addChangeListener(e -> {
-            updateBtn.setEnabled(tabs.getSelectedIndex() != 0);
-        });
+        // =========================================================
+        // 🔥 CORE FIX: SMART ENABLE/DISABLE (NO TAB LOGIC ANYMORE)
+        // =========================================================
+
+        Runnable refreshButtonState = () -> {
+
+            boolean canUpdate = false;
+
+            for (int i = 0; i < tabs.getTabCount(); i++) {
+                Component comp = tabs.getComponentAt(i);
+
+                if (comp instanceof BasicDetailsPanel bp && panelHasEditableFields(bp)) {
+                    canUpdate = true;
+                    break;
+                }
+
+                if (comp instanceof OtherDetailsPanel op && panelHasEditableFields(op)) {
+                    canUpdate = true;
+                    break;
+                }
+            }
+
+            updateBtn.setEnabled(canUpdate);
+        };
+
+        // helper check (keeps parent clean, no panel redesign needed)
+        tabs.addChangeListener(e -> refreshButtonState.run());
+
+        // initial state
+        refreshButtonState.run();
 
         // 🔸 Update action
         updateBtn.addActionListener(e -> {
-            JOptionPane.showMessageDialog(this, "Update logic goes here");
-        });
 
+            try {
+                BasicDetailsPanel basicPanel = null;
+                OtherDetailsPanel otherPanel = null;
+
+                // find panels
+                for (int i = 0; i < tabs.getTabCount(); i++) {
+                    Component comp = tabs.getComponentAt(i);
+
+                    if (comp instanceof BasicDetailsPanel bp) {
+                        basicPanel = bp;
+                    }
+
+                    if (comp instanceof OtherDetailsPanel op) {
+                        otherPanel = op;
+                    }
+                }
+
+                EmployeeRepositoryDao dao = new EmployeeRepositoryDao();
+                boolean updatedAny = false;
+
+                if (basicPanel != null && panelHasEditableFields(basicPanel)) {
+                    Employee updatedBasic = basicPanel.getEmployeeFromForm();
+                    updatedBasic.setEMPLOYEE_CODE(empCode);
+                    dao.updateEmployeeDynamic(updatedBasic);
+                    updatedAny = true;
+                }
+
+                if (otherPanel != null && panelHasEditableFields(otherPanel)) {
+                    Employee updatedOther = otherPanel.getUpdatedOtherDetails();
+                    updatedOther.setEMPLOYEE_CODE(empCode);
+                    dao.updateEmployeeDynamic(updatedOther);
+                    updatedAny = true;
+                }
+
+                if (!updatedAny) {
+                    JOptionPane.showMessageDialog(this, "No editable fields found");
+                    return;
+                }
+
+                JOptionPane.showMessageDialog(this, "Updated successfully");
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Update failed");
+            }
+        });
         setVisible(true);
     }
+
+    // ================= SIMPLE CHECK =================
+    // avoids interface changes in panels
+private boolean panelHasEditableFields(Container container) {
+
+    for (Component comp : container.getComponents()) {
+
+        // JTextField
+        if (comp instanceof JTextField tf && tf.isEditable()) {
+            return true;
+        }
+
+        // JTextArea
+        if (comp instanceof JTextArea ta && ta.isEditable()) {
+            return true;
+        }
+
+        // JComboBox
+        if (comp instanceof JComboBox<?> cb && cb.isEnabled()) {
+            return true;
+        }
+
+        // JSpinner
+        if (comp instanceof JSpinner sp && sp.isEnabled()) {
+            return true;
+        }
+
+        // 🔁 recursive check (VERY IMPORTANT)
+        if (comp instanceof Container child) {
+            if (panelHasEditableFields(child)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
 }
