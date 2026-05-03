@@ -7,7 +7,7 @@ import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import java.util.Date;
 import com.kgm.model.Employee;
-public class FormViewPanel extends JPanel {
+public class BasicDetailsPanel extends JPanel {
     // ================= IMAGE =================
     private JLabel photoPreview;
     private JLabel uploadLabel;
@@ -35,7 +35,7 @@ public class FormViewPanel extends JPanel {
     //   private String CURRENT_ADR;
     // ✔ ADDED (ONLY CHANGE)
     private JLabel infoLabel;
-    public FormViewPanel() {
+    public BasicDetailsPanel() {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
         JScrollPane scroll = new JScrollPane(buildForm());
@@ -44,7 +44,7 @@ public class FormViewPanel extends JPanel {
         scroll.getViewport().setBackground(Color.WHITE);
         add(scroll, BorderLayout.CENTER);
     }
-    public FormViewPanel(Employee employee) {
+    public BasicDetailsPanel(Employee employee) {
         this();
         this.employee = employee;
         loadEmployeeData();

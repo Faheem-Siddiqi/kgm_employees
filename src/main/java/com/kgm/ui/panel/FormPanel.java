@@ -1,5 +1,5 @@
 package com.kgm.ui.panel;
-
+import java.text.SimpleDateFormat;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -17,6 +17,7 @@ public class FormPanel extends JPanel {
     private final Font labelFont = new Font("Segoe UI", Font.PLAIN, 13);
     private final Font inputFont = new Font("Segoe UI", Font.PLAIN, 13);
     private final int PHOTO_SIZE = 200;
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
     // ✔ ADDED (ONLY CHANGE)
     private File selectedImage;
@@ -218,7 +219,7 @@ public class FormPanel extends JPanel {
             selectedImage = file;
 
             Image scaled = img.getScaledInstance(
-                    PHOTO_SIZE,
+                    PHOTO_SIZE, 
                     PHOTO_SIZE,
                     Image.SCALE_SMOOTH
             );
@@ -268,8 +269,10 @@ public class FormPanel extends JPanel {
         e.setDESIGNATION(designationField.getText());
         e.setGENDER(genderCombo.getSelectedItem().toString());
         e.setRESIGN_REASON(reasonCombo.getSelectedItem().toString());
-        e.setJOINING_DATE(appointmentSpinner.getValue().toString());
-        e.setRESIGN_DATE(leavingSpinner.getValue().toString());
+       
+e.setJOINING_DATE(sdf.format((Date) appointmentSpinner.getValue()));
+e.setRESIGN_DATE(sdf.format((Date) leavingSpinner.getValue()));
+
         e.setPERMANENT_ADR(addressArea.getText());
 
         return e;
