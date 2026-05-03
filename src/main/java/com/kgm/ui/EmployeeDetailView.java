@@ -58,7 +58,7 @@ public class EmployeeDetailView extends JFrame {
         // 🔹 UPDATED SECOND ROW (ONLY THIS PART CHANGED)
         JPanel secondRow = new JPanel(new BorderLayout());
         secondRow.setBackground(Color.WHITE);
-        secondRow.setBorder(new EmptyBorder(10, 16,0,16));
+        secondRow.setBorder(new EmptyBorder(10, 20,0,16));
 
         // Left: Back button (styled text)
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -83,6 +83,7 @@ public class EmployeeDetailView extends JFrame {
         JPanel right = new JPanel();
         right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
         right.setBackground(Color.WHITE);
+        right.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 18));
 
         String nameValue = (emp != null) ? emp.getEMP_NAME() : "";
         String codeValue = (emp != null) ? emp.getEMPLOYEE_CODE() : "";

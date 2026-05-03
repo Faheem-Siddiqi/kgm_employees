@@ -27,11 +27,16 @@ public class EmployeeInduction extends JFrame {
         // Back button row
         JPanel backRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
         backRow.setBackground(Color.WHITE);
-        backBtn = new JButton("← Back");
-        backBtn.setBorderPainted(false);
+        backBtn = new JButton("Back");
+
+         backBtn.setBorderPainted(false);
         backBtn.setContentAreaFilled(false);
         backBtn.setFocusPainted(false);
         backBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        backBtn.setForeground(new Color(0, 102, 204));
+        backBtn.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
+
+        
         backBtn.addActionListener(e -> {
             this.dispose();
             new HomeView();
