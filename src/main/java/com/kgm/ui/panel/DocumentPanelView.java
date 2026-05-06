@@ -1,5 +1,7 @@
 package com.kgm.ui.panel;
 
+import com.kgm.ui.styling.UniversalTablePagination;
+
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
@@ -44,26 +46,12 @@ public class DocumentPanelView extends JPanel {
             model.addRow(new Object[]{doc, "-", "Not Loaded", "Action"});
         }
 
-        table = new JTable(model);
-
-        table.setRowHeight(45);
-        table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        table.setFillsViewportHeight(true);
-        table.setShowGrid(true);
-        table.setGridColor(new Color(235, 235, 235));
-
-        JTableHeader header = table.getTableHeader();
-        header.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        header.setBackground(new Color(245, 245, 245));
-
-        table.getColumnModel().getColumn(0).setCellRenderer(centerRenderer());
-        table.getColumnModel().getColumn(1).setCellRenderer(centerRenderer());
-        table.getColumnModel().getColumn(2).setCellRenderer(centerRenderer());
+        table = UniversalTablePagination.createDocumentViewTable(model);
 
         table.getColumnModel().getColumn(3).setCellRenderer(new ActionRenderer());
         table.getColumnModel().getColumn(3).setCellEditor(new ActionEditor());
 
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        add(UniversalTablePagination.createScrollPane(table, false), BorderLayout.CENTER);
     }
 
     // ================= DATA INJECTION FROM PARENT =================
@@ -81,17 +69,6 @@ public class DocumentPanelView extends JPanel {
                 model.setValueAt("Available", i, 2);
             }
         }
-    }
-
-    // ================= RENDERER =================
-    private TableCellRenderer centerRenderer() {
-        return (table, value, isSelected, hasFocus, row, col) -> {
-            JLabel label = new JLabel(value == null ? "" : value.toString());
-            label.setHorizontalAlignment(SwingConstants.CENTER);
-            label.setOpaque(true);
-            label.setBackground(Color.WHITE);
-            return label;
-        };
     }
 
     // ================= ACTION RENDERER =================

@@ -1,5 +1,7 @@
 package com.kgm.ui.panel;
 
+import com.kgm.ui.styling.UniversalTablePagination;
+
 import java.io.File;
 import javax.swing.*;
 import javax.swing.table.*;
@@ -72,62 +74,12 @@ public class DocumentViewPanel extends JPanel {
             model.addRow(new Object[]{doc, "-", "Not Uploaded", "Upload"});
         }
 
-        table = new JTable(model);
-
-        table.setRowHeight(48);
-        table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        table.setBackground(Color.WHITE);
-        table.setFillsViewportHeight(true);
-        table.setShowGrid(true);
-        table.setGridColor(new Color(230, 230, 230));
-
-        JTableHeader header = table.getTableHeader();
-        header.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        header.setPreferredSize(new Dimension(100, 45));
-        header.setBackground(new Color(248, 248, 248));
-        header.setForeground(new Color(60, 60, 60));
-
-        DefaultTableCellRenderer renderer = new DefaultTableCellRenderer() {
-
-            @Override
-            public Component getTableCellRendererComponent(
-                    JTable table, Object value, boolean isSelected,
-                    boolean hasFocus, int row, int column) {
-
-                JLabel label = (JLabel) super.getTableCellRendererComponent(
-                        table, value, isSelected, hasFocus, row, column);
-
-                label.setOpaque(true);
-                label.setBackground(isSelected ? new Color(235, 245, 255) : Color.WHITE);
-
-                label.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createMatteBorder(0, 0, 1, 1, new Color(235, 235, 235)),
-                        BorderFactory.createEmptyBorder(8, 12, 8, 12)
-                ));
-
-                if (column == 1 || column == 2)
-                    label.setHorizontalAlignment(SwingConstants.CENTER);
-                else
-                    label.setHorizontalAlignment(SwingConstants.LEFT);
-
-                if (column == 0 && value != null && value.toString().contains("*")) {
-                    label.setText("<html>" + value.toString().replace("*",
-                            "<font color='red'>*</font>") + "</html>");
-                }
-
-                return label;
-            }
-        };
-
-        table.getColumnModel().getColumn(0).setCellRenderer(renderer);
-        table.getColumnModel().getColumn(1).setCellRenderer(renderer);
-        table.getColumnModel().getColumn(2).setCellRenderer(renderer);
+        table = UniversalTablePagination.createDocumentTable(model);
 
         table.getColumnModel().getColumn(3).setCellRenderer(new ActionRenderer());
         table.getColumnModel().getColumn(3).setCellEditor(new ActionEditor());
 
-        JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        JScrollPane scrollPane = UniversalTablePagination.createScrollPane(table, false);
 
         add(scrollPane, BorderLayout.CENTER);
     }
