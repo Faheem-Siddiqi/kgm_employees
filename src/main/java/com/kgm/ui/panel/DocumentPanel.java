@@ -1,5 +1,6 @@
 package com.kgm.ui.panel;
 
+import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.UniversalTablePagination;
 
 import java.io.File;
@@ -127,12 +128,12 @@ public class DocumentPanel extends JPanel {
             String name = file.getName().toLowerCase();
 
             if (!(name.endsWith(".jpg") || name.endsWith(".jpeg"))) {
-                JOptionPane.showMessageDialog(this, "Only JPG/JPEG files allowed!");
+                DialogHelper.warning(this, "Invalid File Type", "Only JPG/JPEG files allowed.");
                 return;
             }
 
             if (file.length() > MAX_SIZE) {
-                JOptionPane.showMessageDialog(this, "Max size 400 KB!");
+                DialogHelper.warning(this, "File Too Large", "Max size 400 KB.");
                 return;
             }
 
@@ -166,7 +167,7 @@ public class DocumentPanel extends JPanel {
             frame.setVisible(true);
 
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Cannot open file");
+            DialogHelper.error(this, "Cannot Open File", "Cannot open file.");
         }
     }
 

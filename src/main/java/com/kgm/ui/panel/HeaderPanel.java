@@ -1,5 +1,6 @@
 package com.kgm.ui.panel;
 import com.kgm.ui.LoginView;
+import com.kgm.ui.styling.DialogHelper;
 import com.kgm.util.SessionManager;
 import com.kgm.util.SessionWatcher;
 import javax.swing.*;
@@ -89,11 +90,10 @@ public class HeaderPanel extends JPanel {
                 w.dispose();
             new LoginView().setVisible(true);
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(
+            DialogHelper.error(
                     SwingUtilities.getWindowAncestor(this),
-                    "Failure - Try Again",
                     "Error",
-                    JOptionPane.ERROR_MESSAGE);
+                    "Failure - Try Again.");
         }
     }
 }

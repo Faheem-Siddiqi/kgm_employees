@@ -7,6 +7,7 @@ import com.kgm.ui.panel.DocumentPanel;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.FormPanel;
 import com.kgm.ui.panel.HeaderPanel;
+import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeInductionStyle;
 
 import javax.swing.*;
@@ -161,13 +162,12 @@ public class EmployeeInduction extends JFrame {
 
                 EmployeeDao dao = new EmployeeDao(DatabaseConnection.getConnection());
                 dao.insertEmployee(emp);
-                JOptionPane.showMessageDialog(this, "Employee Saved Successfully!");
+                DialogHelper.success(this, "Employee saved successfully.");
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(
+                DialogHelper.error(
                         this,
-                        "Failed to Save Employee:\n" + ex.getMessage(),
                         "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                        "Failed to save employee:\n" + ex.getMessage());
             }
         });
         setVisible(true);

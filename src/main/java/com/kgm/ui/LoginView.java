@@ -1,6 +1,7 @@
 package com.kgm.ui;
 
 import com.kgm.service.AuthService;
+import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.LoginViewStyle;
 import com.kgm.util.SessionManager;
 import com.kgm.util.SessionWatcher;
@@ -58,8 +59,7 @@ public class LoginView extends JFrame {
                 SessionWatcher.closeAllWindows();
                 new HomeView();
             } else {
-                JOptionPane.showMessageDialog(this, "Invalid username or password", "Login Failed",
-                        JOptionPane.ERROR_MESSAGE);
+                DialogHelper.error(this, "Login Failed", "Invalid username or password.");
             }
         });
 

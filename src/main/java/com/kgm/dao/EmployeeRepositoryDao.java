@@ -10,7 +10,11 @@ public class EmployeeRepositoryDao {
     private final Connection con;
 
     public EmployeeRepositoryDao() {
-        this.con = DatabaseConnection.getConnection();
+        try {
+            this.con = DatabaseConnection.getConnection();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to connect to MySQL database.", exception);
+        }
     }
 
     // ==============================
@@ -349,7 +353,7 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
 
             if (!strVal.isEmpty() && !strVal.equalsIgnoreCase("N/A")) {
 
-                sql.append(column).append(" = ?, ");
+                sql.append(quoteIdentifier(column)).append(" = ?, ");
                 values.add(strVal);
             }
         }
@@ -373,4 +377,9 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
 
         ps.executeUpdate();
     }
-}}
+}
+
+    private String quoteIdentifier(String identifier) {
+        return "`" + identifier.replace("`", "``") + "`";
+    }
+}

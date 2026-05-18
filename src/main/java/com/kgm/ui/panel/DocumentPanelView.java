@@ -1,5 +1,6 @@
 package com.kgm.ui.panel;
 
+import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.UniversalTablePagination;
 
 import javax.swing.*;
@@ -158,11 +159,11 @@ public class DocumentPanelView extends JPanel {
                 if (path == null) return;
 
                 if (text.equals("View")) {
-                    JOptionPane.showMessageDialog(null, "Open Preview:\n" + path);
+                    DialogHelper.info(DocumentPanelView.this, "Document Preview", "Open Preview:\n" + path);
                 }
 
                 if (text.equals("Download")) {
-                    JOptionPane.showMessageDialog(null, "Download File:\n" + path);
+                    DialogHelper.info(DocumentPanelView.this, "Download File", "Download File:\n" + path);
                 }
 
                 stopCellEditing();

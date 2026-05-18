@@ -1,140 +1,149 @@
--- =========================
--- EMPLOYEES (CORE)
--- =========================
-CREATE TABLE employees (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    employee_code VARCHAR(50),
-    emp_name VARCHAR(150),
-    father_name VARCHAR(150),
-    mother_name VARCHAR(150),
-    nid VARCHAR(50),
-    dob VARCHAR(30),
-    gender VARCHAR(20),
-    nationality VARCHAR(50),
-    religion VARCHAR(50),
-    blood_group VARCHAR(20),
-    m_status VARCHAR(20),
-    dept_code VARCHAR(50),
-    department VARCHAR(150),
-    desig_code VARCHAR(50),
-    designation VARCHAR(150),
-    org_id VARCHAR(50),
-    division VARCHAR(100),
-    joining_date VARCHAR(30),
-    emp_status VARCHAR(50),
-    shift VARCHAR(50),
-    emp_contno VARCHAR(50),
-    personal_email VARCHAR(150),
-    official_email VARCHAR(150)
-);
+-- MySQL schema for KGM ex-employees.
+-- The application creates the configured database before running this table DDL.
 
--- =========================
--- SALARY
--- =========================
-CREATE TABLE employee_salary (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    employee_id BIGINT,
-    gross_salary VARCHAR(50),
-    pay_sheet VARCHAR(50),
-    pay_category VARCHAR(50),
-    basic VARCHAR(50),
-    cola1 VARCHAR(50),
-    cola2 VARCHAR(50),
-    cola3 VARCHAR(50),
-    cola4 VARCHAR(50),
-    cola5 VARCHAR(50),
-    cola6_7 VARCHAR(50),
-    cola8 VARCHAR(50),
-    cola9 VARCHAR(50),
-    cola10 VARCHAR(50),
-    cola11 VARCHAR(50),
-    h_rent VARCHAR(50),
-    h_maintenance VARCHAR(50),
-    pb_special1_2 VARCHAR(50),
-    pb_special3 VARCHAR(50),
-    pb_special4 VARCHAR(50),
-    special VARCHAR(50),
-    other1 VARCHAR(50),
-    other2 VARCHAR(50),
-    other3 VARCHAR(50),
-    medical VARCHAR(50),
-    conveyance VARCHAR(50),
-    utility VARCHAR(50),
-    entertainment VARCHAR(50),
-    FOREIGN KEY (employee_id) REFERENCES employees(id)
-);
+CREATE TABLE IF NOT EXISTS employees (
+    ID INT NOT NULL AUTO_INCREMENT,
 
--- =========================
--- PROFILE / HR DATA
--- =========================
-CREATE TABLE employee_profile (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    employee_id BIGINT,
-    city_village VARCHAR(150),
-    district VARCHAR(150),
-    current_adr VARCHAR(255),
-    permanent_adr VARCHAR(255),
-    bank_name VARCHAR(150),
-    bank_ac_no VARCHAR(50),
-    ss_no VARCHAR(50),
-    eobi_no VARCHAR(50),
-    tax_no VARCHAR(50),
-    pfund_code VARCHAR(50),
-    pfund_deduction VARCHAR(50),
-    efu VARCHAR(50),
-    efu_no VARCHAR(50),
-    emergency_no VARCHAR(50),
-    rest_day VARCHAR(50),
-    staff VARCHAR(50),
-    reference VARCHAR(150),
-    resign_reason VARCHAR(255),
-    resign_date VARCHAR(50),
-    FOREIGN KEY (employee_id) REFERENCES employees(id)
-);
+    -- CORE
+    UNT_CODE TEXT,
+    EMPLOYEE_CODE VARCHAR(100) NOT NULL DEFAULT '',
+    EMP_NAME TEXT,
+    FATHER_NAME TEXT,
+    MOTHER_NAME TEXT,
+    GENDER TEXT,
+    DOB TEXT,
+    CITY_OF_BIRTH TEXT,
+    NATIONALITY TEXT,
+    RELIGION TEXT,
+    BLOOD_GROUP TEXT,
+    M_STATUS TEXT,
+    NID TEXT,
 
--- =========================
--- IT MODULE
--- =========================
-CREATE TABLE employee_it (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    employee_id BIGINT,
-    it_equipment VARCHAR(50),
-    it_email VARCHAR(150),
-    it_internet VARCHAR(50),
-    internet_justify VARCHAR(255),
-    FOREIGN KEY (employee_id) REFERENCES employees(id)
-);
+    -- EMPLOYMENT
+    DEPARTMENT TEXT,
+    DESIG_CODE TEXT,
+    DESIGNATION TEXT,
+    GRADE TEXT,
+    JOINING_DATE TEXT,
+    CONFIRMING_ON TEXT,
+    EMP_STATUS TEXT,
+    SHIFT TEXT,
+    PROB_PERIOD TEXT,
+    EXP_IN_KTML TEXT,
+    APPLICATION_DATE TEXT,
+    RESIGN_REASON TEXT,
+    RESIGN_DATE TEXT,
 
--- =========================
--- HEALTH / VACCINATION
--- =========================
-CREATE TABLE employee_health (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    employee_id BIGINT,
-    first_dose VARCHAR(50),
-    second_dose VARCHAR(50),
-    first_vacc_date VARCHAR(50),
-    second_vacc_date VARCHAR(50),
-    covid_cert VARCHAR(50),
-    FOREIGN KEY (employee_id) REFERENCES employees(id)
-);
+    -- ORGANIZATION
+    ORG_ID TEXT,
+    DIVISION TEXT,
+    BRANCH_CODE TEXT,
+    BRANCH_NAME TEXT,
+    DESCR TEXT,
 
--- =========================
--- DOCUMENTS
--- =========================
-CREATE TABLE employee_documents (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    employee_id BIGINT,
-    document_type VARCHAR(100),
-    file_path VARCHAR(255),
-    FOREIGN KEY (employee_id) REFERENCES employees(id)
-);
+    -- PAYROLL
+    GROSS_SALARY TEXT,
+    PAY_CATEGORY TEXT,
+    BASIC TEXT,
+    COLA1 TEXT,
+    COLA2 TEXT,
+    COLA3 TEXT,
+    COLA4 TEXT,
+    COLA5 TEXT,
+    COLA6_7 TEXT,
+    COLA8 TEXT,
+    COLA9 TEXT,
+    COLA10 TEXT,
+    COLA11 TEXT,
+    PB_SPECIAL1_2 TEXT,
+    PB_SPECIAL3 TEXT,
+    PB_SPECIAL4 TEXT,
+    SPECIAL TEXT,
+    OTHER1 TEXT,
+    OTHER2 TEXT,
+    OTHER3 TEXT,
+    MEDICAL TEXT,
+    CONVEYANCE TEXT,
+    UTILITY TEXT,
+    ENTERTAINMENT TEXT,
+    PAY_GROUP TEXT,
+    PAY_GROUP_DESC TEXT,
+    PAY_AT_JOINING TEXT,
+    EXTRA_DUTY TEXT,
+    PAYROLL_FLAG TEXT,
 
--- =========================
--- RAW BACKUP (OPTIONAL)
--- =========================
-CREATE TABLE employee_raw (
-    employee_id BIGINT PRIMARY KEY,
-    data JSON,
-    FOREIGN KEY (employee_id) REFERENCES employees(id)
-);
+    -- BANKING
+    BANK_NAME TEXT,
+    BANK_AC_NO TEXT,
+    SS_NO TEXT,
+    EOBI_NO TEXT,
+    TAX_NO TEXT,
+    PFUND_DEDUCTION TEXT,
+    PF_INTEREST TEXT,
+    PFUND_CODE TEXT,
+    CLIPPER_PFUND_CODE TEXT,
+    EFU TEXT,
+    EFU_NO TEXT,
+    EOBI_STATUS TEXT,
+
+    -- CONTACT
+    EMP_CONTNO TEXT,
+    CURRENT_ADR TEXT,
+    PERMANENT_ADR TEXT,
+    PERSONAL_EMAIL TEXT,
+    OFFICIAL_EMAIL TEXT,
+    EMERGENCY_NO TEXT,
+
+    -- REPORTING
+    REP_UNT TEXT,
+    REP_EMP_ID TEXT,
+    REP_EMP_DESIG_CODE TEXT,
+    REP_EMP_DEPT_CODE TEXT,
+    REP_EMP_TYPE TEXT,
+
+    -- COMPLIANCE
+    FLAG TEXT,
+    CLEARANCE_STATUS TEXT,
+    HOD_CHECK TEXT,
+    SEC_HEAD_CHK TEXT,
+    NIC_VERIFY TEXT,
+    NIC_VERIFY_DATE TEXT,
+    ATT_CATEG TEXT,
+    DIS_CERTIFICATE TEXT,
+
+    -- BENEFITS
+    WELLNESS_CLUB TEXT,
+    WELLNESS_CARD_ISSUE TEXT,
+    WELLNESS_CARD_NO TEXT,
+    WELLNESS_CLUB_VALID_DATE TEXT,
+
+    -- VACCINATION
+    FIRST_DOSE TEXT,
+    SECOND_DOSE TEXT,
+    FIRST_VACC_DATE TEXT,
+    SECOND_VACC_DATE TEXT,
+
+    -- DOCUMENTS
+    CNIC_COPY TEXT,
+    SS_CARD_COPY TEXT,
+    EOBI_CARD_COPY TEXT,
+    FINAL_SETTLEMENT TEXT,
+    CLEARANCE_CERT TEXT,
+    JOB_APPOINTMENT TEXT,
+    APPLICATION_DOC TEXT,
+    ISSUANCE_DOC TEXT,
+    SETTLEMENT_DOC TEXT,
+    TRIAL_CARD TEXT,
+    INTERVIEW_DOC TEXT,
+    SERVICE_LETTER TEXT,
+    EXTENSION_LETTER TEXT,
+    RETIREMENT_LETTER TEXT,
+    COVID_CERT TEXT,
+    DISCIPLINARY_I TEXT,
+    DISCIPLINARY_II TEXT,
+    DISCIPLINARY_III TEXT,
+    EMP_IMG TEXT,
+
+    PRIMARY KEY (ID),
+    UNIQUE KEY uk_employee_code (EMPLOYEE_CODE)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -114,7 +114,7 @@ This system provides a complete employee workflow including:
 install Maven
 • Java Swing→ simple desktop UI 
 • Folder storage → for images 
- SQLite  → for data
+ MySQL  → for data
 
  Java 21 (JDK): 
  https://download.oracle.com/java/21/archive/jdk-21.0.10_windows-x64_bin.exe (sha256)

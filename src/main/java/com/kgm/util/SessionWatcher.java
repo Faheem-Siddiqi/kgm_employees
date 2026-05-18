@@ -1,5 +1,6 @@
 package com.kgm.util;
 import com.kgm.ui.LoginView;
+import com.kgm.ui.styling.DialogHelper;
 import javax.swing.*;
 import java.awt.*;
 
@@ -58,11 +59,10 @@ public final class SessionWatcher {
         stopTimer();
         SessionManager.clear();
 
-        JOptionPane.showMessageDialog(
+        DialogHelper.warning(
                 activeWindow(),
-                "Session expired. Please login again.",
                 "Session Expired",
-                JOptionPane.WARNING_MESSAGE
+                "Session expired. Please login again."
         );
 
         closeAllWindows();

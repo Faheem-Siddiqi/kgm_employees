@@ -5,6 +5,7 @@ import com.kgm.ui.panel.EmployeeTablePanel;
 import com.kgm.ui.panel.ExcelImportButton;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
+import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.HomeViewStyle;
 
 import javax.swing.*;
@@ -56,7 +57,7 @@ public class HomeView extends JFrame {
         searchBtn.addActionListener(e -> {
             String empCode = searchField.getText().trim();
             if (empCode.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Enter Employee Code");
+                DialogHelper.warning(this, "Employee Code Required", "Enter Employee Code.");
                 return;
             }
 
@@ -64,7 +65,7 @@ public class HomeView extends JFrame {
             if (emp != null) {
                 tablePanel.showSingleEmployee(emp);
             } else {
-                JOptionPane.showMessageDialog(this, "No employee found");
+                DialogHelper.info(this, "No Result", "No employee found.");
             }
         });
 

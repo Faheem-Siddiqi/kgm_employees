@@ -7,6 +7,7 @@ import com.kgm.ui.panel.DocumentViewPanel;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.OtherDetailsPanel;
+import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDetailViewStyle;
 
 import javax.swing.*;
@@ -28,11 +29,10 @@ public class EmployeeDetailView extends JFrame {
             }
         } catch (Exception ex) {
             ex.printStackTrace();
-            JOptionPane.showMessageDialog(
+            DialogHelper.error(
                     null,
-                    "An unexpected error occurred.\nPlease contact the administrator.",
                     "Error",
-                    JOptionPane.ERROR_MESSAGE);
+                    "An unexpected error occurred.\nPlease contact the administrator.");
         }
 
         initializeUI(emp, true);
@@ -158,15 +158,15 @@ public class EmployeeDetailView extends JFrame {
                 }
 
                 if (!updatedAny) {
-                    JOptionPane.showMessageDialog(this, "No editable fields found");
+                    DialogHelper.warning(this, "No Editable Fields", "No editable fields found.");
                     return;
                 }
 
-                JOptionPane.showMessageDialog(this, "Updated successfully");
+                DialogHelper.success(this, "Updated successfully.");
 
             } catch (Exception ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(this, "Update failed");
+                DialogHelper.error(this, "Update Failed", "Update failed.");
             }
         });
         setVisible(true);

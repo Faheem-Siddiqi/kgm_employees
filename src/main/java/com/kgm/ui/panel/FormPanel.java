@@ -8,6 +8,7 @@ import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import java.util.Date;
 import com.kgm.model.Employee;
+import com.kgm.ui.styling.DialogHelper;
 
 public class FormPanel extends JPanel {
 
@@ -203,7 +204,7 @@ public class FormPanel extends JPanel {
         File file = fc.getSelectedFile();
 
         if (file.length() > 400 * 1024) {
-            JOptionPane.showMessageDialog(this, "Max 400KB allowed");
+            DialogHelper.warning(this, "File Too Large", "Max 400KB allowed.");
             return;
         }
 
@@ -211,7 +212,7 @@ public class FormPanel extends JPanel {
             BufferedImage img = ImageIO.read(file);
 
             if (img == null) {
-                JOptionPane.showMessageDialog(this, "Invalid Image");
+                DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
                 return;
             }
 
@@ -228,7 +229,7 @@ public class FormPanel extends JPanel {
             target.setText("");
 
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Invalid Image");
+            DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
         }
     }
 }
