@@ -38,9 +38,7 @@ public class BasicDetailsPanel extends JPanel {
     private JLabel infoLabel;
     public BasicDetailsPanel() {
         BasicDetailsPanelHelper.stylePanel(this);
-        JScrollPane scroll = new JScrollPane(buildForm());
-        BasicDetailsPanelHelper.styleScrollPane(scroll);
-        add(scroll, BorderLayout.CENTER);
+        add(BasicDetailsPanelHelper.createFormContent(buildForm()), BorderLayout.NORTH);
     }
     public BasicDetailsPanel(Employee employee) {
         this();
@@ -219,13 +217,15 @@ public class BasicDetailsPanel extends JPanel {
         addressArea.setLineWrap(true);
         addressArea.setWrapStyleWord(true);
         BasicDetailsPanelHelper.styleTextArea(addressArea);
+        JScrollPane permanentAddressScroll = BasicDetailsPanelHelper.createTextAreaScrollPane(addressArea);
 
         current_address = new JTextArea(4, 20);
         current_address.setLineWrap(true);
         current_address.setWrapStyleWord(true);
         BasicDetailsPanelHelper.styleTextArea(current_address);
+        JScrollPane currentAddressScroll = BasicDetailsPanelHelper.createTextAreaScrollPane(current_address);
 
-        addRow(panel, gbc, y++, "Permanent Address", addressArea, "Current Address", current_address);
+        addRow(panel, gbc, y++, "Permanent Address", permanentAddressScroll, "Current Address", currentAddressScroll);
         return panel;
     }
     private void addRow(JPanel panel, GridBagConstraints gbc, int y,

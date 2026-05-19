@@ -2,7 +2,6 @@ com\kgm\ui\LoginView.class
 com\kgm\ui\component\UniversalDatePicker$1.class
 com\kgm\ui\styling\LoginViewStyle$PlaceholderPasswordField.class
 com\kgm\ui\panel\UniversalTablePanel$5.class
-com\kgm\ui\styling\EmployeeInductionStyle.class
 com\kgm\ui\styling\UniversalTablePagination$1.class
 com\kgm\ui\panel\DocumentViewPanel$ActionRenderer.class
 com\kgm\ui\panel\FormPanel.class

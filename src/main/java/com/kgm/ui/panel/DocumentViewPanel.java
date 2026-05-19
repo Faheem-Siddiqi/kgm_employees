@@ -72,8 +72,20 @@ public class DocumentViewPanel extends JPanel {
         table.getColumnModel().getColumn(3).setCellEditor(new ActionEditor());
 
         JScrollPane scrollPane = UniversalTablePagination.createScrollPane(table, false);
+        showFullTableWithoutScroll(scrollPane);
 
         add(scrollPane, BorderLayout.CENTER);
+    }
+
+    private void showFullTableWithoutScroll(JScrollPane scrollPane) {
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+        table.setFillsViewportHeight(false);
+
+        int headerHeight = table.getTableHeader() == null ? 0 : table.getTableHeader().getPreferredSize().height;
+        int tableHeight = headerHeight + (table.getRowHeight() * table.getRowCount()) + 2;
+        scrollPane.setPreferredSize(new Dimension(scrollPane.getPreferredSize().width, tableHeight));
+        scrollPane.setMinimumSize(new Dimension(320, tableHeight));
     }
 
     // ================= FILE HELPERS =================
@@ -133,7 +145,7 @@ public class DocumentViewPanel extends JPanel {
             // ✅ STORE PATH FOR DB
             filePaths[row] = file.getAbsolutePath();
 
-            model.setValueAt(trimFileName(file.getName()), row, 1);
+            model.setValueAt(file.getName(), row, 1);
             model.setValueAt("Uploaded (" + formatSize(file.length()) + ")", row, 2);
 
             updateCount();
@@ -147,12 +159,21 @@ public class DocumentViewPanel extends JPanel {
 
         try {
             BufferedImage img = ImageIO.read(files[row]);
+            if (img == null) {
+                DialogHelper.error(this, "Cannot Open File", "Cannot open file.");
+                return;
+            }
 
-            Image scaled = img.getScaledInstance(800, 600, Image.SCALE_SMOOTH);
-            JLabel label = new JLabel(new ImageIcon(scaled));
+            JLabel label = new JLabel(new ImageIcon(img));
+            label.setHorizontalAlignment(SwingConstants.CENTER);
+            label.setVerticalAlignment(SwingConstants.CENTER);
 
-            JFrame frame = new JFrame("Document Preview");
-            frame.getContentPane().add(new JScrollPane(label));
+            JPanel previewPanel = new JPanel(new GridBagLayout());
+            previewPanel.setBackground(Color.WHITE);
+            previewPanel.add(label);
+
+            JFrame frame = new JFrame("Document Preview - " + files[row].getName());
+            frame.getContentPane().add(new JScrollPane(previewPanel));
             DocumentViewPanelHelper.stylePreviewFrame(frame, this);
             frame.setVisible(true);
 
@@ -173,16 +194,19 @@ public ActionRenderer() {
                 boolean hasFocus, int row, int column) {
 
             removeAll();
+            DocumentViewPanelHelper.styleActionCell(this, isSelected);
 
             String status = (String) table.getModel().getValueAt(row, 2);
             boolean uploaded = status.startsWith("Uploaded");
 
+            JPanel buttons = DocumentViewPanelHelper.createActionButtonsPanel();
             JButton uploadBtn = createLink(uploaded ? "Replace" : "Upload");
-            add(uploadBtn);
+            buttons.add(uploadBtn);
 
             JButton viewBtn = createLink("View");
             DocumentViewPanelHelper.styleViewLink(viewBtn, uploaded);
-            add(viewBtn);
+            buttons.add(viewBtn);
+            add(buttons, DocumentViewPanelHelper.actionCellConstraints());
 
             return this;
         }
@@ -209,15 +233,19 @@ public ActionRenderer() {
 
             this.row = row;
             panel.removeAll();
+            DocumentViewPanelHelper.styleActionCell(panel, isSelected);
 
             String status = (String) table.getModel().getValueAt(row, 2);
             boolean uploaded = status.startsWith("Uploaded");
 
-            panel.add(createButton(uploaded ? "Replace" : "Upload"));
+            JPanel buttons = DocumentViewPanelHelper.createActionButtonsPanel();
+            buttons.add(createButton(uploaded ? "Replace" : "Upload"));
 
             JButton viewBtn = createButton("View");
             viewBtn.setEnabled(uploaded);
-            panel.add(viewBtn);
+            DocumentViewPanelHelper.styleViewLink(viewBtn, uploaded);
+            buttons.add(viewBtn);
+            panel.add(buttons, DocumentViewPanelHelper.actionCellConstraints());
 
             return panel;
         }

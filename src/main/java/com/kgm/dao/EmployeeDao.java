@@ -17,7 +17,7 @@ public class EmployeeDao {
 
         String sql = "INSERT INTO employees (" +
                 "NID, EMP_NAME, DEPARTMENT, DESIGNATION, PERSONAL_EMAIL, " +
-                "RESIGN_DATE, JOINING_DATE, EMP_CONTNO, PERMANENT_ADR, EMPLOYEE_CODE, " +
+                "JOINING_DATE, RESIGN_DATE, EMP_CONTNO, PERMANENT_ADR, EMPLOYEE_CODE, " +
                 "GENDER, RESIGN_REASON, " +   
 
                 "CNIC_COPY, SS_CARD_COPY, EOBI_CARD_COPY, FINAL_SETTLEMENT, CLEARANCE_CERT, " +
@@ -33,8 +33,8 @@ public class EmployeeDao {
             ps.setString(3, safe(e.getDEPARTMENT()));
             ps.setString(4, safe(e.getDESIGNATION()));
             ps.setString(5, safe(e.getPERSONAL_EMAIL()));
-            ps.setString(6, safe(e.getRESIGN_DATE()));
-            ps.setString(7, safe(e.getJOINING_DATE()));
+            ps.setString(6, safe(e.getJOINING_DATE()));
+            ps.setString(7, safe(e.getRESIGN_DATE()));
             ps.setString(8, safe(e.getEMP_CONTNO()));
             ps.setString(9, safe(e.getPERMANENT_ADR()));
             ps.setString(10, safe(e.getEMPLOYEE_CODE()));

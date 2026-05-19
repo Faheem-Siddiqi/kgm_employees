@@ -1,12 +1,22 @@
 package com.kgm.ui.styling;
 
 import javax.swing.*;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
+import javax.swing.border.MatteBorder;
 import java.awt.*;
 
 public final class DocumentPanelHelper {
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color ACTION_BLUE = new Color(30, 144, 255);
     private static final Color DISABLED_TEXT = Color.GRAY;
+    private static final Color PRIMARY = new Color(0, 112, 210);
+    private static final Color FIELD_BORDER = new Color(200, 200, 200);
+    private static final Color TEXT_PRIMARY = new Color(35, 43, 54);
+    private static final Color TEXT_SECONDARY = new Color(99, 115, 129);
+    private static final Color CELL_DIVIDER = new Color(232, 236, 240);
+    private static final Color ROW_SELECTION = new Color(229, 242, 255);
 
     private DocumentPanelHelper() {
     }
@@ -15,7 +25,7 @@ public final class DocumentPanelHelper {
         panel.setLayout(new BorderLayout());
         panel.setBackground(PAGE_BACKGROUND);
         panel.setOpaque(true);
-        panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+        panel.setBorder(new EmptyBorder(14, 28, 15, 28));
     }
 
     public static JPanel createTopPanel() {
@@ -32,6 +42,61 @@ public final class DocumentPanelHelper {
         return label;
     }
 
+    public static JPanel createSearchPanel(JTextField searchField, JButton clearButton, JButton searchButton) {
+        JPanel row = new JPanel(new BorderLayout(10, 0));
+        row.setBackground(PAGE_BACKGROUND);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+
+        JPanel searchBox = new JPanel(new BorderLayout(6, 0));
+        searchBox.setBackground(PAGE_BACKGROUND);
+        searchBox.setBorder(new CompoundBorder(
+                new LineBorder(FIELD_BORDER),
+                new EmptyBorder(0, 10, 0, 4)
+        ));
+        searchBox.add(searchField, BorderLayout.CENTER);
+        searchBox.add(clearButton, BorderLayout.EAST);
+
+        row.add(searchBox, BorderLayout.CENTER);
+        row.add(searchButton, BorderLayout.EAST);
+        return row;
+    }
+
+    public static void styleSearchField(JTextField field) {
+        field.setBorder(null);
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        field.setForeground(TEXT_PRIMARY);
+        field.setBackground(PAGE_BACKGROUND);
+        field.setPreferredSize(new Dimension(260, 34));
+    }
+
+    public static void styleSearchButton(JButton button) {
+        button.setBackground(PRIMARY);
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setBorder(new EmptyBorder(8, 16, 8, 16));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
+    public static void styleClearButton(JButton button) {
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false);
+        button.setFocusPainted(false);
+        button.setOpaque(false);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
+        button.setBorder(new EmptyBorder(7, 8, 7, 8));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        updateClearButtonState(button, false);
+    }
+
+    public static void updateClearButtonState(JButton button, boolean enabled) {
+        button.setEnabled(enabled);
+        button.setForeground(enabled ? ACTION_BLUE : TEXT_SECONDARY);
+        button.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
+    }
+
     public static JLabel createSizeLabel() {
         JLabel label = new JLabel("<html>Maximum file size allowed is: <b>400KB</b></html>");
         label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
@@ -40,19 +105,40 @@ public final class DocumentPanelHelper {
 
     public static JPanel createRendererPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
-        panel.setOpaque(false);
         return panel;
     }
 
     public static void styleRendererPanel(JPanel panel) {
         panel.setLayout(new GridBagLayout());
-        panel.setOpaque(false);
+        panel.setOpaque(true);
     }
 
     public static JPanel createEditorPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setOpaque(true);
+        return panel;
+    }
+
+    public static void styleActionCell(JPanel panel, boolean selected) {
+        panel.setBackground(selected ? ROW_SELECTION : PAGE_BACKGROUND);
+        panel.setBorder(new CompoundBorder(
+                new MatteBorder(0, 0, 1, 1, CELL_DIVIDER),
+                new EmptyBorder(0, 4, 0, 4)
+        ));
+    }
+
+    public static JPanel createActionButtonsPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
         panel.setOpaque(false);
         return panel;
+    }
+
+    public static GridBagConstraints actionCellConstraints() {
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.anchor = GridBagConstraints.CENTER;
+        return gbc;
     }
 
     public static JButton createActionLink(String text) {
@@ -62,6 +148,7 @@ public final class DocumentPanelHelper {
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         button.setForeground(ACTION_BLUE);
+        button.setBorder(new EmptyBorder(6, 8, 6, 8));
         return button;
     }
 

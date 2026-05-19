@@ -19,8 +19,7 @@ public final class BasicDetailsPanelHelper {
     }
 
     public static void stylePanel(JPanel panel) {
-        panel.setLayout(new BorderLayout());
-        panel.setBackground(PAGE_BACKGROUND);
+        FormPanelHelper.stylePanel(panel);
     }
 
     public static void styleScrollPane(JScrollPane scrollPane) {
@@ -29,75 +28,55 @@ public final class BasicDetailsPanelHelper {
         scrollPane.getViewport().setBackground(PAGE_BACKGROUND);
     }
 
+    public static JComponent createFormContent(JComponent form) {
+        return FormPanelHelper.createFormContent(form);
+    }
+
     public static JPanel createFormRoot() {
-        JPanel root = new JPanel(new GridBagLayout());
-        root.setBackground(PAGE_BACKGROUND);
-        root.setBorder(new EmptyBorder(20, 20, 20, 20));
-        return root;
+        return FormPanelHelper.createFormRoot();
     }
 
     public static JPanel createPhotoPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setPreferredSize(new Dimension(240, 300));
-        panel.setBackground(PAGE_BACKGROUND);
-        return panel;
+        return FormPanelHelper.createPhotoPanel();
     }
 
     public static JLabel createPhotoPreview(String text) {
-        JLabel label = new JLabel(text, SwingConstants.CENTER);
-        label.setPreferredSize(new Dimension(220, 220));
-        label.setBorder(BorderFactory.createLineBorder(PHOTO_BORDER));
-        return label;
+        return FormPanelHelper.createPhotoPreview(text);
     }
 
     public static void styleUploadLabel(JLabel label) {
-        label.setForeground(LINK_BLUE);
-        label.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        FormPanelHelper.styleUploadLabel(label);
     }
 
     public static JPanel createPhotoInfoPanel() {
-        JPanel panel = new JPanel();
-        panel.setBackground(PAGE_BACKGROUND);
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        return panel;
+        return FormPanelHelper.createPhotoInfoPanel();
     }
 
     public static JLabel createPhotoInfoLabel(String text) {
-        JLabel label = new JLabel(text);
-        label.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        return label;
+        return FormPanelHelper.createPhotoInfoLabel(text);
     }
 
     public static JPanel createRightFormPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBackground(PAGE_BACKGROUND);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(FORM_BORDER),
-                new EmptyBorder(20, 20, 20, 20)));
-        return panel;
+        return FormPanelHelper.createRightFormPanel();
     }
 
     public static void styleTextArea(JTextArea textArea) {
-        textArea.setFont(INPUT_FONT);
-        textArea.setBorder(BorderFactory.createLineBorder(PHOTO_BORDER));
+        FormPanelHelper.styleAddressArea(textArea);
+    }
+
+    public static JScrollPane createTextAreaScrollPane(JTextArea textArea) {
+        return FormPanelHelper.createAddressScrollPane(textArea);
     }
 
     public static void styleFormField(JPanel panel) {
-        panel.setLayout(new BorderLayout(6, 4));
-        panel.setBackground(PAGE_BACKGROUND);
+        FormPanelHelper.styleFormField(panel);
     }
 
     public static JLabel createFieldLabel(String text) {
-        JLabel label = new JLabel(text);
-        label.setFont(LABEL_FONT);
-        label.setForeground(LABEL_TEXT);
-        return label;
+        return FormPanelHelper.createFieldLabel(text);
     }
 
     public static void styleInput(JComponent input) {
-        input.setFont(INPUT_FONT);
-        if (!(input instanceof JTextArea)) {
-            input.setPreferredSize(new Dimension(240, 34));
-        }
+        FormPanelHelper.styleInput(input);
     }
 }

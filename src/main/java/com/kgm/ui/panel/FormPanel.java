@@ -16,7 +16,7 @@ public class FormPanel extends JPanel {
     // ================= IMAGE =================
     private JLabel photoPreview;
     private JLabel uploadLabel;
-    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+    private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
     // ✔ ADDED (ONLY CHANGE)
     private File selectedImage;
@@ -39,9 +39,7 @@ public class FormPanel extends JPanel {
 
     public FormPanel() {
         FormPanelHelper.stylePanel(this);
-        JScrollPane scroll = new JScrollPane(buildForm());
-        FormPanelHelper.styleScrollPane(scroll);
-        add(scroll, BorderLayout.CENTER);
+        add(FormPanelHelper.createFormContent(buildForm()), BorderLayout.NORTH);
     }
 
     // ================= ROOT =================
@@ -138,7 +136,7 @@ public class FormPanel extends JPanel {
 
         leavingPicker = new UniversalDatePicker(new Date());
 
-        addRow(panel, gbc, y++, "Appointment Date", appointmentPicker, "Leaving Date", leavingPicker);
+        addRow(panel, gbc, y++, "Date of Arrival", appointmentPicker, "Leaving Date", leavingPicker);
 
         gbc.gridy = y;
         gbc.gridx = 0;
@@ -196,11 +194,13 @@ public class FormPanel extends JPanel {
             // ✔ STORE FOR MAIN PANEL
             selectedImage = file;
 
-            Image scaled = img.getScaledInstance(
-                    FormPanelHelper.PHOTO_SIZE,
-                    FormPanelHelper.PHOTO_SIZE,
-                    Image.SCALE_SMOOTH
-            );
+            int padding = 4;
+
+Image scaled = img.getScaledInstance(
+        FormPanelHelper.PHOTO_SIZE - padding,
+        FormPanelHelper.PHOTO_SIZE - padding,
+        Image.SCALE_SMOOTH
+);
 
             target.setIcon(new ImageIcon(scaled));
             target.setText("");
@@ -243,17 +243,49 @@ public class FormPanel extends JPanel {
         e.setDESIGNATION(designationField.getText());
         e.setGENDER(genderCombo.getSelectedItem().toString());
         e.setRESIGN_REASON(reasonCombo.getSelectedItem().toString());
-       
-        e.setJOINING_DATE(sdf.format(appointmentPicker.getDate()));
-        e.setRESIGN_DATE(sdf.format(leavingPicker.getDate()));
+        e.setJOINING_DATE(formatDbDate(appointmentPicker));
+        e.setRESIGN_DATE(formatDbDate(leavingPicker));
 
         e.setPERMANENT_ADR(addressArea.getText());
 
         return e;
     }
 
+    private String formatDbDate(UniversalDatePicker picker) {
+        Date date = picker == null ? null : picker.getDate();
+        return date == null ? "" : DB_DATE_FORMAT.format(date);
+    }
+
     // ✔ ADDED (ONLY NEW METHOD FOR MAIN FILE)
     public File getSelectedImage() {
         return selectedImage;
+    }
+
+    public void clearForm() {
+        empIdField.setText("");
+        nameField.setText("");
+        fatherNameField.setText("");
+        cnicField.setText("");
+        phoneField.setText("");
+        emailField.setText("");
+        departmentField.setText("");
+        designationField.setText("");
+        resetCombo(genderCombo);
+        resetCombo(reasonCombo);
+        appointmentPicker.setDate(new Date());
+        leavingPicker.setDate(new Date());
+        addressArea.setText("");
+        selectedImage = null;
+        photoPreview.setIcon(null);
+        photoPreview.setText("Photo");
+        empIdField.requestFocusInWindow();
+        revalidate();
+        repaint();
+    }
+
+    private void resetCombo(JComboBox<String> comboBox) {
+        if (comboBox.getItemCount() > 0) {
+            comboBox.setSelectedIndex(0);
+        }
     }
 }

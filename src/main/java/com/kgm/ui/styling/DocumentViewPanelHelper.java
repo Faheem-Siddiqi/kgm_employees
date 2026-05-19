@@ -43,6 +43,18 @@ public final class DocumentViewPanelHelper {
         DocumentPanelHelper.styleViewLink(button, uploaded);
     }
 
+    public static void styleActionCell(JPanel panel, boolean selected) {
+        DocumentPanelHelper.styleActionCell(panel, selected);
+    }
+
+    public static JPanel createActionButtonsPanel() {
+        return DocumentPanelHelper.createActionButtonsPanel();
+    }
+
+    public static GridBagConstraints actionCellConstraints() {
+        return DocumentPanelHelper.actionCellConstraints();
+    }
+
     public static void stylePreviewFrame(JFrame frame, Component relativeTo) {
         DocumentPanelHelper.stylePreviewFrame(frame, relativeTo);
     }

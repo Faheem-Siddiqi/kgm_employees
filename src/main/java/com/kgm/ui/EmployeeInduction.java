@@ -11,79 +11,67 @@ import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeInductionHelper;
 
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
 import java.awt.*;
 import java.io.File;
 
 public class EmployeeInduction extends JFrame {
-    private JButton nextBackBtn;
-    private JButton submitBtn;
-    private JButton backBtn;
-
     public EmployeeInduction() {
         EmployeeInductionHelper.applyFrame(this);
 
-        JPanel topContainer = EmployeeInductionHelper.createTopContainer();
-        topContainer.add(new HeaderPanel("Employee Induction"), BorderLayout.NORTH);
-
-        JPanel backRow = EmployeeInductionHelper.createBackRow();
-        backBtn = new JButton("Back");
-        EmployeeInductionHelper.styleBackButton(backBtn);
-        backBtn.addActionListener(e -> {
+        Runnable onBack = () -> {
             this.dispose();
             new HomeView();
-        });
-        backRow.add(backBtn);
+        };
 
-        topContainer.add(backRow, BorderLayout.CENTER);
+        JPanel topContainer = EmployeeInductionHelper.createTopContainer();
+        topContainer.add(new HeaderPanel("Employee Induction"), BorderLayout.NORTH);
         add(topContainer, BorderLayout.NORTH);
 
         JPanel centerWrapper = EmployeeInductionHelper.createCenterWrapper();
-        JTabbedPane tabs = new JTabbedPane();
+        centerWrapper.add(EmployeeInductionHelper.screenHeader(onBack), EmployeeInductionHelper.pageConstraints(0));
+
+        JTabbedPane tabs = new HugHeightTabbedPane();
         FormPanel formPanel = new FormPanel();
         DocumentPanel documentPanel = new DocumentPanel();
 
-        tabs.addTab("Form", formPanel);
-        tabs.addTab("Documents", documentPanel);
+        JButton backButton = new JButton("Back");
+        JButton submitButton = new JButton("Submit");
+        EmployeeInductionHelper.styleSecondaryButton(backButton);
+        EmployeeInductionHelper.stylePrimaryButton(submitButton);
+        JPanel documentActions = EmployeeInductionHelper.createActionRow();
+        documentActions.add(backButton);
+        documentActions.add(submitButton);
 
-        // Apply custom tab styling
+        tabs.addTab("Form", EmployeeInductionHelper.createTabContent(formPanel, null));
+        tabs.addTab("Documents", EmployeeInductionHelper.createTabContent(documentPanel, documentActions));
+
         EmployeeInductionHelper.styleTabs(tabs);
-
-        centerWrapper.add(tabs, BorderLayout.CENTER);
-        add(centerWrapper, BorderLayout.CENTER);
-
-        JPanel footerActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        nextBackBtn = new JButton("Next");
-        submitBtn = new JButton("Submit");
-        EmployeeInductionHelper.styleFooterButton(nextBackBtn);
-        EmployeeInductionHelper.styleFooterButton(submitBtn);
-        submitBtn.setEnabled(false);
-
-        footerActions.add(nextBackBtn);
-        footerActions.add(submitBtn);
-        add(new FooterPanel(footerActions), BorderLayout.SOUTH);
-
-        tabs.addChangeListener((ChangeEvent e) -> {
-            int index = tabs.getSelectedIndex();
-            if (index == 0) {
-                nextBackBtn.setText("Next");
-                submitBtn.setEnabled(false);
-            } else {
-                nextBackBtn.setText("Back");
-                submitBtn.setEnabled(true);
+        tabs.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent event) {
+                int tabIndex = tabs.indexAtLocation(event.getX(), event.getY());
+                if (tabIndex >= 0 && tabs.isEnabledAt(tabIndex)) {
+                    tabs.setSelectedIndex(tabIndex);
+                    tabs.revalidate();
+                    tabs.repaint();
+                }
             }
         });
 
-        nextBackBtn.addActionListener(e -> {
-            int index = tabs.getSelectedIndex();
-            if (index == 0) {
-                tabs.setSelectedIndex(1);
-            } else {
-                tabs.setSelectedIndex(0);
-            }
-        });
+        centerWrapper.add(tabs, EmployeeInductionHelper.pageConstraints(1));
 
-        submitBtn.addActionListener(e -> {
+        JScrollPane pageScroll = EmployeeInductionHelper.createPageScrollPane(centerWrapper);
+        tabs.addChangeListener(event -> SwingUtilities.invokeLater(() -> {
+            centerWrapper.revalidate();
+            centerWrapper.repaint();
+            pageScroll.getVerticalScrollBar().setValue(0);
+        }));
+        EmployeeInductionHelper.installPageWheelForwarding(pageScroll, centerWrapper);
+        add(pageScroll, BorderLayout.CENTER);
+        add(new FooterPanel(), BorderLayout.SOUTH);
+
+        backButton.addActionListener(e -> tabs.setSelectedIndex(0));
+
+        submitButton.addActionListener(e -> {
             try {
                 Employee emp = formPanel.getEmployeeFromForm();
                 String empCode = emp.getEMPLOYEE_CODE();
@@ -126,7 +114,10 @@ public class EmployeeInduction extends JFrame {
                             "SERVICE_LETTER.jpg",
                             "EXTENSION_LETTER.jpg",
                             "RETIREMENT_LETTER.jpg",
-                            "COVID_CERT.jpg"
+                            "COVID_CERT.jpg",
+                            "DISCIPLINARY_I.jpg",
+                            "DISCIPLINARY_II.jpg",
+                            "DISCIPLINARY_III.jpg"
                     };
 
                     for (int i = 0; i < docs.length; i++) {
@@ -159,6 +150,9 @@ public class EmployeeInduction extends JFrame {
                                 case 12 -> emp.setEXTENSION_LETTER(dbPath);
                                 case 13 -> emp.setRETIREMENT_LETTER(dbPath);
                                 case 14 -> emp.setCOVID_CERT(dbPath);
+                                case 15 -> emp.setDISCIPLINARY_I(dbPath);
+                                case 16 -> emp.setDISCIPLINARY_II(dbPath);
+                                case 17 -> emp.setDISCIPLINARY_III(dbPath);
                             }
                         }
                     }
@@ -167,6 +161,14 @@ public class EmployeeInduction extends JFrame {
                 EmployeeDao dao = new EmployeeDao(DatabaseConnection.getConnection());
                 dao.insertEmployee(emp);
                 DialogHelper.success(this, "Employee saved successfully.");
+                formPanel.clearForm();
+                documentPanel.clearDocuments();
+                tabs.setSelectedIndex(0);
+                SwingUtilities.invokeLater(() -> {
+                    centerWrapper.revalidate();
+                    centerWrapper.repaint();
+                    pageScroll.getVerticalScrollBar().setValue(0);
+                });
             } catch (Exception ex) {
                 DialogHelper.error(
                         this,
@@ -175,5 +177,30 @@ public class EmployeeInduction extends JFrame {
             }
         });
         setVisible(true);
+    }
+
+    private static class HugHeightTabbedPane extends JTabbedPane {
+        public Dimension getPreferredSize() {
+            Dimension preferred = super.getPreferredSize();
+            Component selected = getSelectedComponent();
+            if (selected == null) {
+                return preferred;
+            }
+
+            int tallestTabContentHeight = 0;
+            for (int index = 0; index < getTabCount(); index++) {
+                Component component = getComponentAt(index);
+                if (component != null) {
+                    tallestTabContentHeight = Math.max(
+                            tallestTabContentHeight,
+                            component.getPreferredSize().height
+                    );
+                }
+            }
+
+            int tabChromeHeight = Math.max(0, preferred.height - tallestTabContentHeight);
+            Dimension selectedSize = selected.getPreferredSize();
+            return new Dimension(preferred.width, selectedSize.height + tabChromeHeight);
+        }
     }
 }

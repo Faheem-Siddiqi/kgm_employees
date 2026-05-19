@@ -1,19 +1,27 @@
 package com.kgm.ui.panel;
 
 import com.kgm.model.Employee;
+import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.styling.OtherDetailsPanelHelper;
 
 import javax.swing.*;
 import java.awt.*;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 public class OtherDetailsPanel extends JPanel {
 
     private Employee data;
+    private JComponent topAnchor;
 
     // 🔥 NEW: store fields
     private Map<String, JTextField> fieldMap = new HashMap<>();
+    private Map<String, UniversalDatePicker> dateFieldMap = new HashMap<>();
+    private Map<String, Boolean> dateDirtyMap = new HashMap<>();
+    private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
     // ================= EMPTY =================
     public OtherDetailsPanel() {
@@ -26,18 +34,27 @@ public class OtherDetailsPanel extends JPanel {
 
         OtherDetailsPanelHelper.stylePanel(this);
 
-        JScrollPane scroll = new JScrollPane(buildUI());
-        OtherDetailsPanelHelper.styleScrollPane(scroll);
-
-        add(scroll, BorderLayout.CENTER);
+        add(OtherDetailsPanelHelper.createContent(buildUI()), BorderLayout.NORTH);
     }
 
     // ================= UI =================
     private JPanel buildUI() {
 
         JPanel root = OtherDetailsPanelHelper.createRootPanel();
+        String[] breadcrumbLabels = {
+                "Organization",
+                "Personal",
+                "Banking",
+                "Compliance",
+                "Emergency",
+                "Vaccination"
+        };
+        JComponent[] sectionRefs = new JComponent[breadcrumbLabels.length];
 
-        root.add(createSection("Organization / Structure",
+        topAnchor = OtherDetailsPanelHelper.createBreadcrumbPanel();
+        root.add(topAnchor);
+
+        sectionRefs[0] = createSection("Organization / Structure",
                 new String[][]{
                         {"ORG ID", get("ORG_ID")},
                         {"DIVISION", get("DIVISION")},
@@ -51,11 +68,12 @@ public class OtherDetailsPanel extends JPanel {
                         {"REP TYPE", get("REP_EMP_TYPE")},
                         {"BRANCH CODE", get("BRANCH_CODE")},
                         {"BRANCH NAME", get("BRANCH_NAME")}
-                }));
+                });
+        root.add(sectionRefs[0]);
 
-        root.add(Box.createVerticalStrut(10));
+        root.add(Box.createVerticalStrut(18));
 
-        root.add(createSection("Personal / HR Details",
+        sectionRefs[1] = createSection("Personal / HR Details",
                 new String[][]{
                         {"DOB", get("DOB")},
                         {"City of Birth", get("CITY_OF_BIRTH")},
@@ -64,11 +82,12 @@ public class OtherDetailsPanel extends JPanel {
                         {"Blood Group", get("BLOOD_GROUP")},
                         {"Marital Status", get("M_STATUS")},
                         {"Mother Name", get("MOTHER_NAME")}
-                }));
+                });
+        root.add(sectionRefs[1]);
 
-        root.add(Box.createVerticalStrut(10));
+        root.add(Box.createVerticalStrut(18));
 
-        root.add(createSection("Banking / Finance",
+        sectionRefs[2] = createSection("Banking / Finance",
                 new String[][]{
                         {"Bank Name", get("BANK_NAME")},
                         {"Account No", get("BANK_AC_NO")},
@@ -78,11 +97,12 @@ public class OtherDetailsPanel extends JPanel {
                         {"EFU", get("EFU")},
                         {"EFU No", get("EFU_NO")},
                         {"PFUND Code", get("CLIPPER_PFUND_CODE")}
-                }));
+                });
+        root.add(sectionRefs[2]);
 
-        root.add(Box.createVerticalStrut(10));
+        root.add(Box.createVerticalStrut(18));
 
-        root.add(createSection("Compliance / Status",
+        sectionRefs[3] = createSection("Compliance / Status",
                 new String[][]{
                         {"EOBI Status", get("EOBI_STATUS")},
                         {"NIC Verify", get("NIC_VERIFY")},
@@ -90,19 +110,21 @@ public class OtherDetailsPanel extends JPanel {
                         {"HOD Check", get("HOD_CHECK")},
                         {"Clearance Status", get("CLEARANCE_STATUS")},
                         {"Dis Certificate", get("DIS_CERTIFICATE")}
-                }));
+                });
+        root.add(sectionRefs[3]);
 
-        root.add(Box.createVerticalStrut(10));
+        root.add(Box.createVerticalStrut(18));
 
-        root.add(createSection("Emergency / Misc",
+        sectionRefs[4] = createSection("Emergency / Misc",
                 new String[][]{
                         {"Emergency No", get("EMERGENCY_NO")},
                         {"Attendance Category", get("ATT_CATEG")}
-                }));
+                });
+        root.add(sectionRefs[4]);
 
-        root.add(Box.createVerticalStrut(10));
+        root.add(Box.createVerticalStrut(18));
 
-        root.add(createSection("Vaccination / Wellness",
+        sectionRefs[5] = createSection("Vaccination / Wellness",
                 new String[][]{
                         {"Wellness Club", get("WELLNESS_CLUB")},
                         {"Card Issue", get("WELLNESS_CARD_ISSUE")},
@@ -112,9 +134,45 @@ public class OtherDetailsPanel extends JPanel {
                         {"Second Dose", get("SECOND_DOSE")},
                         {"First Vacc Date", get("FIRST_VACC_DATE")},
                         {"Second Vacc Date", get("SECOND_VACC_DATE")}
-                }));
+                });
+        root.add(sectionRefs[5]);
+
+        root.add(OtherDetailsPanelHelper.createReturnToTopPanel(() -> scrollToComponent(topAnchor)));
+        installBreadcrumbLinks((JPanel) topAnchor, breadcrumbLabels, sectionRefs);
 
         return root;
+    }
+
+    private void installBreadcrumbLinks(JPanel breadcrumb, String[] labels, JComponent[] targets) {
+        for (int index = 0; index < labels.length; index++) {
+            JButton link = OtherDetailsPanelHelper.createBreadcrumbLink(labels[index]);
+            JComponent target = targets[index];
+            link.addActionListener(event -> scrollToComponent(target));
+            breadcrumb.add(link);
+
+            if (index < labels.length - 1) {
+                breadcrumb.add(OtherDetailsPanelHelper.createBreadcrumbSeparator());
+            }
+        }
+    }
+
+    private void scrollToComponent(JComponent component) {
+        if (component == null) {
+            return;
+        }
+
+        SwingUtilities.invokeLater(() -> {
+            Container parent = component.getParent();
+            if (parent instanceof JComponent parentComponent) {
+                Rectangle bounds = component.getBounds();
+                bounds.y = Math.max(0, bounds.y - 12);
+                bounds.height = component.getHeight() + 24;
+                parentComponent.scrollRectToVisible(bounds);
+                return;
+            }
+
+            component.scrollRectToVisible(new Rectangle(0, 0, component.getWidth(), component.getHeight()));
+        });
     }
 
     // ================= SECTION =================
@@ -136,7 +194,7 @@ public class OtherDetailsPanel extends JPanel {
         JPanel grid = OtherDetailsPanelHelper.createGridPanel();
 
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(8, 10, 8, 10);
+        gbc.insets = new Insets(8, 16, 8, 16);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         int row = 0;
@@ -174,19 +232,50 @@ public class OtherDetailsPanel extends JPanel {
             value = "N/A";
         }
 
-        JTextField field = OtherDetailsPanelHelper.createField(value);
-
         boolean editable = isEmpty(value);
 
-        field.setEditable(editable);
-
         // 🔥 store field
-        fieldMap.put(label, field);
+        JComponent input;
+        if (isDateField(label)) {
+            UniversalDatePicker datePicker = OtherDetailsPanelHelper.createDateField(parseDate(value));
+            datePicker.setEnabled(editable);
+            dateDirtyMap.put(label, false);
+            datePicker.addDateChangeListener(() -> dateDirtyMap.put(label, true));
+            dateFieldMap.put(label, datePicker);
+            input = datePicker;
+        } else {
+            JTextField field = OtherDetailsPanelHelper.createField(value);
+            field.setEditable(editable);
+            fieldMap.put(label, field);
+            input = field;
+        }
 
         p.add(lbl, BorderLayout.NORTH);
-        p.add(field, BorderLayout.CENTER);
+        p.add(input, BorderLayout.CENTER);
 
         return p;
+    }
+
+    private boolean isDateField(String label) {
+        return "First Dose".equals(label)
+                || "Second Dose".equals(label)
+                || "First Vacc Date".equals(label)
+                || "Second Vacc Date".equals(label);
+    }
+
+    private Date parseDate(String value) {
+        if (isEmpty(value)) {
+            return new Date();
+        }
+
+        String[] patterns = {"yyyy-MM-dd", "dd-MM-yyyy HH:mm", "dd-MM-yyyy", "yyyy/MM/dd"};
+        for (String pattern : patterns) {
+            try {
+                return new SimpleDateFormat(pattern).parse(value.trim());
+            } catch (ParseException ignored) {
+            }
+        }
+        return new Date();
     }
 
     // ================= DATA GETTER =================
@@ -312,6 +401,20 @@ public class OtherDetailsPanel extends JPanel {
                 case "Card No": emp.setWELLNESS_CARD_NO(val); break;
                 case "Valid Date": emp.setWELLNESS_CLUB_VALID_DATE(val); break;
 
+                case "First Dose": emp.setFIRST_DOSE(val); break;
+                case "Second Dose": emp.setSECOND_DOSE(val); break;
+                case "First Vacc Date": emp.setFIRST_VACC_DATE(val); break;
+                case "Second Vacc Date": emp.setSECOND_VACC_DATE(val); break;
+            }
+        });
+
+        dateFieldMap.forEach((label, picker) -> {
+            if (!picker.isEnabled() || !Boolean.TRUE.equals(dateDirtyMap.get(label))) {
+                return;
+            }
+
+            String val = DB_DATE_FORMAT.format(picker.getDate());
+            switch (label) {
                 case "First Dose": emp.setFIRST_DOSE(val); break;
                 case "Second Dose": emp.setSECOND_DOSE(val); break;
                 case "First Vacc Date": emp.setFIRST_VACC_DATE(val); break;

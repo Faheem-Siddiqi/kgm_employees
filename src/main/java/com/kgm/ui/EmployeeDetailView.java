@@ -80,7 +80,7 @@ public class EmployeeDetailView extends JFrame {
         add(topContainer, BorderLayout.NORTH);
 
         JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
-        JTabbedPane tabs = new JTabbedPane();
+        JTabbedPane tabs = new HugHeightTabbedPane();
 
         if (isWithData) {
             tabs.addTab("Basic", new BasicDetailsPanel(emp));
@@ -94,9 +94,27 @@ public class EmployeeDetailView extends JFrame {
 
         // Apply custom tab styling
         EmployeeDetailViewHelper.styleTabs(tabs);
+        tabs.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent event) {
+                int tabIndex = tabs.indexAtLocation(event.getX(), event.getY());
+                if (tabIndex >= 0 && tabs.isEnabledAt(tabIndex)) {
+                    tabs.setSelectedIndex(tabIndex);
+                    tabs.revalidate();
+                    tabs.repaint();
+                }
+            }
+        });
 
-        centerWrapper.add(tabs, BorderLayout.CENTER);
-        add(centerWrapper, BorderLayout.CENTER);
+        centerWrapper.add(tabs, EmployeeDetailViewHelper.pageConstraints(0));
+
+        JScrollPane pageScroll = EmployeeDetailViewHelper.createPageScrollPane(centerWrapper);
+        tabs.addChangeListener(event -> SwingUtilities.invokeLater(() -> {
+            centerWrapper.revalidate();
+            centerWrapper.repaint();
+            pageScroll.getVerticalScrollBar().setValue(0);
+        }));
+        EmployeeDetailViewHelper.installPageWheelForwarding(pageScroll, centerWrapper);
+        add(pageScroll, BorderLayout.CENTER);
 
         JPanel footerActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         updateBtn = new JButton("Update");
@@ -204,5 +222,30 @@ public class EmployeeDetailView extends JFrame {
         }
 
         return false;
+    }
+
+    private static class HugHeightTabbedPane extends JTabbedPane {
+        public Dimension getPreferredSize() {
+            Dimension preferred = super.getPreferredSize();
+            Component selected = getSelectedComponent();
+            if (selected == null) {
+                return preferred;
+            }
+
+            int tallestTabContentHeight = 0;
+            for (int index = 0; index < getTabCount(); index++) {
+                Component component = getComponentAt(index);
+                if (component != null) {
+                    tallestTabContentHeight = Math.max(
+                            tallestTabContentHeight,
+                            component.getPreferredSize().height
+                    );
+                }
+            }
+
+            int tabChromeHeight = Math.max(0, preferred.height - tallestTabContentHeight);
+            Dimension selectedSize = selected.getPreferredSize();
+            return new Dimension(preferred.width, selectedSize.height + tabChromeHeight);
+        }
     }
 }
