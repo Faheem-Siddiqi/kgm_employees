@@ -1,6 +1,7 @@
 package com.kgm.ui.panel;
 
 import com.kgm.ui.styling.DialogHelper;
+import com.kgm.ui.styling.DocumentViewPanelHelper;
 import com.kgm.ui.styling.UniversalTablePagination;
 
 import java.io.File;
@@ -32,10 +33,7 @@ public class DocumentViewPanel extends JPanel {
     };
 
     public DocumentViewPanel() {
-        setLayout(new BorderLayout());
-        setBackground(Color.WHITE);
-        setOpaque(true);
-        setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+        DocumentViewPanelHelper.stylePanel(this);
 
         files = new File[documents.length];
 
@@ -43,18 +41,11 @@ public class DocumentViewPanel extends JPanel {
         filePaths = new String[documents.length];
 
         // ================= TOP TEXT =================
-        JPanel topPanel = new JPanel();
-        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
-        topPanel.setBackground(Color.WHITE);
-        topPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JPanel topPanel = DocumentViewPanelHelper.createTopPanel();
 
-        uploadedCountLabel = new JLabel("Total fields uploaded: 0");
-        uploadedCountLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        uploadedCountLabel = DocumentViewPanelHelper.createUploadedCountLabel("Total fields uploaded: 0");
 
-        JLabel sizeLabel = new JLabel(
-                "<html>Maximum file size allowed is: <b>400KB</b></html>"
-        );
-        sizeLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JLabel sizeLabel = DocumentViewPanelHelper.createSizeLabel();
 
         topPanel.add(uploadedCountLabel);
         topPanel.add(Box.createVerticalStrut(4));
@@ -162,8 +153,7 @@ public class DocumentViewPanel extends JPanel {
 
             JFrame frame = new JFrame("Document Preview");
             frame.getContentPane().add(new JScrollPane(label));
-            frame.setSize(850, 650);
-            frame.setLocationRelativeTo(this);
+            DocumentViewPanelHelper.stylePreviewFrame(frame, this);
             frame.setVisible(true);
 
         } catch (Exception e) {
@@ -175,8 +165,7 @@ public class DocumentViewPanel extends JPanel {
     class ActionRenderer extends JPanel implements TableCellRenderer {
 
 public ActionRenderer() {
-    setLayout(new GridBagLayout());
-    setOpaque(false);
+    DocumentViewPanelHelper.styleRendererPanel(this);
 }
         @Override
         public Component getTableCellRendererComponent(
@@ -192,20 +181,14 @@ public ActionRenderer() {
             add(uploadBtn);
 
             JButton viewBtn = createLink("View");
-            viewBtn.setForeground(uploaded ? Color.BLACK : Color.GRAY);
+            DocumentViewPanelHelper.styleViewLink(viewBtn, uploaded);
             add(viewBtn);
 
             return this;
         }
 
         private JButton createLink(String text) {
-            JButton btn = new JButton(text);
-            btn.setBorderPainted(false);
-            btn.setContentAreaFilled(false);
-            btn.setFocusPainted(false);
-            btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-            btn.setForeground(new Color(30, 144, 255));
-            return btn;
+            return DocumentViewPanelHelper.createActionLink(text);
         }
     }
 
@@ -216,8 +199,7 @@ public ActionRenderer() {
         private int row;
 
         public ActionEditor() {
-            panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
-            panel.setOpaque(false);
+            panel = DocumentViewPanelHelper.createEditorPanel();
         }
 
         @Override
@@ -241,11 +223,7 @@ public ActionRenderer() {
         }
 
         private JButton createButton(String text) {
-            JButton btn = new JButton(text);
-
-            btn.setBorderPainted(false);
-            btn.setContentAreaFilled(false);
-            btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            JButton btn = DocumentViewPanelHelper.createActionLink(text);
 
             btn.addActionListener(e -> {
                 if (text.equals("Upload") || text.equals("Replace")) {

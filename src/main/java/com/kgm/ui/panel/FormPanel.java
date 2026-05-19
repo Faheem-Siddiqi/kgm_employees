@@ -1,23 +1,21 @@
 package com.kgm.ui.panel;
 import java.text.SimpleDateFormat;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.io.File;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import java.util.Date;
 import com.kgm.model.Employee;
+import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.styling.DialogHelper;
+import com.kgm.ui.styling.FormPanelHelper;
 
 public class FormPanel extends JPanel {
 
     // ================= IMAGE =================
     private JLabel photoPreview;
     private JLabel uploadLabel;
-    private final Font labelFont = new Font("Segoe UI", Font.PLAIN, 13);
-    private final Font inputFont = new Font("Segoe UI", Font.PLAIN, 13);
-    private final int PHOTO_SIZE = 200;
     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
     // ✔ ADDED (ONLY CHANGE)
@@ -34,26 +32,21 @@ public class FormPanel extends JPanel {
     private JTextField designationField;
     private JComboBox<String> genderCombo;
     private JComboBox<String> reasonCombo;
-    private JSpinner appointmentSpinner;
-    private JSpinner leavingSpinner;
+    private UniversalDatePicker appointmentPicker;
+    private UniversalDatePicker leavingPicker;
     private JTextArea addressArea;
     //  private JTextArea addressArea;
 
     public FormPanel() {
-        setLayout(new BorderLayout());
-        setBackground(Color.WHITE);
+        FormPanelHelper.stylePanel(this);
         JScrollPane scroll = new JScrollPane(buildForm());
-        scroll.setBorder(null);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
-        scroll.getViewport().setBackground(Color.WHITE);
+        FormPanelHelper.styleScrollPane(scroll);
         add(scroll, BorderLayout.CENTER);
     }
 
     // ================= ROOT =================
     private JPanel buildForm() {
-        JPanel root = new JPanel(new GridBagLayout());
-        root.setBackground(Color.WHITE);
-        root.setBorder(new EmptyBorder(20, 20, 20, 20));
+        JPanel root = FormPanelHelper.createFormRoot();
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
@@ -77,13 +70,9 @@ public class FormPanel extends JPanel {
 
     // ================= IMAGE PANEL =================
     private JPanel buildLeftPanel() {
-        JPanel left = new JPanel(new BorderLayout());
-        left.setPreferredSize(new Dimension(240, 300));
-        left.setBackground(Color.WHITE);
+        JPanel left = FormPanelHelper.createPhotoPanel();
 
-        photoPreview = new JLabel("Photo", SwingConstants.CENTER);
-        photoPreview.setPreferredSize(new Dimension(220, 220));
-        photoPreview.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
+        photoPreview = FormPanelHelper.createPhotoPreview("Photo");
 
         photoPreview.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
@@ -92,8 +81,7 @@ public class FormPanel extends JPanel {
         });
 
         uploadLabel = new JLabel("Upload / Replace");
-        uploadLabel.setForeground(new Color(0, 102, 204));
-        uploadLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        FormPanelHelper.styleUploadLabel(uploadLabel);
 
         uploadLabel.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
@@ -101,12 +89,9 @@ public class FormPanel extends JPanel {
             }
         });
 
-        JPanel bottom = new JPanel();
-        bottom.setBackground(Color.WHITE);
-        bottom.setLayout(new BoxLayout(bottom, BoxLayout.Y_AXIS));
+        JPanel bottom = FormPanelHelper.createPhotoInfoPanel();
 
-        JLabel info = new JLabel("JPEG only • Max 400KB");
-        info.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        JLabel info = FormPanelHelper.createPhotoInfoLabel("JPEG only • Max 400KB");
 
         bottom.add(info);
         bottom.add(Box.createVerticalStrut(5));
@@ -120,11 +105,7 @@ public class FormPanel extends JPanel {
 
     // ================= RIGHT FORM =================
     private JPanel buildRightForm() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBackground(Color.WHITE);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(235, 235, 235)),
-                new EmptyBorder(20, 20, 20, 20)));
+        JPanel panel = FormPanelHelper.createRightFormPanel();
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
@@ -153,24 +134,20 @@ public class FormPanel extends JPanel {
         reasonCombo = new JComboBox<>(new String[]{"Layoff", "Retirement", "Others"});
         addRow(panel, gbc, y++, "Gender", genderCombo, "Reason", reasonCombo);
 
-        appointmentSpinner = new JSpinner(
-                new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
+        appointmentPicker = new UniversalDatePicker(new Date());
 
-        leavingSpinner = new JSpinner(
-                new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
+        leavingPicker = new UniversalDatePicker(new Date());
 
-        addRow(panel, gbc, y++, "Appointment Date", appointmentSpinner, "Leaving Date", leavingSpinner);
+        addRow(panel, gbc, y++, "Appointment Date", appointmentPicker, "Leaving Date", leavingPicker);
 
         gbc.gridy = y;
         gbc.gridx = 0;
         gbc.gridwidth = 2;
 
         addressArea = new JTextArea(4, 20);
-        addressArea.setLineWrap(true);
-        addressArea.setWrapStyleWord(true);
+        FormPanelHelper.styleAddressArea(addressArea);
 
-        JScrollPane scroll = new JScrollPane(addressArea);
-        scroll.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
+        JScrollPane scroll = FormPanelHelper.createAddressScrollPane(addressArea);
 
         panel.add(new FormField("Permanent Address", scroll), gbc);
 
@@ -220,8 +197,8 @@ public class FormPanel extends JPanel {
             selectedImage = file;
 
             Image scaled = img.getScaledInstance(
-                    PHOTO_SIZE, 
-                    PHOTO_SIZE,
+                    FormPanelHelper.PHOTO_SIZE,
+                    FormPanelHelper.PHOTO_SIZE,
                     Image.SCALE_SMOOTH
             );
 
@@ -240,16 +217,12 @@ public class FormPanel extends JPanel {
         JComponent input;
 
         public FormField(String text, JComponent comp) {
-            setLayout(new BorderLayout(6, 4));
-            setBackground(Color.WHITE);
+            FormPanelHelper.styleFormField(this);
 
-            label = new JLabel(text);
-            label.setFont(labelFont);
-            label.setForeground(new Color(70, 70, 70));
+            label = FormPanelHelper.createFieldLabel(text);
 
             input = comp;
-            input.setFont(inputFont);
-            input.setPreferredSize(new Dimension(240, 34));
+            FormPanelHelper.styleInput(input);
 
             add(label, BorderLayout.NORTH);
             add(input, BorderLayout.CENTER);
@@ -271,8 +244,8 @@ public class FormPanel extends JPanel {
         e.setGENDER(genderCombo.getSelectedItem().toString());
         e.setRESIGN_REASON(reasonCombo.getSelectedItem().toString());
        
-e.setJOINING_DATE(sdf.format((Date) appointmentSpinner.getValue()));
-e.setRESIGN_DATE(sdf.format((Date) leavingSpinner.getValue()));
+        e.setJOINING_DATE(sdf.format(appointmentPicker.getDate()));
+        e.setRESIGN_DATE(sdf.format(leavingPicker.getDate()));
 
         e.setPERMANENT_ADR(addressArea.getText());
 

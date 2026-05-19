@@ -1,6 +1,6 @@
 package com.kgm.ui.dialog;
 
-import com.kgm.ui.styling.TableStyleHelper;
+import com.kgm.ui.styling.UniversalDialogHelper;
 
 import javax.swing.*;
 import java.awt.*;
@@ -10,10 +10,10 @@ import java.util.regex.Pattern;
 
 public final class UniversalDialog {
     public enum Type {
-        INFO(TableStyleHelper.PRIMARY),
-        SUCCESS(new Color(28, 137, 85)),
-        WARNING(new Color(176, 76, 19)),
-        ERROR(new Color(217, 45, 32));
+        INFO(UniversalDialogHelper.INFO_ACCENT),
+        SUCCESS(UniversalDialogHelper.SUCCESS_ACCENT),
+        WARNING(UniversalDialogHelper.WARNING_ACCENT),
+        ERROR(UniversalDialogHelper.ERROR_ACCENT);
 
         private final Color accent;
 
@@ -22,12 +22,6 @@ public final class UniversalDialog {
         }
     }
 
-    private static final Color FOOTER = new Color(247, 249, 251);
-    private static final Color ERROR_SURFACE = new Color(255, 246, 245);
-    private static final Color ERROR_BORDER = new Color(254, 205, 202);
-    private static final int BODY_WIDTH = 500;
-    private static final int MESSAGE_BOX_WIDTH = 456;
-    private static final int MESSAGE_TEXT_WIDTH = 400;
     private static final int WRAP_COLUMNS = 54;
     private static final int SCROLLABLE_SECTION_ROWS = 10;
     public static final String SECTION_SEPARATOR = "\n\n::kgm-dialog-section::\n\n";
@@ -70,7 +64,7 @@ public final class UniversalDialog {
             String[] secondaryOptions
     ) {
         JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(Color.WHITE);
+        UniversalDialogHelper.styleRoot(root);
         root.add(header(title, type.accent), BorderLayout.NORTH);
         root.add(body(type, message), BorderLayout.CENTER);
         root.add(footer(dialog, selected, type.accent, primaryOption, secondaryOptions), BorderLayout.SOUTH);
@@ -78,25 +72,14 @@ public final class UniversalDialog {
     }
 
     private static JPanel header(String title, Color accent) {
-        JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(accent);
-        header.setBorder(BorderFactory.createEmptyBorder(16, 22, 16, 22));
-
-        JLabel titleLabel = new JLabel(title == null || title.isBlank() ? "Message" : title);
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 17));
-        titleLabel.setForeground(Color.WHITE);
-        header.add(titleLabel, BorderLayout.WEST);
-        return header;
+        return UniversalDialogHelper.createHeader(title, accent);
     }
 
     private static JComponent body(Type type, String message) {
         String text = message == null || message.isBlank() ? "-" : message.trim();
         List<String> sections = messageSections(text);
 
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(Color.WHITE);
-        panel.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
+        JPanel panel = UniversalDialogHelper.createBodyPanel();
 
         for (int index = 0; index < sections.size(); index++) {
             JPanel messageBox = messageBox(type, sections.get(index));
@@ -107,42 +90,19 @@ public final class UniversalDialog {
             }
         }
 
-        JScrollPane scroll = new JScrollPane(panel);
-        scroll.setBorder(null);
-        scroll.getViewport().setBackground(Color.WHITE);
-        scroll.setPreferredSize(new Dimension(BODY_WIDTH, preferredMessageHeight(sections)));
-        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
-        return scroll;
+        return UniversalDialogHelper.createBodyScroll(panel, preferredMessageHeight(sections));
     }
 
     private static JPanel messageBox(Type type, String message) {
-        JPanel row = new JPanel(new BorderLayout(10, 0));
-        row.setBackground(surface(type));
-        row.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(border(type)),
-                BorderFactory.createEmptyBorder(10, 12, 10, 12)
-        ));
+        JPanel row = UniversalDialogHelper.createMessageRow(type);
 
-        JLabel badge = new JLabel(badgeText(type));
-        badge.setHorizontalAlignment(SwingConstants.CENTER);
-        badge.setVerticalAlignment(SwingConstants.CENTER);
-        badge.setPreferredSize(new Dimension(24, 24));
-        badge.setOpaque(true);
-        badge.setBackground(type.accent);
-        badge.setForeground(Color.WHITE);
-        badge.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        JLabel badge = UniversalDialogHelper.createBadge(type, type.accent);
 
         String[] parts = headingAndBody(message);
-        JPanel textPanel = new JPanel();
-        textPanel.setOpaque(false);
-        textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+        JPanel textPanel = UniversalDialogHelper.createMessageTextPanel();
 
         if (!parts[0].isEmpty()) {
-            JLabel heading = new JLabel(parts[0]);
-            heading.setFont(new Font("Segoe UI", Font.BOLD, 13));
-            heading.setForeground(TableStyleHelper.TEXT_PRIMARY);
-            heading.setAlignmentX(Component.LEFT_ALIGNMENT);
+            JLabel heading = UniversalDialogHelper.createHeading(parts[0]);
             textPanel.add(heading);
             textPanel.add(Box.createVerticalStrut(4));
         }
@@ -151,77 +111,34 @@ public final class UniversalDialog {
         boolean scrollableText = isScrollableSection(parts[0]) && contentRows > SCROLLABLE_SECTION_ROWS;
         int visibleRows = scrollableText ? SCROLLABLE_SECTION_ROWS : contentRows;
 
-        JTextArea text = new JTextArea(parts[1]);
-        text.setEditable(false);
-        text.setFocusable(false);
-        text.setLineWrap(true);
-        text.setWrapStyleWord(false);
-        text.setRows(contentRows);
-        text.setColumns(0);
-        text.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        text.setForeground(TableStyleHelper.TEXT_PRIMARY);
-        text.setBackground(row.getBackground());
-        text.setBorder(BorderFactory.createEmptyBorder());
-        text.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JTextArea text = UniversalDialogHelper.createMessageText(parts[1], row.getBackground(), contentRows);
 
         int lineHeight = text.getFontMetrics(text.getFont()).getHeight();
         int textHeight = Math.max(42, visibleRows * lineHeight + 4);
         int contentHeight = Math.max(textHeight, contentRows * lineHeight + 4);
         int headingHeight = parts[0].isEmpty() ? 0 : 22;
-        Dimension textSize = new Dimension(MESSAGE_TEXT_WIDTH, contentHeight);
-        text.setPreferredSize(textSize);
-        text.setMinimumSize(textSize);
-        text.setMaximumSize(textSize);
+        Dimension textSize = new Dimension(UniversalDialogHelper.MESSAGE_TEXT_WIDTH, contentHeight);
+        UniversalDialogHelper.setFixedSize(text, textSize);
 
         if (scrollableText) {
-            JScrollPane sectionScroll = new JScrollPane(text);
-            sectionScroll.setBorder(BorderFactory.createLineBorder(TableStyleHelper.BORDER));
-            sectionScroll.getViewport().setBackground(row.getBackground());
-            sectionScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-            sectionScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
-            Dimension scrollSize = new Dimension(MESSAGE_TEXT_WIDTH, textHeight);
-            sectionScroll.setPreferredSize(scrollSize);
-            sectionScroll.setMinimumSize(scrollSize);
-            sectionScroll.setMaximumSize(scrollSize);
-            sectionScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
+            Dimension scrollSize = new Dimension(UniversalDialogHelper.MESSAGE_TEXT_WIDTH, textHeight);
+            JScrollPane sectionScroll = UniversalDialogHelper.createSectionScroll(text, row.getBackground(), scrollSize);
             textPanel.add(sectionScroll);
         } else {
-            Dimension visibleTextSize = new Dimension(MESSAGE_TEXT_WIDTH, textHeight);
-            text.setPreferredSize(visibleTextSize);
-            text.setMinimumSize(visibleTextSize);
-            text.setMaximumSize(visibleTextSize);
+            Dimension visibleTextSize = new Dimension(UniversalDialogHelper.MESSAGE_TEXT_WIDTH, textHeight);
+            UniversalDialogHelper.setFixedSize(text, visibleTextSize);
             textPanel.add(text);
         }
-        Dimension panelSize = new Dimension(MESSAGE_TEXT_WIDTH, textHeight + headingHeight);
-        textPanel.setPreferredSize(panelSize);
-        textPanel.setMinimumSize(panelSize);
-        textPanel.setMaximumSize(panelSize);
+        Dimension panelSize = new Dimension(UniversalDialogHelper.MESSAGE_TEXT_WIDTH, textHeight + headingHeight);
+        UniversalDialogHelper.setFixedSize(textPanel, panelSize);
 
         int boxHeight = textHeight + headingHeight + 22;
-        Dimension boxSize = new Dimension(MESSAGE_BOX_WIDTH, boxHeight);
-        row.setPreferredSize(boxSize);
-        row.setMinimumSize(boxSize);
-        row.setMaximumSize(boxSize);
+        Dimension boxSize = new Dimension(UniversalDialogHelper.MESSAGE_BOX_WIDTH, boxHeight);
+        UniversalDialogHelper.setFixedSize(row, boxSize);
 
         row.add(badge, BorderLayout.WEST);
         row.add(textPanel, BorderLayout.CENTER);
         return row;
-    }
-
-    private static Color surface(Type type) {
-        return type == Type.ERROR ? ERROR_SURFACE : Color.WHITE;
-    }
-
-    private static Color border(Type type) {
-        return type == Type.ERROR ? ERROR_BORDER : TableStyleHelper.BORDER;
-    }
-
-    private static String badgeText(Type type) {
-        return switch (type) {
-            case SUCCESS -> "OK";
-            case WARNING, ERROR -> "!";
-            case INFO -> "i";
-        };
     }
 
     private static JPanel footer(
@@ -231,9 +148,7 @@ public final class UniversalDialog {
             String primaryOption,
             String[] secondaryOptions
     ) {
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        footer.setBackground(FOOTER);
-        footer.setBorder(BorderFactory.createEmptyBorder(14, 22, 14, 22));
+        JPanel footer = UniversalDialogHelper.createFooter();
 
         for (int index = secondaryOptions.length - 1; index >= 0; index--) {
             String option = secondaryOptions[index];
@@ -257,35 +172,11 @@ public final class UniversalDialog {
     }
 
     private static JButton primaryButton(String text, Color accent) {
-        JButton button = new JButton(buttonText(text));
-        button.setPreferredSize(buttonSize(button.getText(), 92, 34));
-        button.setBackground(accent);
-        button.setForeground(Color.WHITE);
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
-        button.setFocusPainted(false);
-        button.setBorderPainted(false);
-        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        return button;
+        return UniversalDialogHelper.primaryButton(text, accent);
     }
 
     private static JButton secondaryButton(String text) {
-        JButton button = new JButton(buttonText(text));
-        button.setPreferredSize(buttonSize(button.getText(), 82, 30));
-        button.setBackground(Color.WHITE);
-        button.setForeground(TableStyleHelper.TEXT_SECONDARY);
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createLineBorder(TableStyleHelper.BORDER));
-        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        return button;
-    }
-
-    private static Dimension buttonSize(String text, int minimumWidth, int padding) {
-        return new Dimension(Math.max(minimumWidth, text.length() * 9 + padding), 34);
-    }
-
-    private static String buttonText(String text) {
-        return text == null || text.isBlank() ? "OK" : text;
+        return UniversalDialogHelper.secondaryButton(text);
     }
 
     private static int preferredMessageHeight(List<String> sections) {

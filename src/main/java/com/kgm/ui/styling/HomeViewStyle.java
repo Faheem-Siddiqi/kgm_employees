@@ -21,7 +21,7 @@ public final class HomeViewStyle {
 
     public static void applyFrame(JFrame frame) {
         frame.setTitle("Home");
-        frame.setSize(1100, 650);
+        frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
         frame.setLocationRelativeTo(null);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());

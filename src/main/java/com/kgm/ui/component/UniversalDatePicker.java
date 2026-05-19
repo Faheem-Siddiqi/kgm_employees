@@ -1,5 +1,6 @@
 package com.kgm.ui.component;
 
+import com.kgm.ui.styling.UniversalDatePickerHelper;
 import com.toedter.calendar.JCalendar;
 
 import javax.swing.*;
@@ -10,28 +11,8 @@ import java.awt.event.MouseEvent;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.Locale;
 
 public class UniversalDatePicker extends JPanel {
-
-    private static final String DATE_FORMAT = "dd-MM-yyyy HH:mm";
-
-    private static final Color BORDER_COLOR = new Color(200, 200, 200);
-    private static final Color BORDER_FOCUS_COLOR = new Color(0, 112, 210);
-    private static final Color BACKGROUND_COLOR = Color.WHITE;
-    private static final Color DISABLED_BACKGROUND = new Color(248, 248, 248);
-    private static final Color DISABLED_FOREGROUND = new Color(150, 150, 150);
-    private static final Color ICON_COLOR = new Color(120, 120, 120);
-
-    private static final Font DISPLAY_FONT = new Font("Segoe UI", Font.PLAIN, 13);
-
-    private static final int FIELD_HEIGHT = 34;
-    private static final int FIELD_WIDTH = 340;
-
-    private static final int POPUP_WIDTH = 330;
-    private static final int POPUP_HEIGHT = 330;
-
-    private static final int ICON_SIZE = 16;
 
     private final JTextField displayField;
     private final JPanel iconPanel;
@@ -58,71 +39,23 @@ public class UniversalDatePicker extends JPanel {
 
         this.selectedDate = initialDate != null ? initialDate : new Date();
 
-        setOpaque(false);
+        UniversalDatePickerHelper.stylePicker(this);
 
-        setLayout(new BorderLayout());
-
-        setBorder(createBorder());
-
-        setPreferredSize(new Dimension(FIELD_WIDTH, FIELD_HEIGHT));
-        setMinimumSize(new Dimension(260, FIELD_HEIGHT));
-        setMaximumSize(new Dimension(Integer.MAX_VALUE, FIELD_HEIGHT));
-
-        displayField = new JTextField(formatDate(selectedDate));
-
-        displayField.setFont(DISPLAY_FONT);
-
-        displayField.setEditable(false);
-
-        displayField.setFocusable(false);
-
-        displayField.setBorder(null);
-
-        displayField.setBackground(BACKGROUND_COLOR);
-
-        displayField.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        displayField = UniversalDatePickerHelper.createDisplayField(formatDate(selectedDate));
 
         add(displayField, BorderLayout.CENTER);
 
-        iconPanel = new JPanel(new GridBagLayout());
-
-        iconPanel.setOpaque(false);
-
-        iconPanel.setPreferredSize(new Dimension(34, FIELD_HEIGHT));
-
-        iconPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-        iconPanel.add(new CalendarIcon(ICON_COLOR));
+        iconPanel = UniversalDatePickerHelper.createIconPanel();
 
         add(iconPanel, BorderLayout.EAST);
 
         calendar = new JCalendar();
 
-        calendar.setLocale(Locale.ENGLISH);
-
         calendar.setDate(selectedDate);
 
-        calendar.setDecorationBackgroundColor(BACKGROUND_COLOR);
+        UniversalDatePickerHelper.styleCalendar(calendar);
 
-        calendar.setWeekdayForeground(new Color(60, 60, 60));
-
-        forceCompactCalendar(calendar);
-
-        JPanel calendarContainer = new JPanel(new BorderLayout());
-
-        calendarContainer.setBackground(BACKGROUND_COLOR);
-
-        calendarContainer.setBorder(new EmptyBorder(8, 8, 8, 8));
-
-        calendarContainer.setPreferredSize(new Dimension(POPUP_WIDTH, POPUP_HEIGHT));
-
-        calendarContainer.setMinimumSize(new Dimension(POPUP_WIDTH, POPUP_HEIGHT));
-
-        calendarContainer.setMaximumSize(new Dimension(POPUP_WIDTH, POPUP_HEIGHT));
-
-        calendarContainer.add(calendar, BorderLayout.CENTER);
-
-        calendarContainer.add(createTimePanel(), BorderLayout.SOUTH);
+        JPanel calendarContainer = UniversalDatePickerHelper.createCalendarContainer(calendar, createTimePanel());
 
         Window owner = null;
 
@@ -131,21 +64,7 @@ public class UniversalDatePicker extends JPanel {
         } catch (Exception ignored) {
         }
 
-        calendarDialog = new JDialog(owner);
-
-        calendarDialog.setUndecorated(true);
-
-        calendarDialog.setModal(false);
-
-        calendarDialog.setAlwaysOnTop(false);
-
-        calendarDialog.setLayout(new BorderLayout());
-
-        calendarDialog.getRootPane().setBorder(new LineBorder(new Color(190, 190, 190), 1));
-
-        calendarDialog.add(calendarContainer, BorderLayout.CENTER);
-
-        calendarDialog.setSize(POPUP_WIDTH, POPUP_HEIGHT);
+        calendarDialog = UniversalDatePickerHelper.createCalendarDialog(owner, calendarContainer);
 
         MouseAdapter showCalendarListener = new MouseAdapter() {
 
@@ -192,35 +111,12 @@ public class UniversalDatePicker extends JPanel {
     }
 
     private void forceCompactCalendar(JCalendar calendar) {
-
-        Dimension compactSize = new Dimension(310, 230);
-
-        calendar.setPreferredSize(compactSize);
-
-        calendar.setMinimumSize(compactSize);
-
-        calendar.setMaximumSize(compactSize);
-
-        calendar.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-
-        for (Component component : calendar.getComponents()) {
-
-            component.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        }
+        UniversalDatePickerHelper.forceCompactCalendar(calendar);
     }
 
     private JPanel createTimePanel() {
 
-        JPanel timePanel = new JPanel();
-
-        timePanel.setLayout(new FlowLayout(FlowLayout.CENTER, 5, 5));
-
-        timePanel.setBackground(new Color(245, 245, 245));
-
-        timePanel.setBorder(new CompoundBorder(
-                new MatteBorder(1, 0, 0, 0, new Color(220, 220, 220)),
-                new EmptyBorder(4, 4, 4, 4)
-        ));
+        JPanel timePanel = UniversalDatePickerHelper.createTimePanel();
 
         Calendar cal = Calendar.getInstance();
 
@@ -235,7 +131,7 @@ public class UniversalDatePicker extends JPanel {
 
         styleSpinner(hourSpinner);
 
-        hourSpinner.setPreferredSize(new Dimension(44, 24));
+        UniversalDatePickerHelper.setSmallControlWidth(hourSpinner, 44);
 
         hourSpinner.addChangeListener(e -> updateTimeFromSpinners());
 
@@ -250,7 +146,7 @@ public class UniversalDatePicker extends JPanel {
 
         styleSpinner(minuteSpinner);
 
-        minuteSpinner.setPreferredSize(new Dimension(44, 24));
+        UniversalDatePickerHelper.setSmallControlWidth(minuteSpinner, 44);
 
         minuteSpinner.addChangeListener(e -> updateTimeFromSpinners());
 
@@ -258,7 +154,7 @@ public class UniversalDatePicker extends JPanel {
 
         JButton nowButton = smallButton("Now", false);
 
-        nowButton.setPreferredSize(new Dimension(56, 24));
+        UniversalDatePickerHelper.setSmallControlWidth(nowButton, 56);
 
         nowButton.addActionListener(e -> {
 
@@ -275,7 +171,7 @@ public class UniversalDatePicker extends JPanel {
 
         JButton doneButton = smallButton("OK", true);
 
-        doneButton.setPreferredSize(new Dimension(52, 24));
+        UniversalDatePickerHelper.setSmallControlWidth(doneButton, 52);
 
         doneButton.addActionListener(e -> confirmAndClose());
 
@@ -285,63 +181,15 @@ public class UniversalDatePicker extends JPanel {
     }
 
     private JLabel smallLabel(String text) {
-
-        JLabel label = new JLabel(text);
-
-        label.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-
-        label.setForeground(new Color(60, 60, 60));
-
-        return label;
+        return UniversalDatePickerHelper.smallLabel(text);
     }
 
     private void styleSpinner(JSpinner spinner) {
-
-        spinner.setPreferredSize(new Dimension(48, 24));
-
-        spinner.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-
-        JComponent editor = spinner.getEditor();
-
-        if (editor instanceof JSpinner.DefaultEditor) {
-
-            JTextField field = ((JSpinner.DefaultEditor) editor).getTextField();
-
-            field.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-
-            field.setHorizontalAlignment(JTextField.CENTER);
-        }
+        UniversalDatePickerHelper.styleSpinner(spinner);
     }
 
     private JButton smallButton(String text, boolean primary) {
-
-        JButton button = new JButton(text);
-
-        button.setFont(new Font("Segoe UI", Font.BOLD, 11));
-
-        button.setFocusPainted(false);
-
-        if (primary) {
-
-            button.setBackground(new Color(0, 112, 210));
-
-            button.setForeground(Color.WHITE);
-
-            button.setBorder(new EmptyBorder(4, 10, 4, 10));
-
-        } else {
-
-            button.setBackground(new Color(245, 245, 245));
-
-            button.setForeground(new Color(80, 80, 80));
-
-            button.setBorder(new CompoundBorder(
-                    new LineBorder(new Color(170, 170, 170)),
-                    new EmptyBorder(4, 10, 4, 10)
-            ));
-        }
-
-        return button;
+        return UniversalDatePickerHelper.smallButton(text, primary);
     }
 
     private void updateTimeFromSpinners() {
@@ -406,10 +254,7 @@ public class UniversalDatePicker extends JPanel {
 
     private CompoundBorder createBorder() {
 
-        return new CompoundBorder(
-                new LineBorder(BORDER_COLOR, 1),
-                new EmptyBorder(6, 8, 6, 8)
-        );
+        return UniversalDatePickerHelper.fieldBorder();
     }
 
     private String formatDate(Date date) {
@@ -418,7 +263,7 @@ public class UniversalDatePicker extends JPanel {
             return "";
         }
 
-        return new SimpleDateFormat(DATE_FORMAT).format(date);
+        return new SimpleDateFormat(UniversalDatePickerHelper.DATE_FORMAT).format(date);
     }
 
     private void showCalendar() {
@@ -441,14 +286,14 @@ public class UniversalDatePicker extends JPanel {
 
         int y = screenPoint.y + getHeight() + 2;
 
-        if (x + POPUP_WIDTH > screen.x + screen.width) {
+        if (x + UniversalDatePickerHelper.POPUP_WIDTH > screen.x + screen.width) {
 
-            x = screen.x + screen.width - POPUP_WIDTH;
+            x = screen.x + screen.width - UniversalDatePickerHelper.POPUP_WIDTH;
         }
 
-        if (y + POPUP_HEIGHT > screen.y + screen.height) {
+        if (y + UniversalDatePickerHelper.POPUP_HEIGHT > screen.y + screen.height) {
 
-            y = screenPoint.y - POPUP_HEIGHT - 2;
+            y = screenPoint.y - UniversalDatePickerHelper.POPUP_HEIGHT - 2;
         }
 
         calendarDialog.setLocation(x, y);
@@ -495,30 +340,9 @@ public class UniversalDatePicker extends JPanel {
 
         iconPanel.setEnabled(enabled);
 
-        if (enabled) {
+        UniversalDatePickerHelper.applyEnabledStyle(displayField, iconPanel, enabled);
 
-            displayField.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-            iconPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-            displayField.setBackground(BACKGROUND_COLOR);
-
-            displayField.setForeground(Color.BLACK);
-
-            iconPanel.setVisible(true);
-
-        } else {
-
-            displayField.setCursor(Cursor.getDefaultCursor());
-
-            iconPanel.setCursor(Cursor.getDefaultCursor());
-
-            displayField.setBackground(DISABLED_BACKGROUND);
-
-            displayField.setForeground(DISABLED_FOREGROUND);
-
-            iconPanel.setVisible(false);
-
+        if (!enabled) {
             calendarDialog.setVisible(false);
         }
     }
@@ -532,10 +356,7 @@ public class UniversalDatePicker extends JPanel {
 
         if (focus) {
 
-            setBorder(new CompoundBorder(
-                    new LineBorder(BORDER_FOCUS_COLOR, 2),
-                    new EmptyBorder(5, 7, 5, 7)
-            ));
+            setBorder(UniversalDatePickerHelper.focusedFieldBorder());
 
         } else {
 
@@ -549,99 +370,7 @@ public class UniversalDatePicker extends JPanel {
     }
 
     public void applyProjectStyling() {
-
-        setPreferredSize(new Dimension(FIELD_WIDTH, FIELD_HEIGHT));
-
-        setMinimumSize(new Dimension(260, FIELD_HEIGHT));
-
-        setMaximumSize(new Dimension(Integer.MAX_VALUE, FIELD_HEIGHT));
-
-        setFont(DISPLAY_FONT);
-
-        setBackground(BACKGROUND_COLOR);
-
-        setBorder(new CompoundBorder(
-                new RoundedBorder(16),
-                new EmptyBorder(6, 8, 6, 8)
-        ));
+        UniversalDatePickerHelper.applyProjectStyling(this);
     }
 
-    private static class CalendarIcon extends JLabel {
-
-        private final Color iconColor;
-
-        CalendarIcon(Color color) {
-
-            this.iconColor = color;
-
-            setPreferredSize(new Dimension(ICON_SIZE, ICON_SIZE));
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-
-            super.paintComponent(g);
-
-            Graphics2D g2 = (Graphics2D) g.create();
-
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            int x = (getWidth() - ICON_SIZE) / 2;
-
-            int y = (getHeight() - ICON_SIZE) / 2;
-
-            int w = ICON_SIZE;
-
-            int h = ICON_SIZE;
-
-            g2.setColor(iconColor);
-
-            g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-
-            g2.drawRoundRect(x, y + 4, w, h - 4, 2, 2);
-
-            g2.fillRect(x, y + 4, w, 4);
-
-            g2.drawLine(x + 3, y, x + 3, y + 6);
-
-            g2.drawLine(x + w - 3, y, x + w - 3, y + 6);
-
-            g2.drawLine(x + w / 3, y + 8, x + w / 3, y + h - 2);
-
-            g2.drawLine(x + 2 * w / 3, y + 8, x + 2 * w / 3, y + h - 2);
-
-            g2.drawLine(x + 2, y + 12, x + w - 2, y + 12);
-
-            g2.dispose();
-        }
-    }
-
-    public static class RoundedBorder extends AbstractBorder {
-
-        private final int radius;
-
-        public RoundedBorder(int radius) {
-            this.radius = radius;
-        }
-
-        @Override
-        public void paintBorder(Component component, Graphics g, int x, int y, int width, int height) {
-
-            Graphics2D g2 = (Graphics2D) g.create();
-
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            g2.setColor(BORDER_COLOR);
-
-            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
-
-            g2.dispose();
-        }
-
-        @Override
-        public Insets getBorderInsets(Component component) {
-
-            return new Insets(4, 4, 4, 4);
-        }
-    }
 }

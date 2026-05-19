@@ -16,7 +16,7 @@ public final class EmployeeDetailViewStyle {
 
     public static void applyFrame(JFrame frame) {
         frame.setTitle("Employee Form");
-        frame.setSize(1100, 650);
+        frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
         frame.setLocationRelativeTo(null);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());

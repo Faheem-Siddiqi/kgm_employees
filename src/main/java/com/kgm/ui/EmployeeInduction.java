@@ -8,7 +8,7 @@ import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.FormPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.styling.DialogHelper;
-import com.kgm.ui.styling.EmployeeInductionStyle;
+import com.kgm.ui.styling.EmployeeInductionHelper;
 
 import javax.swing.*;
 import javax.swing.event.ChangeEvent;
@@ -21,14 +21,14 @@ public class EmployeeInduction extends JFrame {
     private JButton backBtn;
 
     public EmployeeInduction() {
-        EmployeeInductionStyle.applyFrame(this);
+        EmployeeInductionHelper.applyFrame(this);
 
-        JPanel topContainer = EmployeeInductionStyle.createTopContainer();
+        JPanel topContainer = EmployeeInductionHelper.createTopContainer();
         topContainer.add(new HeaderPanel("Employee Induction"), BorderLayout.NORTH);
 
-        JPanel backRow = EmployeeInductionStyle.createBackRow();
+        JPanel backRow = EmployeeInductionHelper.createBackRow();
         backBtn = new JButton("Back");
-        EmployeeInductionStyle.styleBackButton(backBtn);
+        EmployeeInductionHelper.styleBackButton(backBtn);
         backBtn.addActionListener(e -> {
             this.dispose();
             new HomeView();
@@ -38,21 +38,25 @@ public class EmployeeInduction extends JFrame {
         topContainer.add(backRow, BorderLayout.CENTER);
         add(topContainer, BorderLayout.NORTH);
 
-        JPanel centerWrapper = EmployeeInductionStyle.createCenterWrapper();
+        JPanel centerWrapper = EmployeeInductionHelper.createCenterWrapper();
         JTabbedPane tabs = new JTabbedPane();
         FormPanel formPanel = new FormPanel();
         DocumentPanel documentPanel = new DocumentPanel();
 
         tabs.addTab("Form", formPanel);
         tabs.addTab("Documents", documentPanel);
+
+        // Apply custom tab styling
+        EmployeeInductionHelper.styleTabs(tabs);
+
         centerWrapper.add(tabs, BorderLayout.CENTER);
         add(centerWrapper, BorderLayout.CENTER);
 
         JPanel footerActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         nextBackBtn = new JButton("Next");
         submitBtn = new JButton("Submit");
-        EmployeeInductionStyle.styleFooterButton(nextBackBtn);
-        EmployeeInductionStyle.styleFooterButton(submitBtn);
+        EmployeeInductionHelper.styleFooterButton(nextBackBtn);
+        EmployeeInductionHelper.styleFooterButton(submitBtn);
         submitBtn.setEnabled(false);
 
         footerActions.add(nextBackBtn);

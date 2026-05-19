@@ -1,20 +1,20 @@
 package com.kgm.ui.panel;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.io.File;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import com.kgm.model.Employee;
+import com.kgm.ui.component.UniversalDatePicker;
+import com.kgm.ui.styling.BasicDetailsPanelHelper;
 import com.kgm.ui.styling.DialogHelper;
 public class BasicDetailsPanel extends JPanel {
     // ================= IMAGE =================
     private JLabel photoPreview;
     private JLabel uploadLabel;
-    private final Font labelFont = new Font("Segoe UI", Font.PLAIN, 13);
-    private final Font inputFont = new Font("Segoe UI", Font.PLAIN, 13);
-    private final int PHOTO_SIZE = 200;
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
     private File selectedImage;
     private Employee employee;
     private JTextField empIdField;
@@ -27,8 +27,8 @@ public class BasicDetailsPanel extends JPanel {
     private JTextField designationField;
     private JComboBox<String> genderCombo;
     private JComboBox<String> reasonCombo;
-    private JSpinner appointmentSpinner;
-    private JSpinner leavingSpinner;
+    private UniversalDatePicker appointmentPicker;
+    private UniversalDatePicker leavingPicker;
     private JTextArea addressArea;
     private JTextArea current_address;
 
@@ -37,12 +37,9 @@ public class BasicDetailsPanel extends JPanel {
     // ✔ ADDED (ONLY CHANGE)
     private JLabel infoLabel;
     public BasicDetailsPanel() {
-        setLayout(new BorderLayout());
-        setBackground(Color.WHITE);
+        BasicDetailsPanelHelper.stylePanel(this);
         JScrollPane scroll = new JScrollPane(buildForm());
-        scroll.setBorder(null);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
-        scroll.getViewport().setBackground(Color.WHITE);
+        BasicDetailsPanelHelper.styleScrollPane(scroll);
         add(scroll, BorderLayout.CENTER);
     }
     public BasicDetailsPanel(Employee employee) {
@@ -75,7 +72,7 @@ public class BasicDetailsPanel extends JPanel {
             ((JTextField) field).setEditable(editable);
         } else if (field instanceof JTextArea) {
             ((JTextArea) field).setEditable(editable);
-        } else if (field instanceof JComboBox || field instanceof JSpinner) {
+        } else if (field instanceof JComboBox || field instanceof JSpinner || field instanceof UniversalDatePicker) {
             field.setEnabled(editable);
         }
     }
@@ -132,8 +129,8 @@ public class BasicDetailsPanel extends JPanel {
                 if (imgFile.exists()) {
                     BufferedImage img = ImageIO.read(imgFile);
                     Image scaled = img.getScaledInstance(
-                            PHOTO_SIZE,
-                            PHOTO_SIZE,
+                            BasicDetailsPanelHelper.PHOTO_SIZE,
+                            BasicDetailsPanelHelper.PHOTO_SIZE,
                             Image.SCALE_SMOOTH);
                     photoPreview.setIcon(new ImageIcon(scaled));
                     photoPreview.setText("");
@@ -152,9 +149,7 @@ public class BasicDetailsPanel extends JPanel {
         }
     }
     private JPanel buildForm() {
-        JPanel root = new JPanel(new GridBagLayout());
-        root.setBackground(Color.WHITE);
-        root.setBorder(new EmptyBorder(20, 20, 20, 20));
+        JPanel root = BasicDetailsPanelHelper.createFormRoot();
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.BOTH;
@@ -172,30 +167,22 @@ public class BasicDetailsPanel extends JPanel {
         return root;
     }
     private JPanel buildLeftPanel() {
-        JPanel left = new JPanel(new BorderLayout());
-        left.setPreferredSize(new Dimension(240, 300));
-        left.setBackground(Color.WHITE);
-        photoPreview = new JLabel("Photo", SwingConstants.CENTER);
-        photoPreview.setPreferredSize(new Dimension(220, 220));
-        photoPreview.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
+        JPanel left = BasicDetailsPanelHelper.createPhotoPanel();
+        photoPreview = BasicDetailsPanelHelper.createPhotoPreview("Photo");
         photoPreview.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 chooseImage(photoPreview);
             }
         });
         uploadLabel = new JLabel("Upload / Replace");
-        uploadLabel.setForeground(new Color(0, 102, 204));
-        uploadLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        BasicDetailsPanelHelper.styleUploadLabel(uploadLabel);
         uploadLabel.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 chooseImage(photoPreview);
             }
         });
-        JPanel bottom = new JPanel();
-        bottom.setBackground(Color.WHITE);
-        bottom.setLayout(new BoxLayout(bottom, BoxLayout.Y_AXIS));
-        infoLabel = new JLabel("JPEG only • Max 400KB");
-        infoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        JPanel bottom = BasicDetailsPanelHelper.createPhotoInfoPanel();
+        infoLabel = BasicDetailsPanelHelper.createPhotoInfoLabel("JPEG only • Max 400KB");
         bottom.add(infoLabel);
         bottom.add(Box.createVerticalStrut(5));
         bottom.add(uploadLabel);
@@ -204,11 +191,7 @@ public class BasicDetailsPanel extends JPanel {
         return left;
     }
     private JPanel buildRightForm() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBackground(Color.WHITE);
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(235, 235, 235)),
-                new EmptyBorder(20, 20, 20, 20)));
+        JPanel panel = BasicDetailsPanelHelper.createRightFormPanel();
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -229,22 +212,18 @@ public class BasicDetailsPanel extends JPanel {
         genderCombo = new JComboBox<>(new String[] { "Male", "Female", "Other" });
         reasonCombo = new JComboBox<>(new String[] { "Layoff", "Retirement", "Others" });
         addRow(panel, gbc, y++, "Gender", genderCombo, "Reason", reasonCombo);
-        appointmentSpinner = new JSpinner(
-                new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
-        leavingSpinner = new JSpinner(
-                new SpinnerDateModel(new Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
-        addRow(panel, gbc, y++, "Appointment Date", appointmentSpinner, "Leaving Date", leavingSpinner);
+        appointmentPicker = new UniversalDatePicker(new Date());
+        leavingPicker = new UniversalDatePicker(new Date());
+        addRow(panel, gbc, y++, "Appointment Date", appointmentPicker, "Leaving Date", leavingPicker);
         addressArea = new JTextArea(4, 20);
         addressArea.setLineWrap(true);
         addressArea.setWrapStyleWord(true);
-        addressArea.setFont(inputFont);
-        addressArea.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
+        BasicDetailsPanelHelper.styleTextArea(addressArea);
 
         current_address = new JTextArea(4, 20);
         current_address.setLineWrap(true);
         current_address.setWrapStyleWord(true);
-        current_address.setFont(inputFont);
-        current_address.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210)));
+        BasicDetailsPanelHelper.styleTextArea(current_address);
 
         addRow(panel, gbc, y++, "Permanent Address", addressArea, "Current Address", current_address);
         return panel;
@@ -278,8 +257,8 @@ public class BasicDetailsPanel extends JPanel {
                 }
                 selectedImage = file;
                 Image scaled = img.getScaledInstance(
-                        PHOTO_SIZE,
-                        PHOTO_SIZE,
+                        BasicDetailsPanelHelper.PHOTO_SIZE,
+                        BasicDetailsPanelHelper.PHOTO_SIZE,
                         Image.SCALE_SMOOTH);
                 target.setIcon(new ImageIcon(scaled));
                 target.setText("");
@@ -292,16 +271,10 @@ public class BasicDetailsPanel extends JPanel {
         JLabel label;
         JComponent input;
         public FormField(String text, JComponent comp) {
-            setLayout(new BorderLayout(6, 4));
-            setBackground(Color.WHITE);
-            label = new JLabel(text);
-            label.setFont(labelFont);
-            label.setForeground(new Color(70, 70, 70));
+            BasicDetailsPanelHelper.styleFormField(this);
+            label = BasicDetailsPanelHelper.createFieldLabel(text);
             input = comp;
-            input.setFont(inputFont);
-            if (!(input instanceof JTextArea)) {
-                input.setPreferredSize(new Dimension(240, 34));
-            }
+            BasicDetailsPanelHelper.styleInput(input);
             add(label, BorderLayout.NORTH);
             add(input, BorderLayout.CENTER);
         }
@@ -341,11 +314,11 @@ public class BasicDetailsPanel extends JPanel {
                 && !isEmpty(reasonCombo.getSelectedItem().toString())) {
             e.setRESIGN_REASON(reasonCombo.getSelectedItem().toString());
         }
-        if (appointmentSpinner.isEnabled() && appointmentSpinner.getValue() != null) {
-            e.setJOINING_DATE(appointmentSpinner.getValue().toString());
+        if (appointmentPicker.isEnabled() && appointmentPicker.getDate() != null) {
+            e.setJOINING_DATE(sdf.format(appointmentPicker.getDate()));
         }
-        if (leavingSpinner.isEnabled() && leavingSpinner.getValue() != null) {
-            e.setRESIGN_DATE(leavingSpinner.getValue().toString());
+        if (leavingPicker.isEnabled() && leavingPicker.getDate() != null) {
+            e.setRESIGN_DATE(sdf.format(leavingPicker.getDate()));
         }
         if (addressArea.isEditable() && !isEmpty(addressArea.getText())) {
             e.setPERMANENT_ADR(addressArea.getText());

@@ -1,9 +1,9 @@
 package com.kgm.ui.panel;
 
 import com.kgm.model.Employee;
+import com.kgm.ui.styling.OtherDetailsPanelHelper;
 
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -24,13 +24,10 @@ public class OtherDetailsPanel extends JPanel {
     public OtherDetailsPanel(Employee data) {
         this.data = data;
 
-        setLayout(new BorderLayout());
-        setBackground(Color.WHITE);
+        OtherDetailsPanelHelper.stylePanel(this);
 
         JScrollPane scroll = new JScrollPane(buildUI());
-        scroll.setBorder(null);
-        scroll.getViewport().setBackground(Color.WHITE);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        OtherDetailsPanelHelper.styleScrollPane(scroll);
 
         add(scroll, BorderLayout.CENTER);
     }
@@ -38,10 +35,7 @@ public class OtherDetailsPanel extends JPanel {
     // ================= UI =================
     private JPanel buildUI() {
 
-        JPanel root = new JPanel();
-        root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-        root.setBackground(Color.WHITE);
-        root.setBorder(new EmptyBorder(20, 20, 20, 20));
+        JPanel root = OtherDetailsPanelHelper.createRootPanel();
 
         root.add(createSection("Organization / Structure",
                 new String[][]{
@@ -126,16 +120,9 @@ public class OtherDetailsPanel extends JPanel {
     // ================= SECTION =================
     private JPanel createSection(String title, String[][] data) {
 
-        JPanel section = new JPanel(new BorderLayout());
-        section.setBackground(Color.WHITE);
-        section.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(230, 230, 230)),
-                new EmptyBorder(12, 12, 12, 12)
-        ));
+        JPanel section = OtherDetailsPanelHelper.createSectionPanel();
 
-        JLabel header = new JLabel(title);
-        header.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        header.setForeground(new Color(60, 60, 60));
+        JLabel header = OtherDetailsPanelHelper.createSectionHeader(title);
 
         section.add(header, BorderLayout.NORTH);
         section.add(buildGrid(data), BorderLayout.CENTER);
@@ -146,8 +133,7 @@ public class OtherDetailsPanel extends JPanel {
     // ================= GRID =================
     private JPanel buildGrid(String[][] data) {
 
-        JPanel grid = new JPanel(new GridBagLayout());
-        grid.setBackground(Color.WHITE);
+        JPanel grid = OtherDetailsPanelHelper.createGridPanel();
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(8, 10, 8, 10);
@@ -169,7 +155,7 @@ public class OtherDetailsPanel extends JPanel {
             if (i + 1 < data.length) {
                 grid.add(createField(data[i + 1][0], data[i + 1][1]), gbc);
             } else {
-                grid.add(new JPanel(), gbc);
+                grid.add(OtherDetailsPanelHelper.createGridFiller(), gbc);
             }
         }
 
@@ -179,26 +165,20 @@ public class OtherDetailsPanel extends JPanel {
     // ================= FIELD =================
     private JPanel createField(String label, String value) {
 
-        JPanel p = new JPanel(new BorderLayout(5, 3));
-        p.setBackground(Color.WHITE);
+        JPanel p = OtherDetailsPanelHelper.createFieldPanel();
 
-        JLabel lbl = new JLabel(label);
-        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        JLabel lbl = OtherDetailsPanelHelper.createFieldLabel(label);
 
         // 🔥 normalize empty -> N/A
         if (isEmpty(value)) {
             value = "N/A";
         }
 
-        JTextField field = new JTextField(value);
-        field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        JTextField field = OtherDetailsPanelHelper.createField(value);
 
         boolean editable = isEmpty(value);
 
         field.setEditable(editable);
-        field.setBackground(Color.WHITE);
-        field.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220)));
-        field.setPreferredSize(new Dimension(200, 30));
 
         // 🔥 store field
         fieldMap.put(label, field);

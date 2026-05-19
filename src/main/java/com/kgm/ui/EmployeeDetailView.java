@@ -2,13 +2,14 @@ package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRepositoryDao;
 import com.kgm.model.Employee;
+import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.panel.BasicDetailsPanel;
 import com.kgm.ui.panel.DocumentViewPanel;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.OtherDetailsPanel;
 import com.kgm.ui.styling.DialogHelper;
-import com.kgm.ui.styling.EmployeeDetailViewStyle;
+import com.kgm.ui.styling.EmployeeDetailViewHelper;
 
 import javax.swing.*;
 import java.awt.*;
@@ -43,31 +44,31 @@ public class EmployeeDetailView extends JFrame {
     }
 
     private void initializeUI(Employee emp, boolean isWithData) {
-        EmployeeDetailViewStyle.applyFrame(this);
+        EmployeeDetailViewHelper.applyFrame(this);
 
-        JPanel topContainer = EmployeeDetailViewStyle.createTopContainer();
+        JPanel topContainer = EmployeeDetailViewHelper.createTopContainer();
         topContainer.add(new HeaderPanel("Employee Record"), BorderLayout.NORTH);
 
-        JPanel secondRow = EmployeeDetailViewStyle.createSecondRow();
-        JPanel left = EmployeeDetailViewStyle.createBackButtonPanel();
+        JPanel secondRow = EmployeeDetailViewHelper.createSecondRow();
+        JPanel left = EmployeeDetailViewHelper.createBackButtonPanel();
 
         backBtn = new JButton("Back");
-        EmployeeDetailViewStyle.styleBackButton(backBtn);
+        EmployeeDetailViewHelper.styleBackButton(backBtn);
         backBtn.addActionListener(e -> {
             this.dispose();
             new HomeView();
         });
         left.add(backBtn);
 
-        JPanel right = EmployeeDetailViewStyle.createEmployeeSummaryPanel();
+        JPanel right = EmployeeDetailViewHelper.createEmployeeSummaryPanel();
         String nameValue = (emp != null) ? emp.getEMP_NAME() : "";
         String codeValue = (emp != null) ? emp.getEMPLOYEE_CODE() : "";
 
         JLabel name = new JLabel(nameValue);
-        EmployeeDetailViewStyle.styleEmployeeName(name);
+        EmployeeDetailViewHelper.styleEmployeeName(name);
 
         JLabel code = new JLabel("Code: " + codeValue);
-        EmployeeDetailViewStyle.styleEmployeeCode(code);
+        EmployeeDetailViewHelper.styleEmployeeCode(code);
 
         right.add(name);
         right.add(Box.createVerticalStrut(2));
@@ -78,7 +79,7 @@ public class EmployeeDetailView extends JFrame {
         topContainer.add(secondRow, BorderLayout.CENTER);
         add(topContainer, BorderLayout.NORTH);
 
-        JPanel centerWrapper = EmployeeDetailViewStyle.createCenterWrapper();
+        JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
         JTabbedPane tabs = new JTabbedPane();
 
         if (isWithData) {
@@ -91,12 +92,15 @@ public class EmployeeDetailView extends JFrame {
 
         tabs.addTab("Documents", new DocumentViewPanel());
 
+        // Apply custom tab styling
+        EmployeeDetailViewHelper.styleTabs(tabs);
+
         centerWrapper.add(tabs, BorderLayout.CENTER);
         add(centerWrapper, BorderLayout.CENTER);
 
         JPanel footerActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         updateBtn = new JButton("Update");
-        EmployeeDetailViewStyle.styleUpdateButton(updateBtn);
+        EmployeeDetailViewHelper.styleUpdateButton(updateBtn);
         footerActions.add(updateBtn);
         add(new FooterPanel(footerActions), BorderLayout.SOUTH);
 
@@ -187,6 +191,10 @@ public class EmployeeDetailView extends JFrame {
             }
 
             if (comp instanceof JSpinner sp && sp.isEnabled()) {
+                return true;
+            }
+
+            if (comp instanceof UniversalDatePicker udp && udp.isEnabled()) {
                 return true;
             }
 
