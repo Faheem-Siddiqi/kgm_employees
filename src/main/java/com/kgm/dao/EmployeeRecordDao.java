@@ -31,7 +31,10 @@ public class EmployeeRecordDao {
     // 🔹 PAGINATED LIST (LIMIT FIXED = 2500)
     // ==============================
     public List<Employee> getEmployees(int offset) {
-        int limit = 2500; // FIXED PAGE SIZE
+        return getEmployees(offset, 2500);
+    }
+
+    public List<Employee> getEmployees(int offset, int limit) {
         List<Employee> list = new ArrayList<>();
         String sql = """
                     SELECT
@@ -54,8 +57,8 @@ public class EmployeeRecordDao {
                 """;
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, limit);
-            ps.setInt(2, offset);
+            ps.setInt(1, Math.max(1, limit));
+            ps.setInt(2, Math.max(0, offset));
 
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {

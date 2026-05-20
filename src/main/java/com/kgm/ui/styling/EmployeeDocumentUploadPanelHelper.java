@@ -8,6 +8,10 @@ import javax.swing.border.MatteBorder;
 import java.awt.*;
 
 public final class EmployeeDocumentUploadPanelHelper {
+    private static final int SEARCH_BOX_WIDTH = 340;
+    private static final int SEARCH_ROW_WIDTH = 455;
+    private static final int SEARCH_CONTROL_HEIGHT = 36;
+
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color ACTION_BLUE = new Color(30, 144, 255);
     private static final Color DISABLED_TEXT = Color.GRAY;
@@ -43,13 +47,18 @@ public final class EmployeeDocumentUploadPanelHelper {
     }
 
     public static JPanel createSearchPanel(JTextField searchField, JButton clearButton, JButton searchButton) {
-        JPanel row = new JPanel(new BorderLayout(10, 0));
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         row.setBackground(PAGE_BACKGROUND);
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        row.setPreferredSize(new Dimension(SEARCH_ROW_WIDTH, SEARCH_CONTROL_HEIGHT));
+        row.setMaximumSize(new Dimension(SEARCH_ROW_WIDTH, SEARCH_CONTROL_HEIGHT));
 
         JPanel searchBox = new JPanel(new BorderLayout(6, 0));
         searchBox.setBackground(PAGE_BACKGROUND);
+        Dimension searchBoxSize = new Dimension(SEARCH_BOX_WIDTH, SEARCH_CONTROL_HEIGHT);
+        searchBox.setPreferredSize(searchBoxSize);
+        searchBox.setMinimumSize(searchBoxSize);
+        searchBox.setMaximumSize(searchBoxSize);
         searchBox.setBorder(new CompoundBorder(
                 new LineBorder(FIELD_BORDER),
                 new EmptyBorder(0, 10, 0, 4)
@@ -57,8 +66,17 @@ public final class EmployeeDocumentUploadPanelHelper {
         searchBox.add(searchField, BorderLayout.CENTER);
         searchBox.add(clearButton, BorderLayout.EAST);
 
-        row.add(searchBox, BorderLayout.CENTER);
-        row.add(searchButton, BorderLayout.EAST);
+        row.add(searchBox);
+        row.add(searchButton);
+        return row;
+    }
+
+    public static JPanel createBulkActionPanel(JButton uploadAllButton) {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        row.setBackground(PAGE_BACKGROUND);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        row.add(uploadAllButton);
         return row;
     }
 
@@ -67,7 +85,7 @@ public final class EmployeeDocumentUploadPanelHelper {
         field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         field.setForeground(TEXT_PRIMARY);
         field.setBackground(PAGE_BACKGROUND);
-        field.setPreferredSize(new Dimension(260, 34));
+        field.setPreferredSize(new Dimension(240, 34));
     }
 
     public static void styleSearchButton(JButton button) {
@@ -77,6 +95,17 @@ public final class EmployeeDocumentUploadPanelHelper {
         button.setBorderPainted(false);
         button.setFont(new Font("Segoe UI", Font.BOLD, 13));
         button.setBorder(new EmptyBorder(8, 16, 8, 16));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
+    public static void styleTextCtaButton(JButton button) {
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false);
+        button.setFocusPainted(false);
+        button.setOpaque(false);
+        button.setForeground(ACTION_BLUE);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        button.setBorder(new EmptyBorder(6, 0, 6, 0));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 

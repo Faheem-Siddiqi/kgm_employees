@@ -211,10 +211,12 @@ public final class TablePaginationHelper {
                         table, value, isSelected, hasFocus, row, column);
                 label.setOpaque(true);
                 boolean actionColumn = "Action".equalsIgnoreCase(table.getColumnName(column));
+                boolean employeeIdColumn = "Employee ID".equalsIgnoreCase(table.getColumnName(column));
+                boolean clickableColumn = actionColumn || employeeIdColumn;
                 label.setHorizontalAlignment(actionColumn ? SwingConstants.CENTER : SwingConstants.LEFT);
                 label.setBackground(isSelected ? ROW_SELECTION : PAGE_BACKGROUND);
-                label.setForeground(actionColumn ? PRIMARY : TEXT_PRIMARY);
-                label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                label.setForeground(clickableColumn ? PRIMARY : TEXT_PRIMARY);
+                label.setFont(new Font("Segoe UI", clickableColumn ? Font.BOLD : Font.PLAIN, 13));
                 label.setBorder(new CompoundBorder(
                         new MatteBorder(0, 0, 1, 1, CELL_DIVIDER),
                         new EmptyBorder(0, 16, 0, 14)));

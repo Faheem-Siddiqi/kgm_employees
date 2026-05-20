@@ -9,6 +9,7 @@ import com.kgm.ui.panel.EmployeeRegistrationFormPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
+import com.kgm.util.EmployeeDocumentUtil;
 
 import javax.swing.*;
 import java.awt.*;
@@ -99,31 +100,11 @@ public class EmployeeRegistrationView extends JFrame {
                 EmployeeDocumentUploadPanel docPanel = documentPanel;
                 String[] docs = docPanel.getAllDocumentPaths();
                 if (docs != null) {
-                    String[] fileNames = {
-                            "CNIC_COPY.jpg",
-                            "EOBI_CARD_COPY.jpg",
-                            "SS_CARD_COPY.jpg",
-                            "FINAL_SETTLEMENT.jpg",
-                            "CLEARANCE_CERT.jpg",
-                            "JOB_APPOINTMENT.jpg",
-                            "APPLICATION_DOC.jpg",
-                            "ISSUANCE_DOC.jpg",
-                            "SETTLEMENT_DOC.jpg",
-                            "TRIAL_CARD.jpg",
-                            "INTERVIEW_DOC.jpg",
-                            "SERVICE_LETTER.jpg",
-                            "EXTENSION_LETTER.jpg",
-                            "RETIREMENT_LETTER.jpg",
-                            "COVID_CERT.jpg",
-                            "DISCIPLINARY_I.jpg",
-                            "DISCIPLINARY_II.jpg",
-                            "DISCIPLINARY_III.jpg"
-                    };
-
                     for (int i = 0; i < docs.length; i++) {
                         if (docs[i] != null) {
                             File src = new File(docs[i]);
-                            File dest = new File(docDir, fileNames[i]);
+                            String storageName = EmployeeDocumentUtil.documentType(i).storageName();
+                            File dest = new File(docDir, storageName);
                             try (java.io.InputStream in = new java.io.FileInputStream(src);
                                     java.io.OutputStream out = new java.io.FileOutputStream(dest)) {
                                 byte[] buffer = new byte[1024];
@@ -133,27 +114,8 @@ public class EmployeeRegistrationView extends JFrame {
                                 }
                             }
 
-                            String dbPath = "employees/" + empCode + "/documents/" + fileNames[i];
-                            switch (i) {
-                                case 0 -> emp.setCNIC_COPY(dbPath);
-                                case 1 -> emp.setEOBI_CARD_COPY(dbPath);
-                                case 2 -> emp.setSS_CARD_COPY(dbPath);
-                                case 3 -> emp.setFINAL_SETTLEMENT(dbPath);
-                                case 4 -> emp.setCLEARANCE_CERT(dbPath);
-                                case 5 -> emp.setJOB_APPOINTMENT(dbPath);
-                                case 6 -> emp.setAPPLICATION_DOC(dbPath);
-                                case 7 -> emp.setISSUANCE_DOC(dbPath);
-                                case 8 -> emp.setSETTLEMENT_DOC(dbPath);
-                                case 9 -> emp.setTRIAL_CARD(dbPath);
-                                case 10 -> emp.setINTERVIEW_DOC(dbPath);
-                                case 11 -> emp.setSERVICE_LETTER(dbPath);
-                                case 12 -> emp.setEXTENSION_LETTER(dbPath);
-                                case 13 -> emp.setRETIREMENT_LETTER(dbPath);
-                                case 14 -> emp.setCOVID_CERT(dbPath);
-                                case 15 -> emp.setDISCIPLINARY_I(dbPath);
-                                case 16 -> emp.setDISCIPLINARY_II(dbPath);
-                                case 17 -> emp.setDISCIPLINARY_III(dbPath);
-                            }
+                            String dbPath = "employees/" + empCode + "/documents/" + storageName;
+                            EmployeeDocumentUtil.setDocumentPath(emp, i, dbPath);
                         }
                     }
                 }

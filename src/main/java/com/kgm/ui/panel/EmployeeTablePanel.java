@@ -1,35 +1,33 @@
 package com.kgm.ui.panel;
 
-import javax.swing.*;
-import com.kgm.ui.EmployeeDetailView;
-import com.kgm.ui.styling.TablePaginationHelper;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.DefaultTableModel;
-import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.font.TextAttribute;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.model.Employee;
+import com.kgm.ui.EmployeeDetailView;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class EmployeeTablePanel extends JPanel {
     private static final int EMPLOYEE_CODE_COLUMN = 0;
-    private static final int ACTION_COLUMN = 9;
-    private static final String ACTION_LABEL = "View";
+    private static final int ACTION_COLUMN = 8;
 
-    private JTable table;
-    private DefaultTableModel model;
-    private JPanel paginationPanel;
-    private final List<Employee> allData = new ArrayList<>();
+    private static final String[] COLUMNS = {
+            "Employee ID",
+            "Name",
+            "CNIC",
+            "Phone",
+            "Department",
+            "Designation",
+            "Joining Date",
+            "Leaving Date",
+            "Action"
+    };
 
-    // pagination editable - max 12 entries, no vertical scrolling
-    private final int rowsPerPage = 12;
-    private int currentPage = 1;
     private final EmployeeRecordDao repo;
-    private JLabel showingLabel;
+    private final UniversalTablePanel tablePanel;
+    private final List<Employee> displayedEmployees = new ArrayList<>();
 
     public EmployeeTablePanel(EmployeeRecordDao repo) {
         this.repo = repo;
@@ -37,203 +35,80 @@ public class EmployeeTablePanel extends JPanel {
         setBackground(Color.WHITE);
         setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
 
-        model = new DefaultTableModel() {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
+        tablePanel = new UniversalTablePanel(COLUMNS, "No employee records found.");
+        tablePanel.setLinkColumn(EMPLOYEE_CODE_COLUMN, this::openEmployeeDetail);
+        tablePanel.setActionColumn(ACTION_COLUMN, "View", this::openEmployeeDetail);
+        tablePanel.setColumnAlignment(6, SwingConstants.CENTER);
+        tablePanel.setColumnAlignment(7, SwingConstants.CENTER);
+        tablePanel.setClippedTextColumn(1);
+        tablePanel.setClippedTextColumn(4);
+        tablePanel.setClippedTextColumn(5);
+        tablePanel.setPreferredColumnWidthLimit(2, 150);
+        tablePanel.setPreferredColumnWidthLimit(3, 140);
+        tablePanel.setPreferredColumnWidthLimit(6, 130);
+        tablePanel.setPreferredColumnWidthLimit(7, 130);
+        // Pagination button gap for this table specifically.
+        tablePanel.setPaginationBottomGap(5);
 
-        model.setColumnIdentifiers(new String[] {
-                "Employee ID",
-                "Name",
-                "CNIC",
-                "Phone",
-                "Email",
-                "Department",
-                "Designation",
-                "Joining Date",
-                "Leaving Date",
-                "Action",
-        });
-
-        table = TablePaginationHelper.createEmployeeTable(model);
-        configureActionColumnStyle();
-
-        JScrollPane scrollPane = createNoScrollScrollPane(table);
-        add(scrollPane, BorderLayout.CENTER);
-
-        table.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent event) {
-                int row = table.rowAtPoint(event.getPoint());
-                int column = table.columnAtPoint(event.getPoint());
-
-                if (row >= 0 && column == ACTION_COLUMN) {
-                    openEmployeeDetail(row);
-                }
-            }
-        });
-
-        table.addMouseMotionListener(new MouseAdapter() {
-            public void mouseMoved(MouseEvent event) {
-                int column = table.columnAtPoint(event.getPoint());
-
-                table.setCursor(Cursor.getPredefinedCursor(
-                        column == ACTION_COLUMN ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR
-                ));
-            }
-        });
-
-        paginationPanel = TablePaginationHelper.createPaginationButtonPanel();
-        showingLabel = TablePaginationHelper.createShowingLabel();
-
-        add(TablePaginationHelper.createPaginationContainer(showingLabel, paginationPanel), BorderLayout.SOUTH);
-
-        loadPage(1);
-        buildPagination();
+        add(tablePanel, BorderLayout.CENTER);
+        reload();
     }
 
-    // ================= SEARCH DISPLAY =================
-    public void showSingleEmployee(Employee e) {
-        model.setRowCount(0);
-
-        if (e == null) {
-            return;
+    public void showSingleEmployee(Employee employee) {
+        displayedEmployees.clear();
+        if (employee != null) {
+            displayedEmployees.add(employee);
         }
 
-        model.addRow(new Object[] {
-                e.getEMPLOYEE_CODE(),
-                e.getEMP_NAME(),
-                e.getNID(),
-                e.getEMP_CONTNO(),
-                e.getPERSONAL_EMAIL(),
-                e.getDEPARTMENT(),
-                e.getDESIGNATION(),
-                e.getJOINING_DATE(),
-                e.getRESIGN_DATE(),
-                ACTION_LABEL
-        });
-
-        TablePaginationHelper.showSingleRecord(showingLabel, paginationPanel);
-    }
-
-    private void loadPage(int page) {
-        model.setRowCount(0);
-
-        int offset = (page - 1) * rowsPerPage;
-        List<Employee> list = repo.getEmployees(offset);
-
-        allData.clear();
-        allData.addAll(list);
-
-        for (Employee e : list) {
-            model.addRow(new Object[] {
-                    e.getEMPLOYEE_CODE(),
-                    e.getEMP_NAME(),
-                    e.getNID(),
-                    e.getEMP_CONTNO(),
-                    e.getPERSONAL_EMAIL(),
-                    e.getDEPARTMENT(),
-                    e.getDESIGNATION(),
-                    e.getJOINING_DATE(),
-                    e.getRESIGN_DATE(),
-                    ACTION_LABEL
-            });
-        }
-
-        TablePaginationHelper.updateShowingLabel(showingLabel, currentPage, rowsPerPage, repo.countEmployees());
-        SwingUtilities.invokeLater(() -> TablePaginationHelper.autoResizeColumns(table));
-    }
-
-    private void buildPagination() {
-        TablePaginationHelper.buildPagination(
-                paginationPanel,
-                repo.countEmployees(),
-                rowsPerPage,
-                currentPage,
-                page -> {
-                    currentPage = page;
-                    loadPage(page);
-                    buildPagination();
-                });
+        tablePanel.setPaginationEnabled(false);
+        tablePanel.setRows(toRows(displayedEmployees));
     }
 
     public void clearTable() {
-        model.setRowCount(0);
+        displayedEmployees.clear();
+        tablePanel.clearRows();
     }
 
     public void reload() {
-        currentPage = 1;
-        loadPage(currentPage);
-        buildPagination();
+        displayedEmployees.clear();
+        int totalEmployees = repo.countEmployees();
+        if (totalEmployees > 0) {
+            displayedEmployees.addAll(repo.getEmployees(0, totalEmployees));
+        }
+
+        tablePanel.setPaginationEnabled(true);
+        tablePanel.setRows(toRows(displayedEmployees));
+    }
+
+    private List<Object[]> toRows(List<Employee> employees) {
+        List<Object[]> rows = new ArrayList<>();
+        for (Employee employee : employees) {
+            rows.add(new Object[]{
+                    employee.getEMPLOYEE_CODE(),
+                    employee.getEMP_NAME(),
+                    employee.getNID(),
+                    employee.getEMP_CONTNO(),
+                    employee.getDEPARTMENT(),
+                    employee.getDESIGNATION(),
+                    employee.getJOINING_DATE(),
+                    employee.getRESIGN_DATE(),
+                    "View"
+            });
+        }
+        return rows;
     }
 
     private void openEmployeeDetail(int row) {
-        String empCode = table.getValueAt(row, EMPLOYEE_CODE_COLUMN).toString();
+        if (row < 0 || row >= displayedEmployees.size()) {
+            return;
+        }
 
-        java.awt.Window window = SwingUtilities.getWindowAncestor(table);
+        String employeeCode = displayedEmployees.get(row).getEMPLOYEE_CODE();
+        Window window = SwingUtilities.getWindowAncestor(this);
         if (window != null) {
             window.dispose();
         }
 
-        new EmployeeDetailView(empCode);
-    }
-
-    private void configureActionColumnStyle() {
-        table.getColumnModel().getColumn(ACTION_COLUMN).setCellRenderer(new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(
-                    JTable table,
-                    Object value,
-                    boolean isSelected,
-                    boolean hasFocus,
-                    int row,
-                    int column
-            ) {
-                Component component = super.getTableCellRendererComponent(
-                        table,
-                        value,
-                        isSelected,
-                        hasFocus,
-                        row,
-                        column
-                );
-
-                if (component instanceof JLabel label) {
-                    Map<TextAttribute, Object> attributes = new java.util.HashMap<>(
-                            label.getFont().getAttributes()
-                    );
-
-                    attributes.put(TextAttribute.WEIGHT, TextAttribute.WEIGHT_SEMIBOLD);
-                    label.setFont(label.getFont().deriveFont(attributes));
-                    label.setHorizontalAlignment(SwingConstants.CENTER);
-                }
-
-                return component;
-            }
-        });
-    }
-
-    /**
-     * Creates a scroll pane with no vertical scrolling that hugs the table content.
-     * This ensures the table displays exactly the rows without scrolling, limited to 12 entries.
-     */
-    private JScrollPane createNoScrollScrollPane(JTable table) {
-        JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(new TablePaginationHelper.RoundedTableBorder());
-        scrollPane.getViewport().setBackground(Color.WHITE);
-        scrollPane.getViewport().setBorder(null);
-
-        // Horizontal scroll as needed, no vertical scroll
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
-
-        scrollPane.getHorizontalScrollBar().setUnitIncrement(16);
-        scrollPane.getHorizontalScrollBar().setBlockIncrement(96);
-
-        // Set preferred size to hug the table content 12 rows max
-        scrollPane.setPreferredSize(table.getPreferredScrollableViewportSize());
-
-        return scrollPane;
+        new EmployeeDetailView(employeeCode);
     }
 }

@@ -41,7 +41,7 @@ public final class HomeViewHelper {
         JPanel card = sectionCard("Employee Filters", "Search and narrow employee records quickly.");
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.setOpaque(false);
-        wrapper.setBorder(new EmptyBorder(24, 24, 0, 24));
+        wrapper.setBorder(new EmptyBorder(24, 28, 0, 28));
 
         JPanel row = new JPanel(new BorderLayout(10, 0));
         row.setBackground(PAGE_BACKGROUND);
@@ -112,7 +112,7 @@ public final class HomeViewHelper {
 
     public static JPanel createButtonRow() {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
-        row.setBorder(BorderFactory.createEmptyBorder(20, 15, 10, 15));
+        row.setBorder(BorderFactory.createEmptyBorder(20, 28, 10, 28));
         row.setOpaque(false);
         return row;
     }
@@ -135,7 +135,7 @@ public final class HomeViewHelper {
     public static JPanel createBodyPanel() {
         JPanel body = new JPanel(new BorderLayout());
         body.setBackground(PAGE_BACKGROUND);
-        body.setBorder(BorderFactory.createEmptyBorder(10, 25, 0, 25));
+        body.setBorder(BorderFactory.createEmptyBorder(10, 28, 0, 28));
         return body;
     }
 

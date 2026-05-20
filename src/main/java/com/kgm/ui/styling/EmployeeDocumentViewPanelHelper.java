@@ -23,6 +23,34 @@ public final class EmployeeDocumentViewPanelHelper {
         return EmployeeDocumentUploadPanelHelper.createSizeLabel();
     }
 
+    public static JPanel createSearchPanel(JTextField searchField, JButton clearButton, JButton searchButton) {
+        return EmployeeDocumentUploadPanelHelper.createSearchPanel(searchField, clearButton, searchButton);
+    }
+
+    public static JPanel createBulkActionPanel(JButton uploadAllButton) {
+        return EmployeeDocumentUploadPanelHelper.createBulkActionPanel(uploadAllButton);
+    }
+
+    public static void styleSearchField(JTextField field) {
+        EmployeeDocumentUploadPanelHelper.styleSearchField(field);
+    }
+
+    public static void styleSearchButton(JButton button) {
+        EmployeeDocumentUploadPanelHelper.styleSearchButton(button);
+    }
+
+    public static void styleTextCtaButton(JButton button) {
+        EmployeeDocumentUploadPanelHelper.styleTextCtaButton(button);
+    }
+
+    public static void styleClearButton(JButton button) {
+        EmployeeDocumentUploadPanelHelper.styleClearButton(button);
+    }
+
+    public static void updateClearButtonState(JButton button, boolean enabled) {
+        EmployeeDocumentUploadPanelHelper.updateClearButtonState(button, enabled);
+    }
+
     public static JPanel createRendererPanel() {
         return EmployeeDocumentUploadPanelHelper.createRendererPanel();
     }

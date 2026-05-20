@@ -8,6 +8,7 @@ public final class EmployeeDetailViewLayoutHelper {
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color NAVY = new Color(0, 38, 77);
     private static final Color LINK_BLUE = new Color(0, 102, 204);
+    private static final Color SUCCESS_GREEN = new Color(15, 139, 76);
     private static final Color EMPLOYEE_NAME = new Color(100, 100, 100);
     private static final Color EMPLOYEE_CODE = new Color(90, 90, 90);
 
@@ -71,32 +72,35 @@ public final class EmployeeDetailViewLayoutHelper {
         titleBlock.add(title);
         titleBlock.add(Box.createVerticalStrut(3));
         titleBlock.add(subtitle);
+
+        JPanel actionGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 18, 0));
+        actionGroup.setOpaque(false);
         if (onDownloadReport != null) {
             JButton downloadReport = createDownloadReportButton();
             downloadReport.addActionListener(e -> onDownloadReport.run());
-            titleBlock.add(Box.createVerticalStrut(8));
-            titleBlock.add(downloadReport);
+            actionGroup.add(downloadReport);
         }
 
         JButton back = new JButton("Dashboard");
         styleBackButton(back);
         back.addActionListener(e -> onBack.run());
+        actionGroup.add(back);
 
         header.add(titleBlock, BorderLayout.WEST);
-        header.add(back, BorderLayout.EAST);
+        header.add(actionGroup, BorderLayout.EAST);
         return header;
     }
 
     private static JButton createDownloadReportButton() {
-        JButton button = new JButton("Download Report");
+        JButton button = new JButton("Download Profile");
         button.setAlignmentX(Component.LEFT_ALIGNMENT);
         button.setBorderPainted(false);
         button.setContentAreaFilled(false);
         button.setFocusPainted(false);
         button.setOpaque(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(LINK_BLUE);
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        button.setForeground(SUCCESS_GREEN);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
         button.setMargin(new Insets(0, 0, 0, 0));
         button.setBorder(new EmptyBorder(0, 0, 0, 0));
         return button;

@@ -46,6 +46,7 @@ public class UniversalTablePanel extends JPanel {
     private int hoveredLinkRow = -1;
     private boolean hugRows = true;
     private boolean paginationEnabled = true;
+    private int paginationBottomGap = 0;
     private int currentPage = 0;
 
     public UniversalTablePanel(String[] columns, String emptyText) {
@@ -283,6 +284,11 @@ public class UniversalTablePanel extends JPanel {
         refresh();
     }
 
+    public void setPaginationBottomGap(int paginationBottomGap) {
+        this.paginationBottomGap = Math.max(0, paginationBottomGap);
+        refresh();
+    }
+
     public void addRow(Object[] row) {
         rows.add(row);
         currentPage = lastPage();
@@ -426,6 +432,7 @@ public class UniversalTablePanel extends JPanel {
 
     private JPanel createPagination() {
         JPanel pagination = UniversalTablePanelHelper.createPagination();
+        pagination.setBorder(BorderFactory.createEmptyBorder(2, 0, paginationBottomGap, 0));
 
         UniversalTablePanelHelper.styleRangeLabel(rangeLabel, showingText());
 
@@ -549,7 +556,10 @@ public class UniversalTablePanel extends JPanel {
     private String showingText() {
         int start = currentPage * PAGE_SIZE;
         int end = Math.min(start + PAGE_SIZE, rows.size());
-        return "Showing " + start + "-" + end + " / " + rows.size();
+        if (rows.isEmpty()) {
+            return "Showing 0 / 0";
+        }
+        return "Showing " + (start + 1) + "-" + end + " / " + rows.size();
     }
 
     private int toAbsoluteRow(int pageRow) {

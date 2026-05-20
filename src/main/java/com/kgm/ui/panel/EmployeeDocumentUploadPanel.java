@@ -3,15 +3,19 @@ package com.kgm.ui.panel;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDocumentUploadPanelHelper;
 import com.kgm.ui.styling.TablePaginationHelper;
+import com.kgm.util.EmployeeDocumentUtil;
 
-import java.io.File;
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.table.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -23,46 +27,34 @@ public class EmployeeDocumentUploadPanel extends JPanel {
     private JTable table;
     private DefaultTableModel model;
     private File[] files;
+    private String[] filePaths;
     private JTextField searchField;
     private JButton clearSearchButton;
-
-    // ✅ NEW: store actual file paths for DB
-    private String[] filePaths;
-
-    private static final long MAX_SIZE = 400 * 1024; // 400 KB
-
+    private JScrollPane documentScrollPane;
     private JLabel uploadedCountLabel;
-
-    private final String[] documents = {
-            "CNIC *", "EOBI Card *", "SS_CARD_COPY*", "Final Settlement",
-            "Clearance Certificate", "Job Appointment Letter", "Application Letter",
-            "Insurance Form", "Settlement Document", "Trial Card",
-            "Interview Form", "Service Letter", "Extension Letter",
-            "Retirement Letter", "Covid Certification", "DISCIPLINARY_I", "DISCIPLINARY_II", "DISCIPLINARY_III"
-    };
 
     public EmployeeDocumentUploadPanel() {
         EmployeeDocumentUploadPanelHelper.stylePanel(this);
 
-        files = new File[documents.length];
+        files = new File[EmployeeDocumentUtil.documentCount()];
+        filePaths = new String[EmployeeDocumentUtil.documentCount()];
 
-        // ✅ NEW INIT
-        filePaths = new String[documents.length];
-
-        // ================= TOP TEXT =================
         JPanel topPanel = EmployeeDocumentUploadPanelHelper.createTopPanel();
 
-        uploadedCountLabel = EmployeeDocumentUploadPanelHelper.createUploadedCountLabel("Total Uploades: 0");
-
+        uploadedCountLabel = EmployeeDocumentUploadPanelHelper.createUploadedCountLabel("Total uploads: 0");
         JLabel sizeLabel = EmployeeDocumentUploadPanelHelper.createSizeLabel();
         searchField = new PlaceholderTextField("Search Document Name");
         JButton searchButton = new JButton("Search");
         clearSearchButton = new JButton("Clear");
+        JButton uploadAllButton = new JButton("Upload All");
+
         EmployeeDocumentUploadPanelHelper.styleSearchField(searchField);
         EmployeeDocumentUploadPanelHelper.styleSearchButton(searchButton);
         EmployeeDocumentUploadPanelHelper.styleClearButton(clearSearchButton);
+        EmployeeDocumentUploadPanelHelper.styleTextCtaButton(uploadAllButton);
 
         searchButton.addActionListener(e -> refreshDocumentRows());
+        uploadAllButton.addActionListener(e -> chooseMultipleFiles());
         clearSearchButton.addActionListener(e -> {
             searchField.setText("");
             searchField.requestFocusInWindow();
@@ -94,12 +86,12 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         topPanel.add(sizeLabel);
         topPanel.add(Box.createVerticalStrut(12));
         topPanel.add(EmployeeDocumentUploadPanelHelper.createSearchPanel(searchField, clearSearchButton, searchButton));
+        topPanel.add(Box.createVerticalStrut(8));
+        topPanel.add(EmployeeDocumentUploadPanelHelper.createBulkActionPanel(uploadAllButton));
         topPanel.add(Box.createVerticalStrut(12));
-
         add(topPanel, BorderLayout.NORTH);
 
         String[] columns = {"Document", "File", "Status", "Actions", "DocumentIndex"};
-
         model = new DefaultTableModel(columns, 0) {
             public boolean isCellEditable(int row, int column) {
                 return column == ACTION_COLUMN;
@@ -110,14 +102,12 @@ public class EmployeeDocumentUploadPanel extends JPanel {
 
         table = TablePaginationHelper.createDocumentTable(model);
         hideDocumentIndexColumn();
-
         table.getColumnModel().getColumn(ACTION_COLUMN).setCellRenderer(new ActionRenderer());
         table.getColumnModel().getColumn(ACTION_COLUMN).setCellEditor(new ActionEditor());
 
-        JScrollPane scrollPane = TablePaginationHelper.createScrollPane(table, false);
-        showFullTableWithoutScroll(scrollPane);
-
-        add(scrollPane, BorderLayout.CENTER);
+        documentScrollPane = TablePaginationHelper.createScrollPane(table, false);
+        showFullTableWithoutScroll(documentScrollPane);
+        add(documentScrollPane, BorderLayout.CENTER);
     }
 
     private void showFullTableWithoutScroll(JScrollPane scrollPane) {
@@ -127,8 +117,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
 
         int headerHeight = table.getTableHeader() == null ? 0 : table.getTableHeader().getPreferredSize().height;
         int tableHeight = headerHeight + (table.getRowHeight() * table.getRowCount()) + 2;
-        Dimension preferredSize = new Dimension(scrollPane.getPreferredSize().width, tableHeight);
-        scrollPane.setPreferredSize(preferredSize);
+        scrollPane.setPreferredSize(new Dimension(scrollPane.getPreferredSize().width, tableHeight));
         scrollPane.setMinimumSize(new Dimension(320, tableHeight));
     }
 
@@ -140,13 +129,14 @@ public class EmployeeDocumentUploadPanel extends JPanel {
             table.getCellEditor().stopCellEditing();
         }
 
-        String query = normalizedSearch(searchField == null ? "" : searchField.getText());
+        String query = EmployeeDocumentUtil.normalizedSearch(searchField == null ? "" : searchField.getText());
         List<Integer> orderedIndexes = new ArrayList<>();
-        for (int index = 0; index < documents.length; index++) {
+        for (int index = 0; index < EmployeeDocumentUtil.documentCount(); index++) {
             orderedIndexes.add(index);
         }
 
         if (!query.isEmpty()) {
+            orderedIndexes.removeIf(index -> matchScore(index, query) == 2);
             orderedIndexes.sort((left, right) -> {
                 int score = Integer.compare(matchScore(left, query), matchScore(right, query));
                 return score != 0 ? score : Integer.compare(left, right);
@@ -157,14 +147,21 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         for (Integer documentIndex : orderedIndexes) {
             addDocumentRow(documentIndex);
         }
+        if (documentScrollPane != null) {
+            showFullTableWithoutScroll(documentScrollPane);
+            revalidate();
+            repaint();
+        }
     }
 
     private void addDocumentRow(int documentIndex) {
         File file = files[documentIndex];
         String fileText = file == null ? "-" : file.getName();
-        String statusText = file == null ? "Not Uploaded" : "Uploaded (" + formatSize(file.length()) + ")";
+        String statusText = file == null
+                ? "Not Uploaded"
+                : "Uploaded (" + EmployeeDocumentUtil.formatSize(file.length()) + ")";
         model.addRow(new Object[]{
-                documents[documentIndex],
+                EmployeeDocumentUtil.documentType(documentIndex).label(),
                 fileText,
                 statusText,
                 "",
@@ -192,68 +189,59 @@ public class EmployeeDocumentUploadPanel extends JPanel {
     }
 
     private int matchScore(int documentIndex, String query) {
-        String documentName = normalizedSearch(documents[documentIndex]);
-        if (documentName.startsWith(query)) {
-            return 0;
+        List<String> searchableValues = new ArrayList<>();
+        searchableValues.add(EmployeeDocumentUtil.documentType(documentIndex).label());
+        searchableValues.add(EmployeeDocumentUtil.documentType(documentIndex).employeeFieldName());
+        searchableValues.add(EmployeeDocumentUtil.documentType(documentIndex).storageName());
+        File file = files[documentIndex];
+        if (file != null) {
+            searchableValues.add(file.getName());
         }
-        if (documentName.contains(query)) {
-            return 1;
+
+        int bestScore = 2;
+        for (String value : searchableValues) {
+            String documentName = EmployeeDocumentUtil.normalizedSearch(value);
+            if (documentName.startsWith(query)) {
+                return 0;
+            }
+            if (documentName.contains(query)) {
+                bestScore = 1;
+            }
         }
-        return 2;
-    }
-
-    private String normalizedSearch(String value) {
-        return value == null
-                ? ""
-                : value.replace("*", "").trim().toLowerCase();
-    }
-
-    // ================= FILE HELPERS =================
-    private String formatSize(long bytes) {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
-        return (bytes / (1024 * 1024)) + " MB";
+        return bestScore;
     }
 
     private void updateCount() {
         int count = 0;
-        for (File f : files) if (f != null) count++;
-        uploadedCountLabel.setText("Total Uploades: " + count);
+        for (File file : files) {
+            if (file != null) {
+                count++;
+            }
+        }
+        uploadedCountLabel.setText("Total uploads: " + count);
     }
 
-    // ================= FILE UPLOAD =================
     private void chooseFile(int documentIndex) {
         JFileChooser fc = new JFileChooser();
-
         fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
                 "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg"
         ));
 
         if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-
             File file = fc.getSelectedFile();
-
-            String name = file.getName().toLowerCase();
-
-            if (!(name.endsWith(".jpg") || name.endsWith(".jpeg"))) {
-                DialogHelper.warning(this, "Invalid File Type", "Only JPG/JPEG files allowed.");
-                return;
-            }
-
-            if (file.length() > MAX_SIZE) {
-                DialogHelper.warning(this, "File Too Large", "Max size 400 KB.");
+            String validationMessage = EmployeeDocumentUtil.validateImageFile(file);
+            if (validationMessage != null) {
+                DialogHelper.warning(this, "Cannot Upload File", validationMessage);
                 return;
             }
 
             files[documentIndex] = file;
-
-            // ✅ STORE PATH FOR DB
             filePaths[documentIndex] = file.getAbsolutePath();
 
             int modelRow = findModelRowByDocumentIndex(documentIndex);
             if (modelRow >= 0) {
                 model.setValueAt(file.getName(), modelRow, 1);
-                model.setValueAt("Uploaded (" + formatSize(file.length()) + ")", modelRow, 2);
+                model.setValueAt("Uploaded (" + EmployeeDocumentUtil.formatSize(file.length()) + ")", modelRow, 2);
             }
 
             updateCount();
@@ -261,9 +249,54 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         }
     }
 
-    // ================= VIEW FILE =================
+    private void chooseMultipleFiles() {
+        JFileChooser fc = new JFileChooser();
+        fc.setMultiSelectionEnabled(true);
+        fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg"
+        ));
+
+        if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        EmployeeDocumentUtil.BulkUploadResult summary = EmployeeDocumentUtil.matchBulkFiles(fc.getSelectedFiles(), null);
+        for (EmployeeDocumentUtil.BulkUploadItem item : summary.uploadedDocuments()) {
+            files[item.documentIndex()] = item.file();
+            filePaths[item.documentIndex()] = item.file().getAbsolutePath();
+        }
+
+        refreshDocumentRows();
+        updateCount();
+        model.fireTableDataChanged();
+        showBulkUploadSummary(summary);
+    }
+
+    private void showBulkUploadSummary(EmployeeDocumentUtil.BulkUploadResult summary) {
+        String uploadedText = summary.uploadedCount() == 1
+                ? "1 document is ready to save."
+                : summary.uploadedCount() + " documents are ready to save.";
+        String discardedText = summary.discardedCount() == 1
+                ? "1 file was not used."
+                : summary.discardedCount() + " files were not used.";
+
+        if (summary.discardedCount() == 0) {
+            DialogHelper.success(this, "Bulk upload complete.\n" + uploadedText);
+            return;
+        }
+
+        DialogHelper.warningSections(
+                this,
+                "Bulk Upload Complete",
+                "Uploaded documents\n" + uploadedText,
+                "Files to review\n" + discardedText + "\n" + summary.discardedDetails()
+        );
+    }
+
     private void viewFile(int documentIndex) {
-        if (files[documentIndex] == null) return;
+        if (files[documentIndex] == null) {
+            return;
+        }
 
         try {
             BufferedImage img = ImageIO.read(files[documentIndex]);
@@ -290,9 +323,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         }
     }
 
-    // ================= ACTION RENDERER =================
     class ActionRenderer extends JPanel implements TableCellRenderer {
-
         public ActionRenderer() {
             EmployeeDocumentUploadPanelHelper.styleRendererPanel(this);
         }
@@ -310,8 +341,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
             boolean uploaded = status.startsWith("Uploaded");
 
             JPanel buttons = EmployeeDocumentUploadPanelHelper.createActionButtonsPanel();
-            JButton uploadBtn = createLink(uploaded ? "Replace" : "Upload");
-            buttons.add(uploadBtn);
+            buttons.add(createLink(uploaded ? "Replace" : "Upload"));
 
             JButton viewBtn = createLink("View");
             EmployeeDocumentUploadPanelHelper.styleViewLink(viewBtn, uploaded);
@@ -326,10 +356,8 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         }
     }
 
-    // ================= ACTION EDITOR =================
     class ActionEditor extends AbstractCellEditor implements TableCellEditor {
-
-        private JPanel panel;
+        private final JPanel panel;
         private int documentIndex;
 
         public ActionEditor() {
@@ -365,7 +393,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
             JButton btn = EmployeeDocumentUploadPanelHelper.createActionLink(text);
 
             btn.addActionListener(e -> {
-                if (text.equals("Upload") || text.equals("Replace")) {
+                if ("Upload".equals(text) || "Replace".equals(text)) {
                     chooseFile(documentIndex);
                 } else {
                     viewFile(documentIndex);
@@ -382,8 +410,6 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         }
     }
 
-    // ================= NEW: GET PATHS FOR PARENT =================
-    // CUSTOMIZE FILE PATH TO STORE DOCUMENTS
     public String getDocumentPath(int index) {
         return (filePaths != null && index < filePaths.length)
                 ? filePaths[index]
@@ -437,4 +463,3 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         }
     }
 }
-

@@ -3,6 +3,9 @@ package com.kgm.service;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.model.Employee;
 
+import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -17,8 +20,10 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class EmployeeReportService {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
@@ -42,16 +47,38 @@ public class EmployeeReportService {
     private final EmployeeRecordDao employeeRecordDao = new EmployeeRecordDao();
 
     public PackageResult generateEmployeePackage(String employeeCode, File selectedDirectory) throws Exception {
+        return generateEmployeePackage(employeeCode, selectedDirectory, PackageOptions.all());
+    }
+
+    public PackageResult generateEmployeePackage(
+            String employeeCode,
+            File selectedDirectory,
+            PackageOptions options
+    ) throws Exception {
         if (employeeCode == null || employeeCode.isBlank()) {
             throw new IllegalArgumentException("Employee code is required.");
         }
         if (selectedDirectory == null) {
             throw new IllegalArgumentException("Please choose a folder to save the report package.");
         }
+        PackageOptions effectiveOptions = options == null ? PackageOptions.all() : options;
 
         Employee employee = employeeRecordDao.getFullEmployeeByCode(employeeCode.trim());
         if (employee == null) {
             throw new IllegalArgumentException("Employee record was not found for code: " + employeeCode);
+        }
+
+        List<DocumentEntry> selectedDocuments = selectedDocumentEntries(employee, effectiveOptions);
+        List<DocumentEntry> mergedPdfDocuments = effectiveOptions.includeMergedDocumentsPdf()
+                ? mergeableDocumentEntries(employee)
+                : List.of();
+        if (!effectiveOptions.includePdfProfile()
+                && !effectiveOptions.includeMergedDocumentsPdf()
+                && selectedDocuments.isEmpty()) {
+            throw new IllegalArgumentException("Select the PDF profile, all documents PDF, or at least one saved document.");
+        }
+        if (effectiveOptions.includeMergedDocumentsPdf() && mergedPdfDocuments.isEmpty()) {
+            throw new IllegalArgumentException("No saved document image files are available for the All Documents PDF.");
         }
 
         Path baseDirectory = selectedDirectory.toPath().toAbsolutePath().normalize();
@@ -63,9 +90,27 @@ public class EmployeeReportService {
         Path packageFolder = uniqueDirectory(baseDirectory.resolve(packageFolderName(employee)));
         Files.createDirectories(packageFolder);
 
-        List<PackagedDocument> documents = copyEmployeeDocuments(employee, packageFolder.resolve("documents"));
-        Path pdfPath = packageFolder.resolve("Employee_Report_" + sanitizeFileName(employee.getEMPLOYEE_CODE(), "Employee") + ".pdf");
-        File pdfFile = writePdfSafely(pdfPath, employee, documents);
+        List<PackagedDocument> documents = selectedDocuments.isEmpty()
+                ? new ArrayList<>()
+                : copyEmployeeDocuments(selectedDocuments, packageFolder.resolve("documents"));
+
+        File pdfFile = null;
+        if (effectiveOptions.includePdfProfile()) {
+            Path pdfPath = packageFolder.resolve("Employee_Report_" + sanitizeFileName(employee.getEMPLOYEE_CODE(), "Employee") + ".pdf");
+            pdfFile = writePdfSafely(pdfPath, employee, documents);
+        }
+
+        File mergedDocumentsPdfFile = null;
+        int mergedDocumentCount = 0;
+        if (effectiveOptions.includeMergedDocumentsPdf()) {
+            Path mergedPdfPath = packageFolder.resolve(
+                    "All_Documents_" + sanitizeFileName(employee.getEMPLOYEE_CODE(), "Employee") + ".pdf"
+            );
+            MergedDocumentsPdfResult mergedResult =
+                    writeMergedDocumentsPdfSafely(mergedPdfPath, mergedPdfDocuments);
+            mergedDocumentsPdfFile = mergedResult.file();
+            mergedDocumentCount = mergedResult.documentCount();
+        }
 
         int copied = 0;
         for (PackagedDocument document : documents) {
@@ -74,7 +119,8 @@ public class EmployeeReportService {
             }
         }
 
-        return new PackageResult(packageFolder.toFile(), pdfFile, copied, documents.size());
+        return new PackageResult(packageFolder.toFile(), pdfFile, mergedDocumentsPdfFile, copied,
+                documents.size(), mergedDocumentCount);
     }
 
     private String packageFolderName(Employee employee) {
@@ -83,11 +129,61 @@ public class EmployeeReportService {
         return name + " - " + code;
     }
 
-    private List<PackagedDocument> copyEmployeeDocuments(Employee employee, Path documentsDirectory) throws IOException {
+    public List<AvailableDocument> availableDocuments(Employee employee) {
+        List<AvailableDocument> available = new ArrayList<>();
+        for (DocumentEntry entry : savedDocumentEntries(employee)) {
+            File sourceFile = resolveDocumentPath(entry.sourcePath()).toFile();
+            available.add(new AvailableDocument(entry.label(), sourceFile, sourceFile.isFile(), !entry.employeePhoto()));
+        }
+        return available;
+    }
+
+    private List<DocumentEntry> selectedDocumentEntries(Employee employee, PackageOptions options) {
+        List<DocumentEntry> available = savedDocumentEntries(employee);
+        if (options.includeAllDocuments()) {
+            return available;
+        }
+
+        Set<String> selectedLabels = new HashSet<>(options.selectedDocumentLabels());
+        List<DocumentEntry> selected = new ArrayList<>();
+        for (DocumentEntry entry : available) {
+            if (selectedLabels.contains(entry.label())) {
+                selected.add(entry);
+            }
+        }
+        return selected;
+    }
+
+    private List<DocumentEntry> savedDocumentEntries(Employee employee) {
+        List<DocumentEntry> available = new ArrayList<>();
+        for (DocumentEntry entry : documentEntries(employee)) {
+            if (!hasStoredPath(entry.sourcePath())) {
+                continue;
+            }
+            available.add(entry);
+        }
+        return available;
+    }
+
+    private List<DocumentEntry> mergeableDocumentEntries(Employee employee) {
+        List<DocumentEntry> available = new ArrayList<>();
+        for (DocumentEntry entry : savedDocumentEntries(employee)) {
+            if (entry.employeePhoto()) {
+                continue;
+            }
+            Path source = resolveDocumentPath(entry.sourcePath());
+            if (Files.isRegularFile(source)) {
+                available.add(entry);
+            }
+        }
+        return available;
+    }
+
+    private List<PackagedDocument> copyEmployeeDocuments(List<DocumentEntry> entries, Path documentsDirectory) throws IOException {
         Files.createDirectories(documentsDirectory);
 
         List<PackagedDocument> packaged = new ArrayList<>();
-        for (DocumentEntry entry : documentEntries(employee)) {
+        for (DocumentEntry entry : entries) {
             if (!hasStoredPath(entry.sourcePath())) {
                 packaged.add(new PackagedDocument(entry.label(), "-", "-", "Not provided"));
                 continue;
@@ -110,7 +206,7 @@ public class EmployeeReportService {
 
     private List<DocumentEntry> documentEntries(Employee employee) {
         List<DocumentEntry> entries = new ArrayList<>();
-        entries.add(new DocumentEntry("Employee Photo", employee.getEMP_IMG()));
+        entries.add(new DocumentEntry("Employee Photo", employee.getEMP_IMG(), true));
         entries.add(new DocumentEntry("CNIC Copy", employee.getCNIC_COPY()));
         entries.add(new DocumentEntry("EOBI Card Copy", employee.getEOBI_CARD_COPY()));
         entries.add(new DocumentEntry("Social Security Card Copy", employee.getSS_CARD_COPY()));
@@ -164,6 +260,85 @@ public class EmployeeReportService {
                 Files.deleteIfExists(temp);
             }
         }
+    }
+
+    private MergedDocumentsPdfResult writeMergedDocumentsPdfSafely(
+            Path target,
+            List<DocumentEntry> entries
+    ) throws IOException {
+        List<DocumentImage> images = readDocumentImages(entries);
+        if (images.isEmpty()) {
+            throw new IllegalArgumentException("No saved document image files are available for the All Documents PDF.");
+        }
+
+        Path targetPath = target.toAbsolutePath().normalize();
+        Path parent = targetPath.getParent();
+        if (parent == null) {
+            parent = Path.of(".").toAbsolutePath().normalize();
+            targetPath = parent.resolve(targetPath.getFileName());
+        }
+        Files.createDirectories(parent);
+
+        Path temp = Files.createTempFile(parent, targetPath.getFileName().toString(), ".tmp");
+        boolean saved = false;
+        try {
+            try (OutputStream output = Files.newOutputStream(temp)) {
+                DocumentImagePdf document = new DocumentImagePdf(images);
+                document.write(output);
+            }
+            File savedFile = commitPdf(temp, targetPath);
+            saved = true;
+            return new MergedDocumentsPdfResult(savedFile, images.size());
+        } finally {
+            if (!saved) {
+                Files.deleteIfExists(temp);
+            }
+        }
+    }
+
+    private List<DocumentImage> readDocumentImages(List<DocumentEntry> entries) throws IOException {
+        List<DocumentImage> images = new ArrayList<>();
+        for (DocumentEntry entry : entries) {
+            Path source = resolveDocumentPath(entry.sourcePath());
+            if (!Files.isRegularFile(source)) {
+                continue;
+            }
+
+            DocumentImage image = readDocumentImage(entry.label(), source);
+            if (image != null) {
+                images.add(image);
+            }
+        }
+        return images;
+    }
+
+    private DocumentImage readDocumentImage(String label, Path source) throws IOException {
+        BufferedImage image = ImageIO.read(source.toFile());
+        if (image == null) {
+            return null;
+        }
+
+        byte[] imageBytes;
+        String extension = extension(source).toLowerCase(Locale.ROOT);
+        if (".jpg".equals(extension) || ".jpeg".equals(extension)) {
+            imageBytes = Files.readAllBytes(source);
+        } else {
+            BufferedImage rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = rgb.createGraphics();
+            try {
+                graphics.setColor(java.awt.Color.WHITE);
+                graphics.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
+                graphics.drawImage(image, 0, 0, null);
+            } finally {
+                graphics.dispose();
+            }
+
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            ImageIO.write(rgb, "jpg", buffer);
+            imageBytes = buffer.toByteArray();
+        }
+
+        return new DocumentImage(label, source, image.getWidth(), image.getHeight(), imageBytes);
     }
 
     private File commitPdf(Path temp, Path target) throws IOException {
@@ -434,17 +609,125 @@ public class EmployeeReportService {
         return String.format(Locale.US, "%.2f", value);
     }
 
+    private static String escapePdf(String value) {
+        StringBuilder escaped = new StringBuilder();
+        String clean = value == null ? "" : value;
+        for (int index = 0; index < clean.length(); index++) {
+            char c = clean.charAt(index);
+            if (c == '\\' || c == '(' || c == ')') {
+                escaped.append('\\').append(c);
+            } else if (c >= 32 && c <= 255) {
+                escaped.append(c);
+            } else if (Character.isWhitespace(c)) {
+                escaped.append(' ');
+            } else {
+                escaped.append('?');
+            }
+        }
+        return escaped.toString();
+    }
+
+    public static final class PackageOptions {
+        private final boolean includePdfProfile;
+        private final boolean includeAllDocuments;
+        private final boolean includeMergedDocumentsPdf;
+        private final List<String> selectedDocumentLabels;
+
+        public PackageOptions(
+                boolean includePdfProfile,
+                boolean includeAllDocuments,
+                List<String> selectedDocumentLabels
+        ) {
+            this(includePdfProfile, includeAllDocuments, false, selectedDocumentLabels);
+        }
+
+        public PackageOptions(
+                boolean includePdfProfile,
+                boolean includeAllDocuments,
+                boolean includeMergedDocumentsPdf,
+                List<String> selectedDocumentLabels
+        ) {
+            this.includePdfProfile = includePdfProfile;
+            this.includeAllDocuments = includeAllDocuments;
+            this.includeMergedDocumentsPdf = includeMergedDocumentsPdf;
+            this.selectedDocumentLabels = selectedDocumentLabels == null
+                    ? List.of()
+                    : List.copyOf(selectedDocumentLabels);
+        }
+
+        private static PackageOptions all() {
+            return new PackageOptions(true, true, false, List.of());
+        }
+
+        public boolean includePdfProfile() {
+            return includePdfProfile;
+        }
+
+        public boolean includeAllDocuments() {
+            return includeAllDocuments;
+        }
+
+        public boolean includeMergedDocumentsPdf() {
+            return includeMergedDocumentsPdf;
+        }
+
+        public List<String> selectedDocumentLabels() {
+            return selectedDocumentLabels;
+        }
+    }
+
+    public static final class AvailableDocument {
+        private final String label;
+        private final File sourceFile;
+        private final boolean fileReady;
+        private final boolean mergeableForDocumentsPdf;
+
+        private AvailableDocument(String label, File sourceFile, boolean fileReady, boolean mergeableForDocumentsPdf) {
+            this.label = label;
+            this.sourceFile = sourceFile;
+            this.fileReady = fileReady;
+            this.mergeableForDocumentsPdf = mergeableForDocumentsPdf;
+        }
+
+        public String label() {
+            return label;
+        }
+
+        public File sourceFile() {
+            return sourceFile;
+        }
+
+        public boolean fileReady() {
+            return fileReady;
+        }
+
+        public boolean mergeableForDocumentsPdf() {
+            return mergeableForDocumentsPdf;
+        }
+    }
+
     public static final class PackageResult {
         private final File folder;
         private final File pdfFile;
+        private final File mergedDocumentsPdfFile;
         private final int copiedDocumentCount;
         private final int totalDocumentCount;
+        private final int mergedDocumentCount;
 
-        private PackageResult(File folder, File pdfFile, int copiedDocumentCount, int totalDocumentCount) {
+        private PackageResult(
+                File folder,
+                File pdfFile,
+                File mergedDocumentsPdfFile,
+                int copiedDocumentCount,
+                int totalDocumentCount,
+                int mergedDocumentCount
+        ) {
             this.folder = folder;
             this.pdfFile = pdfFile;
+            this.mergedDocumentsPdfFile = mergedDocumentsPdfFile;
             this.copiedDocumentCount = copiedDocumentCount;
             this.totalDocumentCount = totalDocumentCount;
+            this.mergedDocumentCount = mergedDocumentCount;
         }
 
         public File folder() {
@@ -455,6 +738,10 @@ public class EmployeeReportService {
             return pdfFile;
         }
 
+        public File mergedDocumentsPdfFile() {
+            return mergedDocumentsPdfFile;
+        }
+
         public int copiedDocumentCount() {
             return copiedDocumentCount;
         }
@@ -462,15 +749,25 @@ public class EmployeeReportService {
         public int totalDocumentCount() {
             return totalDocumentCount;
         }
+
+        public int mergedDocumentCount() {
+            return mergedDocumentCount;
+        }
     }
 
     private static final class DocumentEntry {
         private final String label;
         private final String sourcePath;
+        private final boolean employeePhoto;
 
         private DocumentEntry(String label, String sourcePath) {
+            this(label, sourcePath, false);
+        }
+
+        private DocumentEntry(String label, String sourcePath, boolean employeePhoto) {
             this.label = label;
             this.sourcePath = sourcePath;
+            this.employeePhoto = employeePhoto;
         }
 
         private String label() {
@@ -479,6 +776,10 @@ public class EmployeeReportService {
 
         private String sourcePath() {
             return sourcePath;
+        }
+
+        private boolean employeePhoto() {
+            return employeePhoto;
         }
     }
 
@@ -509,6 +810,241 @@ public class EmployeeReportService {
 
         private String status() {
             return status;
+        }
+    }
+
+    private static final class MergedDocumentsPdfResult {
+        private final File file;
+        private final int documentCount;
+
+        private MergedDocumentsPdfResult(File file, int documentCount) {
+            this.file = file;
+            this.documentCount = documentCount;
+        }
+
+        private File file() {
+            return file;
+        }
+
+        private int documentCount() {
+            return documentCount;
+        }
+    }
+
+    private static final class DocumentImage {
+        private final String label;
+        private final Path source;
+        private final int width;
+        private final int height;
+        private final byte[] bytes;
+
+        private DocumentImage(String label, Path source, int width, int height, byte[] bytes) {
+            this.label = label;
+            this.source = source;
+            this.width = width;
+            this.height = height;
+            this.bytes = bytes;
+        }
+
+        private String label() {
+            return label;
+        }
+
+        private Path source() {
+            return source;
+        }
+
+        private int width() {
+            return width;
+        }
+
+        private int height() {
+            return height;
+        }
+
+        private byte[] bytes() {
+            return bytes;
+        }
+    }
+
+    private static final class ImagePdfPage {
+        private final int imageIndex;
+        private final double pageWidth;
+        private final double pageHeight;
+        private final double imageTopOffset;
+        private final double visibleHeight;
+
+        private ImagePdfPage(
+                int imageIndex,
+                double pageWidth,
+                double pageHeight,
+                double imageTopOffset,
+                double visibleHeight
+        ) {
+            this.imageIndex = imageIndex;
+            this.pageWidth = pageWidth;
+            this.pageHeight = pageHeight;
+            this.imageTopOffset = imageTopOffset;
+            this.visibleHeight = visibleHeight;
+        }
+    }
+
+    private static final class DocumentImagePdf {
+        private static final double SIDE_MARGIN = 36;
+        private static final double TOP_MARGIN = 36;
+        private static final double FOOTER_HEIGHT = 54;
+        private static final double MAX_BODY_HEIGHT = PAGE_HEIGHT - TOP_MARGIN - FOOTER_HEIGHT;
+
+        private final List<DocumentImage> images;
+        private final List<ImagePdfPage> pages = new ArrayList<>();
+
+        private DocumentImagePdf(List<DocumentImage> images) {
+            this.images = images;
+            buildPages();
+        }
+
+        private void buildPages() {
+            for (int imageIndex = 0; imageIndex < images.size(); imageIndex++) {
+                DocumentImage image = images.get(imageIndex);
+                double pageWidth = Math.max(PAGE_WIDTH, image.width() + (SIDE_MARGIN * 2));
+                double offset = 0;
+                while (offset < image.height()) {
+                    double visibleHeight = Math.min(MAX_BODY_HEIGHT, image.height() - offset);
+                    double pageHeight = Math.max(PAGE_HEIGHT, visibleHeight + TOP_MARGIN + FOOTER_HEIGHT);
+                    pages.add(new ImagePdfPage(imageIndex, pageWidth, pageHeight, offset, visibleHeight));
+                    offset += visibleHeight;
+                }
+            }
+        }
+
+        private void write(OutputStream output) throws IOException {
+            List<byte[]> objects = new ArrayList<>();
+            int imageCount = images.size();
+            int pageCount = pages.size();
+            int firstImageObject = 4;
+            int firstPageObject = firstImageObject + imageCount;
+            int firstContentObject = firstPageObject + pageCount;
+
+            objects.add(pdfObject("<< /Type /Catalog /Pages 2 0 R >>"));
+            objects.add(pdfObject(pagesObject(pageCount, firstPageObject)));
+            objects.add(pdfObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"));
+
+            for (DocumentImage image : images) {
+                objects.add(imageObject(image));
+            }
+
+            for (int index = 0; index < pageCount; index++) {
+                ImagePdfPage page = pages.get(index);
+                int contentObject = firstContentObject + index;
+                int imageObject = firstImageObject + page.imageIndex;
+                String imageName = "Im" + (page.imageIndex + 1);
+                objects.add(pdfObject("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "
+                        + fmt(page.pageWidth) + " " + fmt(page.pageHeight)
+                        + "] /Resources << /Font << /F1 3 0 R >> /XObject << /" + imageName + " "
+                        + imageObject + " 0 R >> >> /Contents " + contentObject + " 0 R >>"));
+            }
+
+            for (int index = 0; index < pageCount; index++) {
+                byte[] stream = contentStream(pages.get(index), index + 1, pageCount)
+                        .getBytes(StandardCharsets.ISO_8859_1);
+                ByteArrayOutputStream object = new ByteArrayOutputStream();
+                object.write(("<< /Length " + stream.length + " >>\nstream\n").getBytes(StandardCharsets.ISO_8859_1));
+                object.write(stream);
+                object.write("\nendstream".getBytes(StandardCharsets.ISO_8859_1));
+                objects.add(object.toByteArray());
+            }
+
+            ByteArrayOutputStream pdf = new ByteArrayOutputStream();
+            pdf.write("%PDF-1.4\n%KGM\n".getBytes(StandardCharsets.ISO_8859_1));
+            List<Integer> offsets = new ArrayList<>();
+            for (int index = 0; index < objects.size(); index++) {
+                offsets.add(pdf.size());
+                pdf.write((index + 1 + " 0 obj\n").getBytes(StandardCharsets.ISO_8859_1));
+                pdf.write(objects.get(index));
+                pdf.write("\nendobj\n".getBytes(StandardCharsets.ISO_8859_1));
+            }
+
+            int xref = pdf.size();
+            pdf.write(("xref\n0 " + (objects.size() + 1) + "\n").getBytes(StandardCharsets.ISO_8859_1));
+            pdf.write("0000000000 65535 f \n".getBytes(StandardCharsets.ISO_8859_1));
+            for (int offset : offsets) {
+                pdf.write(String.format(Locale.US, "%010d 00000 n \n", offset).getBytes(StandardCharsets.ISO_8859_1));
+            }
+            pdf.write(("trailer\n<< /Size " + (objects.size() + 1)
+                    + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n").getBytes(StandardCharsets.ISO_8859_1));
+            output.write(pdf.toByteArray());
+        }
+
+        private String contentStream(ImagePdfPage page, int pageNumber, int pageCount) {
+            DocumentImage image = images.get(page.imageIndex);
+            String imageName = "Im" + (page.imageIndex + 1);
+            double imageX = SIDE_MARGIN;
+            double imageY = page.pageHeight - TOP_MARGIN - image.height() + page.imageTopOffset;
+            double clipY = page.pageHeight - TOP_MARGIN - page.visibleHeight;
+            double footerLineY = 42;
+            double footerTextY = 25;
+            String pageText = "Page " + pageNumber + " of " + pageCount;
+
+            StringBuilder content = new StringBuilder();
+            content.append("q\n")
+                    .append(fmt(imageX)).append(' ').append(fmt(clipY)).append(' ')
+                    .append(fmt(image.width())).append(' ').append(fmt(page.visibleHeight)).append(" re W n\n")
+                    .append("q\n")
+                    .append(fmt(image.width())).append(" 0 0 ").append(fmt(image.height())).append(' ')
+                    .append(fmt(imageX)).append(' ').append(fmt(imageY)).append(" cm\n")
+                    .append('/').append(imageName).append(" Do\n")
+                    .append("Q\n")
+                    .append("Q\n");
+
+            color(content, BORDER, "RG");
+            content.append("0.8 w\n")
+                    .append(fmt(SIDE_MARGIN)).append(' ').append(fmt(footerLineY)).append(" m ")
+                    .append(fmt(page.pageWidth - SIDE_MARGIN)).append(' ').append(fmt(footerLineY)).append(" l S\n");
+            color(content, TEXT_SECONDARY, "rg");
+            content.append("BT /F1 8 Tf 1 0 0 1 ")
+                    .append(fmt(SIDE_MARGIN)).append(' ').append(fmt(footerTextY))
+                    .append(" Tm (KGM Ex-Employee Management System) Tj ET\n");
+            content.append("BT /F1 8 Tf 1 0 0 1 ")
+                    .append(fmt(page.pageWidth - SIDE_MARGIN - textWidth(pageText, 8))).append(' ')
+                    .append(fmt(footerTextY)).append(" Tm (")
+                    .append(escapePdf(pageText)).append(") Tj ET\n");
+            return content.toString();
+        }
+
+        private byte[] imageObject(DocumentImage image) throws IOException {
+            ByteArrayOutputStream object = new ByteArrayOutputStream();
+            object.write(("<< /Type /XObject /Subtype /Image /Width " + image.width()
+                    + " /Height " + image.height()
+                    + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "
+                    + image.bytes().length + " >>\nstream\n").getBytes(StandardCharsets.ISO_8859_1));
+            object.write(image.bytes());
+            object.write("\nendstream".getBytes(StandardCharsets.ISO_8859_1));
+            return object.toByteArray();
+        }
+
+        private String pagesObject(int pageCount, int firstPageObject) {
+            StringBuilder kids = new StringBuilder();
+            for (int index = 0; index < pageCount; index++) {
+                if (index > 0) {
+                    kids.append(' ');
+                }
+                kids.append(firstPageObject + index).append(" 0 R");
+            }
+            return "<< /Type /Pages /Count " + pageCount + " /Kids [" + kids + "] >>";
+        }
+
+        private byte[] pdfObject(String value) {
+            return value.getBytes(StandardCharsets.ISO_8859_1);
+        }
+
+        private void color(StringBuilder content, String hex, String operator) {
+            int red = Integer.parseInt(hex.substring(0, 2), 16);
+            int green = Integer.parseInt(hex.substring(2, 4), 16);
+            int blue = Integer.parseInt(hex.substring(4, 6), 16);
+            content.append(fmt(red / 255.0)).append(' ')
+                    .append(fmt(green / 255.0)).append(' ')
+                    .append(fmt(blue / 255.0)).append(' ')
+                    .append(operator).append('\n');
         }
     }
 
