@@ -1,5 +1,4 @@
 package com.kgm.ui.styling;
-
 import javax.swing.*;
 import javax.swing.border.AbstractBorder;
 import javax.swing.border.CompoundBorder;
@@ -211,10 +210,11 @@ public final class UniversalTablePagination {
                 JLabel label = (JLabel) super.getTableCellRendererComponent(
                         table, value, isSelected, hasFocus, row, column);
                 label.setOpaque(true);
-                label.setHorizontalAlignment(SwingConstants.LEFT);
+                boolean actionColumn = "Action".equalsIgnoreCase(table.getColumnName(column));
+                label.setHorizontalAlignment(actionColumn ? SwingConstants.CENTER : SwingConstants.LEFT);
                 label.setBackground(isSelected ? ROW_SELECTION : PAGE_BACKGROUND);
-                label.setForeground(TEXT_PRIMARY);
-                label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                label.setForeground(actionColumn ? PRIMARY : TEXT_PRIMARY);
+                label.setFont(new Font("Segoe UI", actionColumn ? Font.BOLD : Font.PLAIN, 13));
                 label.setBorder(new CompoundBorder(
                         new MatteBorder(0, 0, 1, 1, CELL_DIVIDER),
                         new EmptyBorder(0, 16, 0, 14)));
@@ -316,7 +316,7 @@ public final class UniversalTablePagination {
         return button;
     }
 
-    private static class RoundedTableBorder extends AbstractBorder {
+    public static class RoundedTableBorder extends AbstractBorder {
         @Override
         public void paintBorder(Component component, Graphics g, int x, int y, int width, int height) {
             Graphics2D g2 = (Graphics2D) g.create();

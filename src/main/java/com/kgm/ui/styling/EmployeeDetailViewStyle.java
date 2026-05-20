@@ -35,6 +35,43 @@ public final class EmployeeDetailViewStyle {
         return row;
     }
 
+    public static JPanel screenHeader(String employeeName, String employeeCode, Runnable onBack) {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(PAGE_BACKGROUND);
+        header.setBorder(new EmptyBorder(25, 28, 0, 28));
+
+        JPanel titleBlock = new JPanel();
+        titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
+        titleBlock.setBackground(PAGE_BACKGROUND);
+
+        JLabel title = new JLabel("Employee Record");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        String cleanName = employeeName == null ? "" : employeeName.trim();
+        String cleanCode = employeeCode == null ? "" : employeeCode.trim();
+        String subtitleText = cleanName.isEmpty() && cleanCode.isEmpty()
+                ? "View and update employee details"
+                : cleanName + (cleanCode.isEmpty() ? "" : " - Code: " + cleanCode);
+
+        JLabel subtitle = new JLabel(subtitleText);
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        subtitle.setForeground(new Color(100, 100, 100));
+        subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        titleBlock.add(title);
+        titleBlock.add(Box.createVerticalStrut(3));
+        titleBlock.add(subtitle);
+
+        JButton back = new JButton("Dashboard");
+        styleBackButton(back);
+        back.addActionListener(e -> onBack.run());
+
+        header.add(titleBlock, BorderLayout.WEST);
+        header.add(back, BorderLayout.EAST);
+        return header;
+    }
+
     public static JPanel createBackButtonPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         panel.setBackground(PAGE_BACKGROUND);

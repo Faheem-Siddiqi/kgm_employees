@@ -10,6 +10,7 @@ import java.awt.*;
 public final class HomeViewStyle {
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color PRIMARY = new Color(0, 112, 210);
+    private static final Color ACTION_BLUE = new Color(30, 144, 255);
     private static final Color TEXT_PRIMARY = new Color(35, 43, 54);
     private static final Color TEXT_SECONDARY = new Color(99, 115, 129);
     private static final Color BORDER = new Color(220, 226, 232);
@@ -39,45 +40,59 @@ public final class HomeViewStyle {
         wrapper.setOpaque(false);
         wrapper.setBorder(new EmptyBorder(24, 24, 0, 24));
 
-        JPanel row = new JPanel();
-        row.setLayout(new BoxLayout(row, BoxLayout.Y_AXIS));
-        row.setOpaque(false);
+        JPanel row = new JPanel(new BorderLayout(10, 0));
+        row.setBackground(PAGE_BACKGROUND);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
 
-        JLabel label = label("Employee Code");
-        label.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JPanel controls = new JPanel();
-        controls.setLayout(new BoxLayout(controls, BoxLayout.X_AXIS));
-        controls.setOpaque(false);
-        controls.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        row.add(label);
-        row.add(Box.createVerticalStrut(6));
-        row.add(controls);
-        card.putClientProperty("searchControls", controls);
+        card.putClientProperty("searchControls", row);
         card.add(row, BorderLayout.CENTER);
-        wrapper.putClientProperty("searchControls", controls);
+        wrapper.putClientProperty("searchControls", row);
         wrapper.add(card, BorderLayout.CENTER);
         return wrapper;
+    }
+
+    public static JTextField createSearchField(String placeholder) {
+        return new PlaceholderTextField(placeholder);
     }
 
     public static void addSearchControls(JPanel searchRow, JTextField field, JButton searchButton, JButton clearButton) {
         Object controls = searchRow.getClientProperty("searchControls");
         if (controls instanceof JPanel row) {
-            row.add(styleField(field, 320));
-            row.add(Box.createHorizontalStrut(10));
-            row.add(searchButton);
-            row.add(Box.createHorizontalStrut(10));
-            row.add(clearButton);
+            styleSearchField(field);
+
+            JPanel searchBox = new JPanel(new BorderLayout(6, 0));
+            searchBox.setBackground(PAGE_BACKGROUND);
+            searchBox.setBorder(new CompoundBorder(
+                    new LineBorder(FIELD_BORDER),
+                    new EmptyBorder(0, 10, 0, 4)
+            ));
+            searchBox.add(field, BorderLayout.CENTER);
+            searchBox.add(clearButton, BorderLayout.EAST);
+
+            row.add(searchBox, BorderLayout.CENTER);
+            row.add(searchButton, BorderLayout.EAST);
         }
     }
 
     public static void styleSearchButton(JButton button) {
-        styleTextButton(button);
+        button.setBackground(PRIMARY);
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setBorder(new EmptyBorder(8, 16, 8, 16));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 
     public static void styleClearButton(JButton button) {
-        styleTextButton(button);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false);
+        button.setFocusPainted(false);
+        button.setOpaque(false);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
+        button.setBorder(new EmptyBorder(7, 8, 7, 8));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 
     public static JPanel createNorthContainer() {
@@ -124,8 +139,16 @@ public final class HomeViewStyle {
 
     public static void setTextButtonEnabled(JButton button, boolean enabled) {
         button.setEnabled(enabled);
-        button.setForeground(enabled ? PRIMARY : new Color(155, 155, 155));
+        button.setForeground(enabled ? ACTION_BLUE : TEXT_SECONDARY);
         button.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
+    }
+
+    private static void styleSearchField(JTextField field) {
+        field.setBorder(null);
+        field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        field.setForeground(TEXT_PRIMARY);
+        field.setBackground(PAGE_BACKGROUND);
+        field.setPreferredSize(new Dimension(260, 34));
     }
 
     private static JPanel sectionCard(String title, String subtitle) {
@@ -157,34 +180,27 @@ public final class HomeViewStyle {
         return card;
     }
 
-    private static JLabel label(String text) {
-        JLabel label = new JLabel(text);
-        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
-        label.setForeground(new Color(70, 82, 96));
-        return label;
-    }
+    private static class PlaceholderTextField extends JTextField {
+        private final String placeholder;
 
-    private static JComponent styleField(JComponent component, int width) {
-        component.setPreferredSize(new Dimension(width, 34));
-        component.setMinimumSize(new Dimension(Math.min(width, 150), 34));
-        component.setMaximumSize(new Dimension(Math.max(width, 260), 34));
-        component.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        component.setBackground(PAGE_BACKGROUND);
-        component.setBorder(new CompoundBorder(
-                new LineBorder(FIELD_BORDER),
-                new EmptyBorder(6, 8, 6, 8)));
-        return component;
-    }
+        private PlaceholderTextField(String placeholder) {
+            this.placeholder = placeholder;
+        }
 
-    private static void styleTextButton(JButton button) {
-        button.setContentAreaFilled(false);
-        button.setBorderPainted(false);
-        button.setFocusPainted(false);
-        button.setOpaque(false);
-        button.setForeground(PRIMARY);
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
-        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setBorder(new EmptyBorder(8, 10, 8, 10));
+        protected void paintComponent(Graphics graphics) {
+            super.paintComponent(graphics);
+            if (!getText().isEmpty()) {
+                return;
+            }
+
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2.setColor(new Color(130, 140, 150));
+            FontMetrics metrics = g2.getFontMetrics(getFont());
+            int y = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
+            g2.drawString(placeholder, 0, y);
+            g2.dispose();
+        }
     }
 
     private static class RoundedBorder extends AbstractBorder {

@@ -1,6 +1,5 @@
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\config\DatabaseConfig.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\config\DatabaseConnection.java
-D:\KGM_Ex_Employees-main\src\main\java\com\kgm\controller\UserSessions.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\dao\EmployeeDao.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\dao\EmployeeRepositoryDao.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\database\DatabaseInitializer.java
@@ -10,7 +9,6 @@ D:\KGM_Ex_Employees-main\src\main\java\com\kgm\model\UserSession.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\service\AuthService.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\service\EmployeeService.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\service\ExcelImportService.java
-D:\KGM_Ex_Employees-main\src\main\java\com\kgm\services\AuthService.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\component\UniversalDatePicker.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\component\UniversalDateRangePicker.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\dialog\UniversalDialog.java
@@ -20,7 +18,6 @@ D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\HomeView.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\LoginView.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\BasicDetailsPanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\DocumentPanel.java
-D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\DocumentPanelView.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\DocumentViewPanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\EmployeeTablePanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\ExcelImportButton.java

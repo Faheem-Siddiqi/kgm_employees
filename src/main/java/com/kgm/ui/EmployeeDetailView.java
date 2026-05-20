@@ -17,7 +17,6 @@ import java.awt.*;
 public class EmployeeDetailView extends JFrame {
 
     private String empCode;
-    private JButton backBtn;
     private JButton updateBtn;
 
     public EmployeeDetailView(String empCode) {
@@ -48,38 +47,16 @@ public class EmployeeDetailView extends JFrame {
 
         JPanel topContainer = EmployeeDetailViewHelper.createTopContainer();
         topContainer.add(new HeaderPanel("Employee Record"), BorderLayout.NORTH);
-
-        JPanel secondRow = EmployeeDetailViewHelper.createSecondRow();
-        JPanel left = EmployeeDetailViewHelper.createBackButtonPanel();
-
-        backBtn = new JButton("Back");
-        EmployeeDetailViewHelper.styleBackButton(backBtn);
-        backBtn.addActionListener(e -> {
-            this.dispose();
-            new HomeView();
-        });
-        left.add(backBtn);
-
-        JPanel right = EmployeeDetailViewHelper.createEmployeeSummaryPanel();
         String nameValue = (emp != null) ? emp.getEMP_NAME() : "";
         String codeValue = (emp != null) ? emp.getEMPLOYEE_CODE() : "";
-
-        JLabel name = new JLabel(nameValue);
-        EmployeeDetailViewHelper.styleEmployeeName(name);
-
-        JLabel code = new JLabel("Code: " + codeValue);
-        EmployeeDetailViewHelper.styleEmployeeCode(code);
-
-        right.add(name);
-        right.add(Box.createVerticalStrut(2));
-        right.add(code);
-
-        secondRow.add(left, BorderLayout.WEST);
-        secondRow.add(right, BorderLayout.EAST);
-        topContainer.add(secondRow, BorderLayout.CENTER);
         add(topContainer, BorderLayout.NORTH);
 
         JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
+        centerWrapper.add(EmployeeDetailViewHelper.screenHeader(nameValue, codeValue, () -> {
+            this.dispose();
+            new HomeView();
+        }), EmployeeDetailViewHelper.pageConstraints(0));
+
         JTabbedPane tabs = new HugHeightTabbedPane();
 
         if (isWithData) {
@@ -105,7 +82,13 @@ public class EmployeeDetailView extends JFrame {
             }
         });
 
-        centerWrapper.add(tabs, EmployeeDetailViewHelper.pageConstraints(0));
+        JPanel footerActions = EmployeeDetailViewHelper.createActionRow();
+        updateBtn = new JButton("Update");
+        EmployeeDetailViewHelper.styleUpdateButton(updateBtn);
+        footerActions.add(updateBtn);
+
+        JPanel tabContent = EmployeeDetailViewHelper.createTabContent(tabs, footerActions);
+        centerWrapper.add(tabContent, EmployeeDetailViewHelper.pageConstraints(1));
 
         JScrollPane pageScroll = EmployeeDetailViewHelper.createPageScrollPane(centerWrapper);
         tabs.addChangeListener(event -> SwingUtilities.invokeLater(() -> {
@@ -115,12 +98,7 @@ public class EmployeeDetailView extends JFrame {
         }));
         EmployeeDetailViewHelper.installPageWheelForwarding(pageScroll, centerWrapper);
         add(pageScroll, BorderLayout.CENTER);
-
-        JPanel footerActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        updateBtn = new JButton("Update");
-        EmployeeDetailViewHelper.styleUpdateButton(updateBtn);
-        footerActions.add(updateBtn);
-        add(new FooterPanel(footerActions), BorderLayout.SOUTH);
+        add(new FooterPanel(), BorderLayout.SOUTH);
 
         Runnable refreshButtonState = () -> {
             boolean canUpdate = false;

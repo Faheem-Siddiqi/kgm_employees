@@ -19,6 +19,10 @@ public final class EmployeeDetailViewHelper {
         return EmployeeDetailViewStyle.createSecondRow();
     }
 
+    public static JPanel screenHeader(String employeeName, String employeeCode, Runnable onBack) {
+        return EmployeeDetailViewStyle.screenHeader(employeeName, employeeCode, onBack);
+    }
+
     public static JPanel createBackButtonPanel() {
         return EmployeeDetailViewStyle.createBackButtonPanel();
     }
@@ -45,6 +49,10 @@ public final class EmployeeDetailViewHelper {
 
     public static void styleUpdateButton(JButton button) {
         EmployeeInductionHelper.stylePrimaryButton(button);
+    }
+
+    public static JPanel createActionRow() {
+        return EmployeeInductionHelper.createActionRow();
     }
 
     public static JScrollPane createPageScrollPane(JComponent content) {

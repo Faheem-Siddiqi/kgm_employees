@@ -24,13 +24,13 @@ public class HomeView extends JFrame {
         top.add(new HeaderPanel("Home Dashboard"), BorderLayout.NORTH);
 
         JPanel searchRow = HomeViewStyle.createSearchRow();
-        JTextField searchField = new JTextField();
+        JTextField searchField = HomeViewStyle.createSearchField("Search Employee Code");
 
-        JButton searchBtn = new JButton("SEARCH");
+        JButton searchBtn = new JButton("Search");
         HomeViewStyle.styleSearchButton(searchBtn);
         searchField.addActionListener(e -> searchBtn.doClick());
 
-        JButton clearBtn = new JButton("CLEAR");
+        JButton clearBtn = new JButton("Clear");
         HomeViewStyle.styleClearButton(clearBtn);
         HomeViewStyle.setTextButtonEnabled(clearBtn, false);
         searchField.getDocument().addDocumentListener(new DocumentListener() {
