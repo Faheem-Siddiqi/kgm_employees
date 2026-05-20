@@ -125,9 +125,9 @@ The project follows a layered desktop-application architecture:
 | **EmployeeTablePanel.java** | Paginated employee table. Displays employee summary rows and a per-row `View` action cell that opens `EmployeeDetailView`. |
 | **EmployeeRegistrationFormPanel.java** | Employee registration form with profile photo upload and core fields required to create a record. |
 | **EmployeeDocumentUploadPanel.java** | Document upload table for registration. Supports search, clear, upload/replace, view, file-size validation, and document path extraction. |
-| **EmployeeDocumentViewPanel.java** | Read-only document panel for employee detail view. Shows document availability and view/download-style actions. |
-| **EmployeeBasicDetailsPanel.java** | Basic employee detail form used in detail/edit flows. Handles profile image, identity, contact, and core fields while ignoring empty database placeholders such as `N/A` for missing images. |
-| **EmployeeAdditionalDetailsPanel.java** | Additional employee detail panel for employment, payroll, banking, reporting, compliance, benefits, and vaccination fields. |
+| **EmployeeDocumentViewPanel.java** | Detail-view document panel. Loads saved document paths, locks existing document records, allows upload only for missing document fields, and exposes pending document updates to `EmployeeDetailView`. |
+| **EmployeeBasicDetailsPanel.java** | Basic employee detail form used in detail/edit flows. Allows updates to normal employee fields, keeps employee code locked, handles missing profile-image upload, and ignores empty placeholders such as `N/A`. |
+| **EmployeeAdditionalDetailsPanel.java** | Additional employee detail panel for employment, payroll, banking, reporting, compliance, benefits, and vaccination fields. Allows normal employee-field updates while ignoring empty placeholders. |
 | **ExcelImportButton.java** | Reusable styled button for triggering Excel import workflows. |
 | **UniversalTablePanel.java** | Generic paginated table container with action-column, link-column, status-column, and horizontal scrolling support. |
 
@@ -219,7 +219,7 @@ The project follows a layered desktop-application architecture:
 
 7. Document Handling
    EmployeeDocumentUploadPanel -> local employees/{employeeCode}/documents storage
-   EmployeeDocumentViewPanel -> document availability and preview/download actions
+   EmployeeDocumentViewPanel -> existing documents locked, missing documents uploaded through detail update
 
 8. Download Employee Report Package
    EmployeeDetailView -> EmployeeReportService -> EmployeeRecordDao.getFullEmployeeByCode
@@ -245,6 +245,17 @@ Key schema areas:
 - Contact: phone, addresses, email, emergency number.
 - Compliance and benefits: clearance, verification, wellness, vaccination.
 - Documents: CNIC, EOBI, social security, settlement, clearance, appointment, service, retirement, disciplinary, and profile image paths.
+
+---
+
+## Employee Update Rules
+
+- Normal employee detail fields can be updated when the submitted value is real data.
+- Empty values, blank strings, `N/A`, `n/a`, `NA`, `NULL`, and `-` are treated as placeholders and are not written as updates.
+- `EMPLOYEE_CODE` is the record key and stays locked in the detail screen.
+- Document fields are record-safe: if a document path already exists in the database, that document can be viewed but cannot be replaced from the detail screen.
+- If a document field is empty or a placeholder, the detail screen allows upload. The file is copied to `employees/{employeeCode}/documents/` and the database path is saved on Update.
+- Profile image follows the same safety rule: it can be uploaded only when `EMP_IMG` is empty or a placeholder.
 
 ---
 

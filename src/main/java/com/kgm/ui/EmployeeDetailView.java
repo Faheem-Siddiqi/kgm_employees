@@ -14,6 +14,10 @@ import com.kgm.ui.styling.EmployeeDetailViewHelper;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
 public class EmployeeDetailView extends JFrame {
 
@@ -66,6 +70,10 @@ public class EmployeeDetailView extends JFrame {
 
         JTabbedPane tabs = new HugHeightTabbedPane();
 
+        EmployeeDocumentViewPanel documentPanel = isWithData && emp != null
+                ? new EmployeeDocumentViewPanel(emp)
+                : new EmployeeDocumentViewPanel();
+
         if (isWithData) {
             tabs.addTab("Basic", new EmployeeBasicDetailsPanel(emp));
             tabs.addTab("Others", new EmployeeAdditionalDetailsPanel(emp));
@@ -74,7 +82,7 @@ public class EmployeeDetailView extends JFrame {
             tabs.addTab("Details", new EmployeeAdditionalDetailsPanel());
         }
 
-        tabs.addTab("Documents", new EmployeeDocumentViewPanel());
+        tabs.addTab("Documents", documentPanel);
 
         // Apply custom tab styling
         EmployeeDetailViewHelper.styleTabs(tabs);
@@ -152,6 +160,10 @@ public class EmployeeDetailView extends JFrame {
 
                 if (basicPanel != null && panelHasEditableFields(basicPanel)) {
                     Employee updatedBasic = basicPanel.getEmployeeFromForm();
+                    File selectedImage = basicPanel.getSelectedImage();
+                    if (selectedImage != null) {
+                        updatedBasic.setEMP_IMG(copyProfileImage(selectedImage, empCode));
+                    }
                     updatedBasic.setEMPLOYEE_CODE(empCode);
                     dao.updateEmployeeDynamic(updatedBasic);
                     updatedAny = true;
@@ -161,6 +173,13 @@ public class EmployeeDetailView extends JFrame {
                     Employee updatedOther = otherPanel.getUpdatedOtherDetails();
                     updatedOther.setEMPLOYEE_CODE(empCode);
                     dao.updateEmployeeDynamic(updatedOther);
+                    updatedAny = true;
+                }
+
+                if (documentPanel.hasPendingDocumentUpdates()) {
+                    Employee documentUpdates = documentPanel.getDocumentUpdates(empCode);
+                    documentUpdates.setEMPLOYEE_CODE(empCode);
+                    dao.updateEmployeeDynamic(documentUpdates);
                     updatedAny = true;
                 }
 
@@ -177,6 +196,17 @@ public class EmployeeDetailView extends JFrame {
             }
         });
         setVisible(true);
+    }
+
+    private String copyProfileImage(File source, String employeeCode) throws IOException {
+        File employeeDir = new File(System.getProperty("user.dir"), "employees/" + employeeCode);
+        if (!employeeDir.exists() && !employeeDir.mkdirs()) {
+            throw new IOException("Could not create employee folder: " + employeeDir.getAbsolutePath());
+        }
+
+        File destination = new File(employeeDir, "EMP_IMG.jpg");
+        Files.copy(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        return "employees/" + employeeCode + "/EMP_IMG.jpg";
     }
 
     private void downloadEmployeeReport() {

@@ -232,20 +232,18 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             value = "N/A";
         }
 
-        boolean editable = isEmpty(value);
-
         // 🔥 store field
         JComponent input;
         if (isDateField(label)) {
             UniversalDatePicker datePicker = EmployeeAdditionalDetailsPanelHelper.createDateField(parseDate(value));
-            datePicker.setEnabled(editable);
+            datePicker.setEnabled(true);
             dateDirtyMap.put(label, false);
             datePicker.addDateChangeListener(() -> dateDirtyMap.put(label, true));
             dateFieldMap.put(label, datePicker);
             input = datePicker;
         } else {
             JTextField field = EmployeeAdditionalDetailsPanelHelper.createField(value);
-            field.setEditable(editable);
+            field.setEditable(true);
             fieldMap.put(label, field);
             input = field;
         }
@@ -433,7 +431,9 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
 
         return v.isEmpty()
                 || v.equalsIgnoreCase("N/A")
-                || v.equalsIgnoreCase("NA");
+                || v.equalsIgnoreCase("NA")
+                || v.equalsIgnoreCase("NULL")
+                || v.equals("-");
     }
 }
 
