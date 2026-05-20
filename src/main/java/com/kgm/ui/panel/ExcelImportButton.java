@@ -18,7 +18,7 @@ public class ExcelImportButton extends JButton {
         setBackground(excelGreen);
         setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        // 🔥 MATCH EXACT SIZE WITH "ADD RECORD"
+        // MATCH EXACT SIZE WITH "ADD RECORD"
         setPreferredSize(new Dimension(120, 32));
 
         setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));

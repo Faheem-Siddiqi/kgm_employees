@@ -2,7 +2,7 @@ package com.kgm.ui;
 
 import com.kgm.service.AuthService;
 import com.kgm.ui.styling.DialogHelper;
-import com.kgm.ui.styling.LoginViewStyle;
+import com.kgm.ui.styling.LoginViewHelper;
 import com.kgm.util.SessionManager;
 import com.kgm.util.SessionWatcher;
 
@@ -12,28 +12,28 @@ import java.awt.*;
 public class LoginView extends JFrame {
 
     public LoginView() {
-        LoginViewStyle.applyFrame(this);
+        LoginViewHelper.applyFrame(this);
 
-        JPanel root = LoginViewStyle.createRootPanel();
+        JPanel root = LoginViewHelper.createRootPanel();
         add(root, BorderLayout.CENTER);
 
-        root.add(LoginViewStyle.createImagePanel());
+        root.add(LoginViewHelper.createImagePanel());
         root.add(createLoginPanel());
 
         setLocationRelativeTo(null);
     }
 
     private JPanel createLoginPanel() {
-        JPanel outer = LoginViewStyle.createOuterPanel();
-        JPanel form = LoginViewStyle.createFormPanel();
+        JPanel outer = LoginViewHelper.createOuterPanel();
+        JPanel form = LoginViewHelper.createFormPanel();
 
-        JLabel eyebrow = LoginViewStyle.createEyebrowLabel("KGM EX-EMPLOYEES PORTAL");
-        JLabel welcome = LoginViewStyle.createWelcomeLabel("Welcome Back");
-        JLabel subtitle = LoginViewStyle.createSubtitleLabel("Sign in to continue to guest management.");
+        JLabel eyebrow = LoginViewHelper.createEyebrowLabel("KGM EX-EMPLOYEES PORTAL");
+        JLabel welcome = LoginViewHelper.createWelcomeLabel("Welcome Back");
+        JLabel subtitle = LoginViewHelper.createSubtitleLabel("Sign in to continue to ex-employee management.");
 
-        JTextField userField = LoginViewStyle.createTextField("Enter username");
-        JPasswordField passField = LoginViewStyle.createPasswordField("Enter password");
-        JButton loginBtn = LoginViewStyle.createPrimaryButton("Sign In");
+        JTextField userField = LoginViewHelper.createTextField("Enter username");
+        JPasswordField passField = LoginViewHelper.createPasswordField("Enter password");
+        JButton loginBtn = LoginViewHelper.createPrimaryButton("Sign In");
 
         form.add(eyebrow);
         form.add(Box.createVerticalStrut(14));
@@ -41,9 +41,9 @@ public class LoginView extends JFrame {
         form.add(Box.createVerticalStrut(4));
         form.add(subtitle);
         form.add(Box.createVerticalStrut(30));
-        form.add(LoginViewStyle.createFieldBlock("Username", userField));
+        form.add(LoginViewHelper.createFieldBlock("Username", userField));
         form.add(Box.createVerticalStrut(14));
-        form.add(LoginViewStyle.createFieldBlock("Password", passField));
+        form.add(LoginViewHelper.createFieldBlock("Password", passField));
         form.add(Box.createVerticalStrut(20));
         form.add(loginBtn);
 
@@ -66,3 +66,4 @@ public class LoginView extends JFrame {
         return outer;
     }
 }
+

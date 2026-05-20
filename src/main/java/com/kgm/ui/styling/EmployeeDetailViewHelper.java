@@ -8,67 +8,67 @@ public final class EmployeeDetailViewHelper {
     }
 
     public static void applyFrame(JFrame frame) {
-        EmployeeDetailViewStyle.applyFrame(frame);
+        EmployeeDetailViewLayoutHelper.applyFrame(frame);
     }
 
     public static JPanel createTopContainer() {
-        return EmployeeDetailViewStyle.createTopContainer();
+        return EmployeeDetailViewLayoutHelper.createTopContainer();
     }
 
     public static JPanel createSecondRow() {
-        return EmployeeDetailViewStyle.createSecondRow();
+        return EmployeeDetailViewLayoutHelper.createSecondRow();
     }
 
     public static JPanel screenHeader(String employeeName, String employeeCode, Runnable onBack) {
-        return EmployeeDetailViewStyle.screenHeader(employeeName, employeeCode, onBack);
+        return EmployeeDetailViewLayoutHelper.screenHeader(employeeName, employeeCode, onBack);
     }
 
     public static JPanel createBackButtonPanel() {
-        return EmployeeDetailViewStyle.createBackButtonPanel();
+        return EmployeeDetailViewLayoutHelper.createBackButtonPanel();
     }
 
     public static void styleBackButton(JButton button) {
-        EmployeeDetailViewStyle.styleBackButton(button);
+        EmployeeDetailViewLayoutHelper.styleBackButton(button);
     }
 
     public static JPanel createEmployeeSummaryPanel() {
-        return EmployeeDetailViewStyle.createEmployeeSummaryPanel();
+        return EmployeeDetailViewLayoutHelper.createEmployeeSummaryPanel();
     }
 
     public static void styleEmployeeName(JLabel label) {
-        EmployeeDetailViewStyle.styleEmployeeName(label);
+        EmployeeDetailViewLayoutHelper.styleEmployeeName(label);
     }
 
     public static void styleEmployeeCode(JLabel label) {
-        EmployeeDetailViewStyle.styleEmployeeCode(label);
+        EmployeeDetailViewLayoutHelper.styleEmployeeCode(label);
     }
 
     public static JPanel createCenterWrapper() {
-        return EmployeeInductionHelper.createCenterWrapper();
+        return EmployeeRegistrationViewHelper.createCenterWrapper();
     }
 
     public static void styleUpdateButton(JButton button) {
-        EmployeeInductionHelper.stylePrimaryButton(button);
+        EmployeeRegistrationViewHelper.stylePrimaryButton(button);
     }
 
     public static JPanel createActionRow() {
-        return EmployeeInductionHelper.createActionRow();
+        return EmployeeRegistrationViewHelper.createActionRow();
     }
 
     public static JScrollPane createPageScrollPane(JComponent content) {
-        return EmployeeInductionHelper.createPageScrollPane(content);
+        return EmployeeRegistrationViewHelper.createPageScrollPane(content);
     }
 
     public static void installPageWheelForwarding(JScrollPane pageScroll, JComponent root) {
-        EmployeeInductionHelper.installPageWheelForwarding(pageScroll, root);
+        EmployeeRegistrationViewHelper.installPageWheelForwarding(pageScroll, root);
     }
 
     public static GridBagConstraints pageConstraints(int y) {
-        return EmployeeInductionHelper.pageConstraints(y);
+        return EmployeeRegistrationViewHelper.pageConstraints(y);
     }
 
     public static JPanel createTabContent(JComponent content, JComponent actions) {
-        return EmployeeInductionHelper.createTabContent(content, actions);
+        return EmployeeRegistrationViewHelper.createTabContent(content, actions);
     }
 
     /**
@@ -76,6 +76,7 @@ public final class EmployeeDetailViewHelper {
      * This creates modern tabs with underline indicator for selected tab.
      */
     public static void styleTabs(JTabbedPane tabs) {
-        EmployeeInductionHelper.styleTabs(tabs);
+        EmployeeRegistrationViewHelper.styleTabs(tabs);
     }
 }
+

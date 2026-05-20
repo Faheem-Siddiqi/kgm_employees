@@ -1,6 +1,6 @@
 package com.kgm.ui.panel;
 
-import com.kgm.ui.styling.TableStyleHelper;
+import com.kgm.ui.styling.TableThemeHelper;
 import com.kgm.ui.styling.UniversalTablePanelHelper;
 
 import javax.swing.*;
@@ -69,7 +69,7 @@ public class UniversalTablePanel extends JPanel {
         setOpaque(false);
         content.setOpaque(false);
 
-        TableStyleHelper.styleTable(table);
+        TableThemeHelper.styleTable(table);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         table.getTableHeader().addMouseWheelListener(this::forwardMouseWheel);
 
@@ -171,7 +171,7 @@ public class UniversalTablePanel extends JPanel {
             ) {
                 JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, false, row, column);
                 String text = value == null ? "" : String.valueOf(value);
-                TableStyleHelper.styleTableLink(label, table, isSelected, row == hoveredLinkRow, text);
+                TableThemeHelper.styleTableLink(label, table, isSelected, row == hoveredLinkRow, text);
                 return label;
             }
         };
@@ -332,7 +332,7 @@ public class UniversalTablePanel extends JPanel {
     private void refresh() {
         content.removeAll();
         if (rows.isEmpty()) {
-            content.add(TableStyleHelper.emptyState(emptyText), BorderLayout.CENTER);
+            content.add(TableThemeHelper.emptyState(emptyText), BorderLayout.CENTER);
         } else {
             renderPage();
             content.add(createTableContainer(), BorderLayout.CENTER);
@@ -543,7 +543,7 @@ public class UniversalTablePanel extends JPanel {
         if (width <= 0 && getParent() != null) {
             width = getParent().getWidth();
         }
-        return Math.max(240, width > 0 ? width : TableStyleHelper.CONTENT_WIDTH - 80);
+        return Math.max(240, width > 0 ? width : TableThemeHelper.CONTENT_WIDTH - 80);
     }
 
     private String showingText() {
@@ -633,3 +633,4 @@ public class UniversalTablePanel extends JPanel {
         }
     }
 }
+

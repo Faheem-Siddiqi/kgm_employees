@@ -1,12 +1,12 @@
 package com.kgm.ui;
 
-import com.kgm.dao.EmployeeRepositoryDao;
+import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.ui.panel.EmployeeTablePanel;
 import com.kgm.ui.panel.ExcelImportButton;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.styling.DialogHelper;
-import com.kgm.ui.styling.HomeViewStyle;
+import com.kgm.ui.styling.HomeViewHelper;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -15,24 +15,24 @@ import java.awt.*;
 
 public class HomeView extends JFrame {
     public HomeView() {
-        HomeViewStyle.applyFrame(this);
+        HomeViewHelper.applyFrame(this);
 
-        EmployeeRepositoryDao repo = new EmployeeRepositoryDao();
+        EmployeeRecordDao repo = new EmployeeRecordDao();
         EmployeeTablePanel tablePanel = new EmployeeTablePanel(repo);
 
-        JPanel top = HomeViewStyle.createTopPanel();
+        JPanel top = HomeViewHelper.createTopPanel();
         top.add(new HeaderPanel("Home Dashboard"), BorderLayout.NORTH);
 
-        JPanel searchRow = HomeViewStyle.createSearchRow();
-        JTextField searchField = HomeViewStyle.createSearchField("Search Employee Code");
+        JPanel searchRow = HomeViewHelper.createSearchRow();
+        JTextField searchField = HomeViewHelper.createSearchField("Search Employee Code");
 
         JButton searchBtn = new JButton("Search");
-        HomeViewStyle.styleSearchButton(searchBtn);
+        HomeViewHelper.styleSearchButton(searchBtn);
         searchField.addActionListener(e -> searchBtn.doClick());
 
         JButton clearBtn = new JButton("Clear");
-        HomeViewStyle.styleClearButton(clearBtn);
-        HomeViewStyle.setTextButtonEnabled(clearBtn, false);
+        HomeViewHelper.styleClearButton(clearBtn);
+        HomeViewHelper.setTextButtonEnabled(clearBtn, false);
         searchField.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
@@ -50,7 +50,7 @@ public class HomeView extends JFrame {
             }
 
             private void updateClearButton() {
-                HomeViewStyle.setTextButtonEnabled(clearBtn, !searchField.getText().trim().isEmpty());
+                HomeViewHelper.setTextButtonEnabled(clearBtn, !searchField.getText().trim().isEmpty());
             }
         });
 
@@ -72,30 +72,30 @@ public class HomeView extends JFrame {
         clearBtn.addActionListener(e -> {
             searchField.setText("");
             tablePanel.reload();
-            HomeViewStyle.setTextButtonEnabled(clearBtn, false);
+            HomeViewHelper.setTextButtonEnabled(clearBtn, false);
         });
 
-        HomeViewStyle.addSearchControls(searchRow, searchField, searchBtn, clearBtn);
+        HomeViewHelper.addSearchControls(searchRow, searchField, searchBtn, clearBtn);
 
-        JPanel northContainer = HomeViewStyle.createNorthContainer();
+        JPanel northContainer = HomeViewHelper.createNorthContainer();
         northContainer.add(top, BorderLayout.NORTH);
         northContainer.add(searchRow, BorderLayout.CENTER);
         add(northContainer, BorderLayout.NORTH);
 
-        JPanel btnRow = HomeViewStyle.createButtonRow();
+        JPanel btnRow = HomeViewHelper.createButtonRow();
         ExcelImportButton excelBtn = new ExcelImportButton(() -> {
             System.out.println("Import Excel clicked");
         });
 
-        JButton addBtn = new JButton("Add Record");
-        HomeViewStyle.styleAddButton(addBtn);
+        JButton addBtn = new JButton("Add Employee");
+        HomeViewHelper.styleAddButton(addBtn);
         addBtn.addActionListener(e -> {
-            new EmployeeInduction().setVisible(true);
+            new EmployeeRegistrationView().setVisible(true);
             dispose();
         });
 
         JButton refreshBtn = new JButton("Refresh");
-        HomeViewStyle.styleRefreshButton(refreshBtn);
+        HomeViewHelper.styleRefreshButton(refreshBtn);
         refreshBtn.addActionListener(e -> tablePanel.reload());
 
         btnRow.add(excelBtn);
@@ -103,7 +103,7 @@ public class HomeView extends JFrame {
         btnRow.add(refreshBtn);
         northContainer.add(btnRow, BorderLayout.SOUTH);
 
-        JPanel body = HomeViewStyle.createBodyPanel();
+        JPanel body = HomeViewHelper.createBodyPanel();
         body.add(tablePanel, BorderLayout.CENTER);
         add(body, BorderLayout.CENTER);
         add(new FooterPanel(), BorderLayout.SOUTH);
@@ -111,3 +111,4 @@ public class HomeView extends JFrame {
         setVisible(true);
     }
 }
+

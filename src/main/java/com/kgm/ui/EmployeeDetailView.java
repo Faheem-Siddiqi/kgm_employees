@@ -1,13 +1,13 @@
 package com.kgm.ui;
 
-import com.kgm.dao.EmployeeRepositoryDao;
+import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.model.Employee;
 import com.kgm.ui.component.UniversalDatePicker;
-import com.kgm.ui.panel.BasicDetailsPanel;
-import com.kgm.ui.panel.DocumentViewPanel;
+import com.kgm.ui.panel.EmployeeBasicDetailsPanel;
+import com.kgm.ui.panel.EmployeeDocumentViewPanel;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
-import com.kgm.ui.panel.OtherDetailsPanel;
+import com.kgm.ui.panel.EmployeeAdditionalDetailsPanel;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDetailViewHelper;
 
@@ -25,7 +25,7 @@ public class EmployeeDetailView extends JFrame {
 
         try {
             if (this.empCode != null && !this.empCode.isEmpty()) {
-                emp = new EmployeeRepositoryDao().getFullEmployeeByCode(this.empCode);
+                emp = new EmployeeRecordDao().getFullEmployeeByCode(this.empCode);
             }
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -60,14 +60,14 @@ public class EmployeeDetailView extends JFrame {
         JTabbedPane tabs = new HugHeightTabbedPane();
 
         if (isWithData) {
-            tabs.addTab("Basic", new BasicDetailsPanel(emp));
-            tabs.addTab("Others", new OtherDetailsPanel(emp));
+            tabs.addTab("Basic", new EmployeeBasicDetailsPanel(emp));
+            tabs.addTab("Others", new EmployeeAdditionalDetailsPanel(emp));
         } else {
-            tabs.addTab("Core", new BasicDetailsPanel());
-            tabs.addTab("Details", new OtherDetailsPanel());
+            tabs.addTab("Core", new EmployeeBasicDetailsPanel());
+            tabs.addTab("Details", new EmployeeAdditionalDetailsPanel());
         }
 
-        tabs.addTab("Documents", new DocumentViewPanel());
+        tabs.addTab("Documents", new EmployeeDocumentViewPanel());
 
         // Apply custom tab styling
         EmployeeDetailViewHelper.styleTabs(tabs);
@@ -106,12 +106,12 @@ public class EmployeeDetailView extends JFrame {
             for (int i = 0; i < tabs.getTabCount(); i++) {
                 Component comp = tabs.getComponentAt(i);
 
-                if (comp instanceof BasicDetailsPanel bp && panelHasEditableFields(bp)) {
+                if (comp instanceof EmployeeBasicDetailsPanel bp && panelHasEditableFields(bp)) {
                     canUpdate = true;
                     break;
                 }
 
-                if (comp instanceof OtherDetailsPanel op && panelHasEditableFields(op)) {
+                if (comp instanceof EmployeeAdditionalDetailsPanel op && panelHasEditableFields(op)) {
                     canUpdate = true;
                     break;
                 }
@@ -125,22 +125,22 @@ public class EmployeeDetailView extends JFrame {
 
         updateBtn.addActionListener(e -> {
             try {
-                BasicDetailsPanel basicPanel = null;
-                OtherDetailsPanel otherPanel = null;
+                EmployeeBasicDetailsPanel basicPanel = null;
+                EmployeeAdditionalDetailsPanel otherPanel = null;
 
                 for (int i = 0; i < tabs.getTabCount(); i++) {
                     Component comp = tabs.getComponentAt(i);
 
-                    if (comp instanceof BasicDetailsPanel bp) {
+                    if (comp instanceof EmployeeBasicDetailsPanel bp) {
                         basicPanel = bp;
                     }
 
-                    if (comp instanceof OtherDetailsPanel op) {
+                    if (comp instanceof EmployeeAdditionalDetailsPanel op) {
                         otherPanel = op;
                     }
                 }
 
-                EmployeeRepositoryDao dao = new EmployeeRepositoryDao();
+                EmployeeRecordDao dao = new EmployeeRecordDao();
                 boolean updatedAny = false;
 
                 if (basicPanel != null && panelHasEditableFields(basicPanel)) {
@@ -227,3 +227,4 @@ public class EmployeeDetailView extends JFrame {
         }
     }
 }
+

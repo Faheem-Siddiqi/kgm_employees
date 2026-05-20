@@ -6,7 +6,7 @@ import javax.swing.*;
 import java.awt.*;
 
 public final class UniversalDialogHelper {
-    public static final Color INFO_ACCENT = TableStyleHelper.PRIMARY;
+    public static final Color INFO_ACCENT = TableThemeHelper.PRIMARY;
     public static final Color SUCCESS_ACCENT = new Color(28, 137, 85);
     public static final Color WARNING_ACCENT = new Color(176, 76, 19);
     public static final Color ERROR_ACCENT = new Color(217, 45, 32);
@@ -87,7 +87,7 @@ public final class UniversalDialogHelper {
     public static JLabel createHeading(String text) {
         JLabel heading = new JLabel(text);
         heading.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        heading.setForeground(TableStyleHelper.TEXT_PRIMARY);
+        heading.setForeground(TableThemeHelper.TEXT_PRIMARY);
         heading.setAlignmentX(Component.LEFT_ALIGNMENT);
         return heading;
     }
@@ -101,7 +101,7 @@ public final class UniversalDialogHelper {
         textArea.setRows(rows);
         textArea.setColumns(0);
         textArea.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        textArea.setForeground(TableStyleHelper.TEXT_PRIMARY);
+        textArea.setForeground(TableThemeHelper.TEXT_PRIMARY);
         textArea.setBackground(background);
         textArea.setBorder(BorderFactory.createEmptyBorder());
         textArea.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -110,7 +110,7 @@ public final class UniversalDialogHelper {
 
     public static JScrollPane createSectionScroll(JTextArea text, Color background, Dimension size) {
         JScrollPane sectionScroll = new JScrollPane(text);
-        sectionScroll.setBorder(BorderFactory.createLineBorder(TableStyleHelper.BORDER));
+        sectionScroll.setBorder(BorderFactory.createLineBorder(TableThemeHelper.BORDER));
         sectionScroll.getViewport().setBackground(background);
         sectionScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         sectionScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
@@ -142,10 +142,10 @@ public final class UniversalDialogHelper {
         JButton button = new JButton(buttonText(text));
         button.setPreferredSize(buttonSize(button.getText(), 82, 30));
         button.setBackground(Color.WHITE);
-        button.setForeground(TableStyleHelper.TEXT_SECONDARY);
+        button.setForeground(TableThemeHelper.TEXT_SECONDARY);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createLineBorder(TableStyleHelper.BORDER));
+        button.setBorder(BorderFactory.createLineBorder(TableThemeHelper.BORDER));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return button;
     }
@@ -161,7 +161,7 @@ public final class UniversalDialogHelper {
     }
 
     public static Color border(UniversalDialog.Type type) {
-        return type == UniversalDialog.Type.ERROR ? ERROR_BORDER : TableStyleHelper.BORDER;
+        return type == UniversalDialog.Type.ERROR ? ERROR_BORDER : TableThemeHelper.BORDER;
     }
 
     private static String badgeText(UniversalDialog.Type type) {
@@ -180,3 +180,4 @@ public final class UniversalDialogHelper {
         return text == null || text.isBlank() ? "OK" : text;
     }
 }
+

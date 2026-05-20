@@ -15,7 +15,7 @@ public final class UniversalDateRangePickerHelper {
     public static final int ICON_SIZE = 16;
 
     private static final Color BORDER_COLOR = new Color(200, 200, 200);
-    private static final Color ICON_COLOR = TableStyleHelper.TEXT_SECONDARY;
+    private static final Color ICON_COLOR = TableThemeHelper.TEXT_SECONDARY;
     private static final Color DISABLED_BACKGROUND = new Color(248, 248, 248);
     private static final Color DISABLED_FOREGROUND = new Color(150, 150, 150);
 
@@ -35,7 +35,7 @@ public final class UniversalDateRangePickerHelper {
     public static JLabel createDisplayLabel() {
         JLabel label = new JLabel();
         label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        label.setForeground(TableStyleHelper.TEXT_PRIMARY);
+        label.setForeground(TableThemeHelper.TEXT_PRIMARY);
         label.setBorder(new EmptyBorder(0, 0, 0, 0));
         return label;
     }
@@ -80,7 +80,7 @@ public final class UniversalDateRangePickerHelper {
         block.setOpaque(false);
         JLabel label = new JLabel(title);
         label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
-        label.setForeground(TableStyleHelper.TEXT_SECONDARY);
+        label.setForeground(TableThemeHelper.TEXT_SECONDARY);
         block.add(label, BorderLayout.NORTH);
         block.add(calendar, BorderLayout.CENTER);
         return block;
@@ -93,13 +93,13 @@ public final class UniversalDateRangePickerHelper {
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         if (primary) {
             button.setForeground(Color.WHITE);
-            button.setBackground(TableStyleHelper.PRIMARY);
+            button.setBackground(TableThemeHelper.PRIMARY);
             button.setBorder(new EmptyBorder(7, 16, 7, 16));
         } else {
-            button.setForeground(TableStyleHelper.PRIMARY);
+            button.setForeground(TableThemeHelper.PRIMARY);
             button.setBackground(Color.WHITE);
             button.setBorder(new CompoundBorder(
-                    new LineBorder(TableStyleHelper.BORDER),
+                    new LineBorder(TableThemeHelper.BORDER),
                     new EmptyBorder(6, 14, 6, 14)));
         }
         return button;
@@ -115,8 +115,8 @@ public final class UniversalDateRangePickerHelper {
         calendar.setLocale(Locale.ENGLISH);
         calendar.setBackground(Color.WHITE);
         calendar.setDecorationBackgroundColor(Color.WHITE);
-        calendar.setWeekdayForeground(TableStyleHelper.TEXT_SECONDARY);
-        calendar.setSundayForeground(TableStyleHelper.DANGER);
+        calendar.setWeekdayForeground(TableThemeHelper.TEXT_SECONDARY);
+        calendar.setSundayForeground(TableThemeHelper.DANGER);
         Dimension size = new Dimension(250, 220);
         calendar.setPreferredSize(size);
         calendar.setMinimumSize(size);
@@ -133,7 +133,7 @@ public final class UniversalDateRangePickerHelper {
         picker.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
         iconLabel.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
         picker.setBackground(enabled ? Color.WHITE : DISABLED_BACKGROUND);
-        displayLabel.setForeground(enabled ? TableStyleHelper.TEXT_PRIMARY : DISABLED_FOREGROUND);
+        displayLabel.setForeground(enabled ? TableThemeHelper.TEXT_PRIMARY : DISABLED_FOREGROUND);
     }
 
     private static void styleChildren(Component component) {
@@ -164,3 +164,4 @@ public final class UniversalDateRangePickerHelper {
         }
     }
 }
+

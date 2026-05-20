@@ -55,7 +55,7 @@ public final class UniversalTablePanelHelper {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
         panel.setOpaque(true);
         panel.setPreferredSize(new Dimension(panel.getPreferredSize().width, table.getRowHeight()));
-        panel.setBackground(isSelected ? TableStyleHelper.ROW_SELECTION : Color.WHITE);
+        panel.setBackground(isSelected ? TableThemeHelper.ROW_SELECTION : Color.WHITE);
         panel.setBorder(new CompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 1, CELL_DIVIDER),
                 new EmptyBorder(12, 16, 0, 14)));
@@ -123,7 +123,7 @@ public final class UniversalTablePanelHelper {
     public static void styleRangeLabel(JLabel label, String text) {
         label.setText(text);
         label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
-        label.setForeground(TableStyleHelper.TEXT_SECONDARY);
+        label.setForeground(TableThemeHelper.TEXT_SECONDARY);
         label.setBorder(new EmptyBorder(8, 0, 8, 0));
     }
 
@@ -139,7 +139,7 @@ public final class UniversalTablePanelHelper {
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         button.setBorder(new EmptyBorder(8, 14, 8, 14));
         button.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
-        button.setBackground(enabled ? TableStyleHelper.PRIMARY : DISABLED_BUTTON);
+        button.setBackground(enabled ? TableThemeHelper.PRIMARY : DISABLED_BUTTON);
         button.setForeground(enabled ? Color.WHITE : DISABLED_TEXT);
         button.setOpaque(true);
         button.setContentAreaFilled(true);
@@ -149,7 +149,7 @@ public final class UniversalTablePanelHelper {
     public static void styleClippedTextCell(JLabel label, JTable table) {
         label.setOpaque(true);
         label.setBackground(Color.WHITE);
-        label.setForeground(TableStyleHelper.TEXT_PRIMARY);
+        label.setForeground(TableThemeHelper.TEXT_PRIMARY);
         label.setFont(table.getFont().deriveFont(Font.PLAIN));
         label.setEnabled(table.isEnabled());
         label.setComponentOrientation(table.getComponentOrientation());
@@ -165,19 +165,19 @@ public final class UniversalTablePanelHelper {
             return new Color(38, 128, 64);
         }
         if (status.equalsIgnoreCase("Upcoming")) {
-            return TableStyleHelper.PRIMARY;
+            return TableThemeHelper.PRIMARY;
         }
         if (status.equalsIgnoreCase("Departed")) {
-            return TableStyleHelper.DANGER;
+            return TableThemeHelper.DANGER;
         }
-        return TableStyleHelper.TEXT_SECONDARY;
+        return TableThemeHelper.TEXT_SECONDARY;
     }
 
     private static void styleActionLabel(JLabel label, boolean selected, String text) {
         label.setText(text);
         label.setHorizontalAlignment(SwingConstants.CENTER);
-        label.setForeground(TableStyleHelper.PRIMARY);
-        label.setBackground(selected ? TableStyleHelper.ROW_SELECTION : Color.WHITE);
+        label.setForeground(TableThemeHelper.PRIMARY);
+        label.setBackground(selected ? TableThemeHelper.ROW_SELECTION : Color.WHITE);
         label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         label.setBorder(new CompoundBorder(
@@ -195,7 +195,7 @@ public final class UniversalTablePanelHelper {
         public void paintBorder(Component component, Graphics g, int x, int y, int width, int height) {
             Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(TableStyleHelper.BORDER);
+            g2.setColor(TableThemeHelper.BORDER);
             g2.drawRoundRect(x, y, width - 1, height - 1, 4, 4);
         }
 
@@ -204,3 +204,4 @@ public final class UniversalTablePanelHelper {
         }
     }
 }
+
