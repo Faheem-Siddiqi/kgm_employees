@@ -214,7 +214,7 @@ public final class TablePaginationHelper {
                 label.setHorizontalAlignment(actionColumn ? SwingConstants.CENTER : SwingConstants.LEFT);
                 label.setBackground(isSelected ? ROW_SELECTION : PAGE_BACKGROUND);
                 label.setForeground(actionColumn ? PRIMARY : TEXT_PRIMARY);
-                label.setFont(new Font("Segoe UI", actionColumn ? Font.BOLD : Font.PLAIN, 13));
+                label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
                 label.setBorder(new CompoundBorder(
                         new MatteBorder(0, 0, 1, 1, CELL_DIVIDER),
                         new EmptyBorder(0, 16, 0, 14)));

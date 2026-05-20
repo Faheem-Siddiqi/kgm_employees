@@ -8,6 +8,7 @@ import com.kgm.ui.panel.EmployeeDocumentViewPanel;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.EmployeeAdditionalDetailsPanel;
+import com.kgm.service.EmployeeReportService;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDetailViewHelper;
 
@@ -52,10 +53,16 @@ public class EmployeeDetailView extends JFrame {
         add(topContainer, BorderLayout.NORTH);
 
         JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
-        centerWrapper.add(EmployeeDetailViewHelper.screenHeader(nameValue, codeValue, () -> {
-            this.dispose();
-            new HomeView();
-        }), EmployeeDetailViewHelper.pageConstraints(0));
+        Runnable onDownloadReport = isWithData && emp != null ? this::downloadEmployeeReport : null;
+        centerWrapper.add(EmployeeDetailViewHelper.screenHeader(
+                nameValue,
+                codeValue,
+                () -> {
+                    this.dispose();
+                    new HomeView();
+                },
+                onDownloadReport
+        ), EmployeeDetailViewHelper.pageConstraints(0));
 
         JTabbedPane tabs = new HugHeightTabbedPane();
 
@@ -170,6 +177,37 @@ public class EmployeeDetailView extends JFrame {
             }
         });
         setVisible(true);
+    }
+
+    private void downloadEmployeeReport() {
+        if (empCode == null || empCode.isBlank()) {
+            DialogHelper.warning(this, "Missing Employee Code", "Employee code is required to generate a report.");
+            return;
+        }
+
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Choose Folder for Employee Report Package");
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        chooser.setApproveButtonText("Save Package Here");
+
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        try {
+            EmployeeReportService.PackageResult result = new EmployeeReportService()
+                    .generateEmployeePackage(empCode, chooser.getSelectedFile());
+            DialogHelper.success(this, "Report package saved successfully.\nFolder: "
+                    + result.folder().getAbsolutePath()
+                    + "\nDocuments copied: " + result.copiedDocumentCount()
+                    + " / " + result.totalDocumentCount());
+        } catch (Exception exception) {
+            exception.printStackTrace();
+            String message = exception.getMessage() == null || exception.getMessage().isBlank()
+                    ? "Employee report package could not be generated."
+                    : exception.getMessage();
+            DialogHelper.error(this, "Download Report Failed", message);
+        }
     }
 
     private boolean panelHasEditableFields(Container container) {

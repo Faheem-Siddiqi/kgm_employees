@@ -56,7 +56,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         String trimmed = value.trim();
         if (trimmed.isEmpty()) return true;
         String upper = trimmed.toUpperCase();
-        return upper.equals("N/A") || upper.equals("N/A");
+        return upper.equals("N/A") || upper.equals("NA") || upper.equals("NULL") || upper.equals("-");
     }
     
     /**
@@ -119,11 +119,9 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         current_address.setText(employee.getCURRENT_ADR());
         setFieldEditability(current_address, employee.getCURRENT_ADR());
         
-        if (employee.getEMP_IMG() != null
-                && !employee.getEMP_IMG().trim().isEmpty()) {
+        if (!isEmpty(employee.getEMP_IMG())) {
             try {
-                File imgFile = new File(employee.getEMP_IMG());
-                System.err.println("Attempting to load image from: " + imgFile.getAbsolutePath());
+                File imgFile = resolveEmployeeImageFile(employee.getEMP_IMG());
                 if (imgFile.exists()) {
                     BufferedImage img = ImageIO.read(imgFile);
                     Image scaled = img.getScaledInstance(
@@ -137,14 +135,19 @@ public class EmployeeBasicDetailsPanel extends JPanel {
                     if (infoLabel != null) {
                         infoLabel.setVisible(false);
                     }
-                    System.out.println("Image loaded: " + employee.getEMP_IMG());
-                } else {
-                    System.out.println("Image not found: " + employee.getEMP_IMG());
                 }
             } catch (Exception ex) {
                 System.out.println("Image load error: " + ex.getMessage());
             }
         }
+    }
+
+    private File resolveEmployeeImageFile(String imagePath) {
+        File imageFile = new File(imagePath);
+        if (imageFile.isAbsolute()) {
+            return imageFile;
+        }
+        return new File(System.getProperty("user.dir"), imagePath);
     }
     private JPanel buildForm() {
         JPanel root = EmployeeBasicDetailsPanelHelper.createFormRoot();

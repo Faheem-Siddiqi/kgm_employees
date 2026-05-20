@@ -3,12 +3,15 @@ package com.kgm.ui.panel;
 import javax.swing.*;
 import com.kgm.ui.EmployeeDetailView;
 import com.kgm.ui.styling.TablePaginationHelper;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.font.TextAttribute;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.model.Employee;
 
@@ -55,6 +58,7 @@ public class EmployeeTablePanel extends JPanel {
         });
 
         table = TablePaginationHelper.createEmployeeTable(model);
+        configureActionColumnStyle();
 
         JScrollPane scrollPane = createNoScrollScrollPane(table);
         add(scrollPane, BorderLayout.CENTER);
@@ -173,6 +177,41 @@ public class EmployeeTablePanel extends JPanel {
         }
 
         new EmployeeDetailView(empCode);
+    }
+
+    private void configureActionColumnStyle() {
+        table.getColumnModel().getColumn(ACTION_COLUMN).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(
+                    JTable table,
+                    Object value,
+                    boolean isSelected,
+                    boolean hasFocus,
+                    int row,
+                    int column
+            ) {
+                Component component = super.getTableCellRendererComponent(
+                        table,
+                        value,
+                        isSelected,
+                        hasFocus,
+                        row,
+                        column
+                );
+
+                if (component instanceof JLabel label) {
+                    Map<TextAttribute, Object> attributes = new java.util.HashMap<>(
+                            label.getFont().getAttributes()
+                    );
+
+                    attributes.put(TextAttribute.WEIGHT, TextAttribute.WEIGHT_SEMIBOLD);
+                    label.setFont(label.getFont().deriveFont(attributes));
+                    label.setHorizontalAlignment(SwingConstants.CENTER);
+                }
+
+                return component;
+            }
+        });
     }
 
     /**

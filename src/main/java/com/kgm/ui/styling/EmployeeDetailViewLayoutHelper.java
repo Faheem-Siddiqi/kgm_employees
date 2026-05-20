@@ -36,6 +36,15 @@ public final class EmployeeDetailViewLayoutHelper {
     }
 
     public static JPanel screenHeader(String employeeName, String employeeCode, Runnable onBack) {
+        return screenHeader(employeeName, employeeCode, onBack, null);
+    }
+
+    public static JPanel screenHeader(
+            String employeeName,
+            String employeeCode,
+            Runnable onBack,
+            Runnable onDownloadReport
+    ) {
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(PAGE_BACKGROUND);
         header.setBorder(new EmptyBorder(25, 28, 0, 28));
@@ -62,6 +71,12 @@ public final class EmployeeDetailViewLayoutHelper {
         titleBlock.add(title);
         titleBlock.add(Box.createVerticalStrut(3));
         titleBlock.add(subtitle);
+        if (onDownloadReport != null) {
+            JButton downloadReport = createDownloadReportButton();
+            downloadReport.addActionListener(e -> onDownloadReport.run());
+            titleBlock.add(Box.createVerticalStrut(8));
+            titleBlock.add(downloadReport);
+        }
 
         JButton back = new JButton("Dashboard");
         styleBackButton(back);
@@ -70,6 +85,21 @@ public final class EmployeeDetailViewLayoutHelper {
         header.add(titleBlock, BorderLayout.WEST);
         header.add(back, BorderLayout.EAST);
         return header;
+    }
+
+    private static JButton createDownloadReportButton() {
+        JButton button = new JButton("Download Report");
+        button.setAlignmentX(Component.LEFT_ALIGNMENT);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false);
+        button.setFocusPainted(false);
+        button.setOpaque(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setForeground(LINK_BLUE);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        button.setMargin(new Insets(0, 0, 0, 0));
+        button.setBorder(new EmptyBorder(0, 0, 0, 0));
+        return button;
     }
 
     public static JPanel createBackButtonPanel() {

@@ -23,6 +23,15 @@ public final class EmployeeDetailViewHelper {
         return EmployeeDetailViewLayoutHelper.screenHeader(employeeName, employeeCode, onBack);
     }
 
+    public static JPanel screenHeader(
+            String employeeName,
+            String employeeCode,
+            Runnable onBack,
+            Runnable onDownloadReport
+    ) {
+        return EmployeeDetailViewLayoutHelper.screenHeader(employeeName, employeeCode, onBack, onDownloadReport);
+    }
+
     public static JPanel createBackButtonPanel() {
         return EmployeeDetailViewLayoutHelper.createBackButtonPanel();
     }

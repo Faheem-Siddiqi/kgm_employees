@@ -75,6 +75,7 @@ The project follows a layered desktop-application architecture:
 | --- | --- |
 | **AuthService.java** | Handles login validation. Current credential check is `admin` / `1234`; this is the boundary for future DB or directory-based authentication. |
 | **EmployeeService.java** | Reserved business-service boundary for employee workflow rules that should not live directly in UI or DAO classes. |
+| **EmployeeReportService.java** | Generates employee report packages from database records. Creates a professional PDF with page numbering and copies available employee documents into an employee-named folder. |
 | **ExcelImportService.java** | Reserved service boundary for parsing and importing employee records from Excel files. |
 
 ---
@@ -99,7 +100,7 @@ The project follows a layered desktop-application architecture:
 | **LoginView.java** | Login window. Collects username/password, validates through `AuthService`, starts the session, and opens `HomeView`. |
 | **HomeView.java** | Main dashboard after login. Shows header, constrained employee-code filter/search bar, employee table, Excel import action, add record action, refresh action, and footer. |
 | **EmployeeRegistrationView.java** | Registration window for adding a new employee record. Combines employee form entry and document upload tabs before saving to MySQL. |
-| **EmployeeDetailView.java** | Detail and edit window for an existing employee. Loads full employee data, shows tabbed basic/additional/document sections, and supports dynamic updates. |
+| **EmployeeDetailView.java** | Detail and edit window for an existing employee. Loads full employee data, shows tabbed basic/additional/document sections, supports dynamic updates, and provides a `Download Report` action for employee document packages. |
 
 ---
 
@@ -125,7 +126,7 @@ The project follows a layered desktop-application architecture:
 | **EmployeeRegistrationFormPanel.java** | Employee registration form with profile photo upload and core fields required to create a record. |
 | **EmployeeDocumentUploadPanel.java** | Document upload table for registration. Supports search, clear, upload/replace, view, file-size validation, and document path extraction. |
 | **EmployeeDocumentViewPanel.java** | Read-only document panel for employee detail view. Shows document availability and view/download-style actions. |
-| **EmployeeBasicDetailsPanel.java** | Basic employee detail form used in detail/edit flows. Handles profile image, identity, contact, and core fields. |
+| **EmployeeBasicDetailsPanel.java** | Basic employee detail form used in detail/edit flows. Handles profile image, identity, contact, and core fields while ignoring empty database placeholders such as `N/A` for missing images. |
 | **EmployeeAdditionalDetailsPanel.java** | Additional employee detail panel for employment, payroll, banking, reporting, compliance, benefits, and vaccination fields. |
 | **ExcelImportButton.java** | Reusable styled button for triggering Excel import workflows. |
 | **UniversalTablePanel.java** | Generic paginated table container with action-column, link-column, status-column, and horizontal scrolling support. |
@@ -219,6 +220,10 @@ The project follows a layered desktop-application architecture:
 7. Document Handling
    EmployeeDocumentUploadPanel -> local employees/{employeeCode}/documents storage
    EmployeeDocumentViewPanel -> document availability and preview/download actions
+
+8. Download Employee Report Package
+   EmployeeDetailView -> EmployeeReportService -> EmployeeRecordDao.getFullEmployeeByCode
+   -> generated PDF + copied employee documents in a selected local folder
 ```
 
 ---
@@ -308,7 +313,7 @@ Password: 1234
 | Configuration | 2 | Database configuration and connection creation |
 | Database initializer | 1 | Startup schema/database creation |
 | DAO layer | 2 | Employee persistence, lookup, listing, and updates |
-| Service layer | 3 | Authentication and future service boundaries |
+| Service layer | 4 | Authentication, employee report packaging, and future service boundaries |
 | Models | 2 | Employee and user session data |
 | UI views | 4 | Main application windows |
 | UI dialogs | 1 | Reusable modal dialog |
@@ -317,7 +322,7 @@ Password: 1234
 | UI styling helpers | 17 | Visual design, table styling, layout helpers |
 | Utilities | 5 | Session and shared utility boundaries |
 | Resources | 1 | SQL schema |
-| **Total source/resource files** | **51** | Complete application code and schema |
+| **Total source/resource files** | **52** | Complete application code and schema |
 
 ---
 
@@ -338,7 +343,7 @@ Password: 1234
 ## Key Design Patterns
 
 1. **DAO Pattern**: `EmployeeRegistrationDao` and `EmployeeRecordDao` isolate database access.
-2. **Service Pattern**: `AuthService`, `EmployeeService`, and `ExcelImportService` define business boundaries.
+2. **Service Pattern**: `AuthService`, `EmployeeReportService`, `EmployeeService`, and `ExcelImportService` define business boundaries.
 3. **Component Pattern**: Date pickers, dialogs, table panels, and document panels are reusable Swing components.
 4. **Helper/Factory Pattern**: Styling helpers create consistent Swing components and layouts.
 5. **Observer Pattern**: Swing listeners handle button clicks, document changes, table actions, and tab changes.
@@ -381,6 +386,7 @@ EmployeeRegistrationView
 
 EmployeeDetailView
 |-- EmployeeRecordDao
+|-- EmployeeReportService
 |-- EmployeeBasicDetailsPanel
 |-- EmployeeAdditionalDetailsPanel
 |-- EmployeeDocumentViewPanel
