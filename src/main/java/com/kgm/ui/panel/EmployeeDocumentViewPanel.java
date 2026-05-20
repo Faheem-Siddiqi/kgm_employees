@@ -438,6 +438,11 @@ public class EmployeeDocumentViewPanel extends JPanel {
 
             if (!lockedDocuments[documentIndex]) {
                 buttons.add(createLink(rowHasPendingFile(documentIndex) ? "Replace" : "Upload"));
+            } else {
+                JButton locked = createLink("Locked");
+                locked.setEnabled(false);
+                EmployeeDocumentViewPanelHelper.styleViewLink(locked, false);
+                buttons.add(locked);
             }
 
             JButton viewBtn = createLink("View");
@@ -474,6 +479,11 @@ public class EmployeeDocumentViewPanel extends JPanel {
 
             if (!lockedDocuments[documentIndex]) {
                 buttons.add(createButton(rowHasPendingFile(documentIndex) ? "Replace" : "Upload"));
+            } else {
+                JButton locked = createButton("Locked");
+                locked.setEnabled(false);
+                EmployeeDocumentViewPanelHelper.styleViewLink(locked, false);
+                buttons.add(locked);
             }
 
             JButton viewBtn = createButton("View");

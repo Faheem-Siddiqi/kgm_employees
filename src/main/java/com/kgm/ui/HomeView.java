@@ -80,7 +80,6 @@ public class HomeView extends JFrame {
         JPanel northContainer = HomeViewHelper.createNorthContainer();
         northContainer.add(top, BorderLayout.NORTH);
         northContainer.add(searchRow, BorderLayout.CENTER);
-        add(northContainer, BorderLayout.NORTH);
 
         JPanel btnRow = HomeViewHelper.createButtonRow();
         ExcelImportButton excelBtn = new ExcelImportButton(() -> {
@@ -104,8 +103,12 @@ public class HomeView extends JFrame {
         northContainer.add(btnRow, BorderLayout.SOUTH);
 
         JPanel body = HomeViewHelper.createBodyPanel();
-        body.add(tablePanel, BorderLayout.CENTER);
-        add(body, BorderLayout.CENTER);
+        body.add(tablePanel, BorderLayout.NORTH);
+
+        JPanel mainContent = HomeViewHelper.createMainContentPanel();
+        mainContent.add(northContainer, BorderLayout.NORTH);
+        mainContent.add(body, BorderLayout.CENTER);
+        add(HomeViewHelper.createMainScrollPane(mainContent), BorderLayout.CENTER);
         add(new FooterPanel(), BorderLayout.SOUTH);
 
         setVisible(true);

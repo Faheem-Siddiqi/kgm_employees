@@ -44,8 +44,7 @@ public final class UniversalTablePanelHelper {
                     int column
             ) {
                 JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, false, row, column);
-                label.setHorizontalAlignment(alignment);
-                label.setBorder(tableCellBorder());
+                stylePlainTableCell(label, table, isSelected, alignment);
                 return label;
             }
         };
@@ -147,8 +146,13 @@ public final class UniversalTablePanelHelper {
     }
 
     public static void styleClippedTextCell(JLabel label, JTable table) {
+        stylePlainTableCell(label, table, false, SwingConstants.LEFT);
+        label.setToolTipText(label.getText());
+    }
+
+    public static void stylePlainTableCell(JLabel label, JTable table, boolean selected, int alignment) {
         label.setOpaque(true);
-        label.setBackground(Color.WHITE);
+        label.setBackground(selected ? TableThemeHelper.ROW_SELECTION : Color.WHITE);
         label.setForeground(TableThemeHelper.TEXT_PRIMARY);
         label.setFont(table.getFont().deriveFont(Font.PLAIN));
         label.setEnabled(table.isEnabled());
@@ -156,7 +160,7 @@ public final class UniversalTablePanelHelper {
         label.setBorder(new CompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 1, CELL_DIVIDER),
                 new EmptyBorder(0, 16, 0, 14)));
-        label.setHorizontalAlignment(SwingConstants.LEFT);
+        label.setHorizontalAlignment(alignment);
         label.setVerticalAlignment(SwingConstants.CENTER);
     }
 

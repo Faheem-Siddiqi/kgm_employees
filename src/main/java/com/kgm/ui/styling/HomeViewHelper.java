@@ -139,6 +139,22 @@ public final class HomeViewHelper {
         return body;
     }
 
+    public static JPanel createMainContentPanel() {
+        JPanel panel = new HomeContentPanel();
+        panel.setBackground(PAGE_BACKGROUND);
+        return panel;
+    }
+
+    public static JScrollPane createMainScrollPane(JComponent content) {
+        JScrollPane scrollPane = new JScrollPane(content);
+        scrollPane.setBorder(null);
+        scrollPane.getViewport().setBackground(PAGE_BACKGROUND);
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(18);
+        return scrollPane;
+    }
+
     private static void styleBaseButton(JButton button, Dimension size, int fontStyle) {
         button.setPreferredSize(size);
         button.setFont(new Font("Segoe UI", fontStyle, 12));
@@ -209,6 +225,32 @@ public final class HomeViewHelper {
             int y = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
             g2.drawString(placeholder, 0, y);
             g2.dispose();
+        }
+    }
+
+    private static class HomeContentPanel extends JPanel implements Scrollable {
+        private HomeContentPanel() {
+            super(new BorderLayout());
+        }
+
+        public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return 18;
+        }
+
+        public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return Math.max(80, visibleRect.height - 80);
+        }
+
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
         }
     }
 

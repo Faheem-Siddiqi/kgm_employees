@@ -36,13 +36,15 @@ public class EmployeeTablePanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
 
         tablePanel = new UniversalTablePanel(COLUMNS, "No employee records found.");
-        tablePanel.setLinkColumn(EMPLOYEE_CODE_COLUMN, this::openEmployeeDetail);
+        tablePanel.setLinkColumn(EMPLOYEE_CODE_COLUMN, this::openEmployeeDetail, true);
         tablePanel.setActionColumn(ACTION_COLUMN, "View", this::openEmployeeDetail);
+        tablePanel.setColumnAlignment(1, SwingConstants.LEFT);
+        tablePanel.setColumnAlignment(2, SwingConstants.LEFT);
+        tablePanel.setColumnAlignment(3, SwingConstants.LEFT);
+        tablePanel.setColumnAlignment(4, SwingConstants.LEFT);
+        tablePanel.setColumnAlignment(5, SwingConstants.LEFT);
         tablePanel.setColumnAlignment(6, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(7, SwingConstants.CENTER);
-        tablePanel.setClippedTextColumn(1);
-        tablePanel.setClippedTextColumn(4);
-        tablePanel.setClippedTextColumn(5);
         tablePanel.setPreferredColumnWidthLimit(2, 150);
         tablePanel.setPreferredColumnWidthLimit(3, 140);
         tablePanel.setPreferredColumnWidthLimit(6, 130);
@@ -50,7 +52,7 @@ public class EmployeeTablePanel extends JPanel {
         // Pagination button gap for this table specifically.
         tablePanel.setPaginationBottomGap(5);
 
-        add(tablePanel, BorderLayout.CENTER);
+        add(tablePanel, BorderLayout.NORTH);
         reload();
     }
 

@@ -43,7 +43,8 @@ public class UniversalTablePanel extends JPanel {
     private int statusColumn = -1;
     private int linkColumn = -1;
     private Consumer<Integer> onLink;
-    private int hoveredLinkRow = -1;
+    private boolean linkHighlightOnlyOnHover = false;
+    private int hoveredRow = -1;
     private boolean hugRows = true;
     private boolean paginationEnabled = true;
     private int paginationBottomGap = 0;
@@ -159,8 +160,13 @@ public class UniversalTablePanel extends JPanel {
     }
 
     public void setLinkColumn(int column, Consumer<Integer> onLink) {
+        setLinkColumn(column, onLink, false);
+    }
+
+    public void setLinkColumn(int column, Consumer<Integer> onLink, boolean highlightOnlyOnHover) {
         this.linkColumn = column;
         this.onLink = onLink;
+        this.linkHighlightOnlyOnHover = highlightOnlyOnHover;
         DefaultTableCellRenderer renderer = new DefaultTableCellRenderer() {
             public Component getTableCellRendererComponent(
                     JTable table,
@@ -172,7 +178,14 @@ public class UniversalTablePanel extends JPanel {
             ) {
                 JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, false, row, column);
                 String text = value == null ? "" : String.valueOf(value);
-                TableThemeHelper.styleTableLink(label, table, isSelected, row == hoveredLinkRow, text);
+                TableThemeHelper.styleTableLink(
+                        label,
+                        table,
+                        isSelected,
+                        row == hoveredRow,
+                        text,
+                        linkHighlightOnlyOnHover
+                );
                 return label;
             }
         };
@@ -338,10 +351,10 @@ public class UniversalTablePanel extends JPanel {
     private void refresh() {
         content.removeAll();
         if (rows.isEmpty()) {
-            content.add(TableThemeHelper.emptyState(emptyText), BorderLayout.CENTER);
+            content.add(TableThemeHelper.emptyState(emptyText), BorderLayout.NORTH);
         } else {
             renderPage();
-            content.add(createTableContainer(), BorderLayout.CENTER);
+            content.add(createTableContainer(), BorderLayout.NORTH);
         }
         content.revalidate();
         content.repaint();
@@ -576,12 +589,18 @@ public class UniversalTablePanel extends JPanel {
     }
 
     private void updateHoveredLink(int viewRow, int viewColumn) {
-        int nextHoveredRow = isLinkCell(viewRow, viewColumn) ? viewRow : -1;
-        if (hoveredLinkRow == nextHoveredRow) {
+        int nextHoveredRow = canHighlightLinkedRow(viewRow) ? viewRow : -1;
+        if (hoveredRow == nextHoveredRow) {
             return;
         }
-        hoveredLinkRow = nextHoveredRow;
+        hoveredRow = nextHoveredRow;
         table.repaint();
+    }
+
+    private boolean canHighlightLinkedRow(int viewRow) {
+        return linkColumn >= 0
+                && onLink != null
+                && viewRow >= 0;
     }
 
     private void goToPage(int page) {

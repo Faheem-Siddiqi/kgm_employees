@@ -35,7 +35,7 @@ public final class TableThemeHelper {
         table.setIntercellSpacing(new Dimension(0, 0));
         table.setSelectionBackground(ROW_SELECTION);
         table.setSelectionForeground(TEXT_PRIMARY);
-        table.setFillsViewportHeight(true);
+        table.setFillsViewportHeight(false);
         table.setDefaultEditor(Object.class, null);
         table.setCellSelectionEnabled(false);
         table.setColumnSelectionAllowed(false);
@@ -105,11 +105,24 @@ public final class TableThemeHelper {
             boolean hovered,
             String text
     ) {
-        label.setText(hovered ? "<html><u>" + escapeHtml(text) + "</u></html>" : text);
+        styleTableLink(label, table, selected, hovered, text, false);
+    }
+
+    public static void styleTableLink(
+            JLabel label,
+            JTable table,
+            boolean selected,
+            boolean hovered,
+            String text,
+            boolean highlightOnlyOnHover
+    ) {
+        boolean highlighted = hovered || selected || !highlightOnlyOnHover;
+        boolean underlined = hovered || (selected && highlightOnlyOnHover);
+        label.setText(underlined ? "<html><u>" + escapeHtml(text) + "</u></html>" : text);
         label.setHorizontalAlignment(SwingConstants.LEFT);
-        label.setForeground(PRIMARY);
+        label.setForeground(highlighted ? PRIMARY : TEXT_PRIMARY);
         label.setBackground(selected ? ROW_SELECTION : Color.WHITE);
-        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        label.setFont(new Font(highlighted ? "Segoe UI Semibold" : "Segoe UI", Font.PLAIN, 13));
         label.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 1, new Color(232, 236, 240)),
                 new EmptyBorder(0, 16, 0, 14)

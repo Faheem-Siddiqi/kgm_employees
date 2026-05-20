@@ -892,8 +892,8 @@ public class EmployeeReportService {
     private static final class DocumentImagePdf {
         private static final double SIDE_MARGIN = 36;
         private static final double TOP_MARGIN = 36;
-        private static final double FOOTER_HEIGHT = 54;
-        private static final double MAX_BODY_HEIGHT = PAGE_HEIGHT - TOP_MARGIN - FOOTER_HEIGHT;
+        private static final double BOTTOM_MARGIN = 36;
+        private static final double MAX_BODY_HEIGHT = PAGE_HEIGHT - TOP_MARGIN - BOTTOM_MARGIN;
 
         private final List<DocumentImage> images;
         private final List<ImagePdfPage> pages = new ArrayList<>();
@@ -910,7 +910,7 @@ public class EmployeeReportService {
                 double offset = 0;
                 while (offset < image.height()) {
                     double visibleHeight = Math.min(MAX_BODY_HEIGHT, image.height() - offset);
-                    double pageHeight = Math.max(PAGE_HEIGHT, visibleHeight + TOP_MARGIN + FOOTER_HEIGHT);
+                    double pageHeight = Math.max(PAGE_HEIGHT, visibleHeight + TOP_MARGIN + BOTTOM_MARGIN);
                     pages.add(new ImagePdfPage(imageIndex, pageWidth, pageHeight, offset, visibleHeight));
                     offset += visibleHeight;
                 }
@@ -921,13 +921,12 @@ public class EmployeeReportService {
             List<byte[]> objects = new ArrayList<>();
             int imageCount = images.size();
             int pageCount = pages.size();
-            int firstImageObject = 4;
+            int firstImageObject = 3;
             int firstPageObject = firstImageObject + imageCount;
             int firstContentObject = firstPageObject + pageCount;
 
             objects.add(pdfObject("<< /Type /Catalog /Pages 2 0 R >>"));
             objects.add(pdfObject(pagesObject(pageCount, firstPageObject)));
-            objects.add(pdfObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"));
 
             for (DocumentImage image : images) {
                 objects.add(imageObject(image));
@@ -940,12 +939,12 @@ public class EmployeeReportService {
                 String imageName = "Im" + (page.imageIndex + 1);
                 objects.add(pdfObject("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "
                         + fmt(page.pageWidth) + " " + fmt(page.pageHeight)
-                        + "] /Resources << /Font << /F1 3 0 R >> /XObject << /" + imageName + " "
+                        + "] /Resources << /XObject << /" + imageName + " "
                         + imageObject + " 0 R >> >> /Contents " + contentObject + " 0 R >>"));
             }
 
             for (int index = 0; index < pageCount; index++) {
-                byte[] stream = contentStream(pages.get(index), index + 1, pageCount)
+                byte[] stream = contentStream(pages.get(index))
                         .getBytes(StandardCharsets.ISO_8859_1);
                 ByteArrayOutputStream object = new ByteArrayOutputStream();
                 object.write(("<< /Length " + stream.length + " >>\nstream\n").getBytes(StandardCharsets.ISO_8859_1));
@@ -975,15 +974,12 @@ public class EmployeeReportService {
             output.write(pdf.toByteArray());
         }
 
-        private String contentStream(ImagePdfPage page, int pageNumber, int pageCount) {
+        private String contentStream(ImagePdfPage page) {
             DocumentImage image = images.get(page.imageIndex);
             String imageName = "Im" + (page.imageIndex + 1);
             double imageX = SIDE_MARGIN;
             double imageY = page.pageHeight - TOP_MARGIN - image.height() + page.imageTopOffset;
             double clipY = page.pageHeight - TOP_MARGIN - page.visibleHeight;
-            double footerLineY = 42;
-            double footerTextY = 25;
-            String pageText = "Page " + pageNumber + " of " + pageCount;
 
             StringBuilder content = new StringBuilder();
             content.append("q\n")
@@ -995,19 +991,6 @@ public class EmployeeReportService {
                     .append('/').append(imageName).append(" Do\n")
                     .append("Q\n")
                     .append("Q\n");
-
-            color(content, BORDER, "RG");
-            content.append("0.8 w\n")
-                    .append(fmt(SIDE_MARGIN)).append(' ').append(fmt(footerLineY)).append(" m ")
-                    .append(fmt(page.pageWidth - SIDE_MARGIN)).append(' ').append(fmt(footerLineY)).append(" l S\n");
-            color(content, TEXT_SECONDARY, "rg");
-            content.append("BT /F1 8 Tf 1 0 0 1 ")
-                    .append(fmt(SIDE_MARGIN)).append(' ').append(fmt(footerTextY))
-                    .append(" Tm (KGM Ex-Employee Management System) Tj ET\n");
-            content.append("BT /F1 8 Tf 1 0 0 1 ")
-                    .append(fmt(page.pageWidth - SIDE_MARGIN - textWidth(pageText, 8))).append(' ')
-                    .append(fmt(footerTextY)).append(" Tm (")
-                    .append(escapePdf(pageText)).append(") Tj ET\n");
             return content.toString();
         }
 
@@ -1037,15 +1020,6 @@ public class EmployeeReportService {
             return value.getBytes(StandardCharsets.ISO_8859_1);
         }
 
-        private void color(StringBuilder content, String hex, String operator) {
-            int red = Integer.parseInt(hex.substring(0, 2), 16);
-            int green = Integer.parseInt(hex.substring(2, 4), 16);
-            int blue = Integer.parseInt(hex.substring(4, 6), 16);
-            content.append(fmt(red / 255.0)).append(' ')
-                    .append(fmt(green / 255.0)).append(' ')
-                    .append(fmt(blue / 255.0)).append(' ')
-                    .append(operator).append('\n');
-        }
     }
 
     private static class ReportWriter {
