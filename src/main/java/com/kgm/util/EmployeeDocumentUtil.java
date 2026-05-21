@@ -1,51 +1,123 @@
 package com.kgm.util;
 
+import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
+import com.kgm.model.EmployeeFieldDefinition;
 
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public final class EmployeeDocumentUtil {
     public static final long MAX_SIZE = 400 * 1024;
+    private static volatile List<DocumentType> cachedDocumentTypes;
 
     private static final List<DocumentType> DOCUMENT_TYPES = List.of(
-            new DocumentType("CNIC *", "CNIC_COPY", "CNIC_COPY.jpg"),
-            new DocumentType("EOBI Card *", "EOBI_CARD_COPY", "EOBI_CARD_COPY.jpg"),
-            new DocumentType("SS_CARD_COPY*", "SS_CARD_COPY", "SS_CARD_COPY.jpg"),
+            new DocumentType("CNIC Front", "CNIC_FRONT", "CNIC_FRONT.jpg", "CNIC_Front"),
+            new DocumentType("CNIC Back", "CNIC_BACK", "CNIC_BACK.jpg", "CNIC_Back"),
+            new DocumentType("EOBI", "EOBI", "EOBI.jpg", "EOBI Card", "EOBI Card Copy"),
+            new DocumentType("Social Security Card", "SS_CARD", "SS_CARD.jpg", "SS_Card", "Social Security", "SS"),
             new DocumentType("Final Settlement", "FINAL_SETTLEMENT", "FINAL_SETTLEMENT.jpg"),
-            new DocumentType("Clearance Certificate", "CLEARANCE_CERT", "CLEARANCE_CERT.jpg"),
-            new DocumentType("Job Appointment Letter", "JOB_APPOINTMENT", "JOB_APPOINTMENT.jpg"),
-            new DocumentType("Application Letter", "APPLICATION_DOC", "APPLICATION_DOC.jpg"),
-            new DocumentType("Issuance Form", "ISSUANCE_DOC", "ISSUANCE_DOC.jpg", "Insurance Form"),
-            new DocumentType("Settlement Document", "SETTLEMENT_DOC", "SETTLEMENT_DOC.jpg"),
+            new DocumentType("Appointment Letter Front", "APPOINTMENT_LETTER_FRONT", "APPOINTMENT_LETTER_FRONT.jpg", "Appointment_letter_Front"),
+            new DocumentType("Appointment Letter Back", "APPOINTMENT_LETTER_BACK", "APPOINTMENT_LETTER_BACK.jpg", "Appointment_Letter_Back"),
+            new DocumentType("Application Front", "APPLICATION_FRONT", "APPLICATION_FRONT.jpg", "Application_Front"),
+            new DocumentType("Application Back", "APPLICATION_BACK", "APPLICATION_BACK.jpg", "Application_Back"),
+            new DocumentType("Clearance Certificate", "CLEARANCE_CERTIFICATE", "CLEARANCE_CERTIFICATE.jpg"),
+            new DocumentType("Service Certificate", "SERVICE_CERTIFICATE", "SERVICE_CERTIFICATE.jpg", "Service Certificate/"),
+            new DocumentType("Payment Voucher", "PAYMENT_VOUCHER", "PAYMENT_VOUCHER.jpg"),
             new DocumentType("Trial Card", "TRIAL_CARD", "TRIAL_CARD.jpg"),
-            new DocumentType("Interview Form", "INTERVIEW_DOC", "INTERVIEW_DOC.jpg"),
-            new DocumentType("Service Letter", "SERVICE_LETTER", "SERVICE_LETTER.jpg"),
-            new DocumentType("Extension Letter", "EXTENSION_LETTER", "EXTENSION_LETTER.jpg"),
-            new DocumentType("Retirement Letter", "RETIREMENT_LETTER", "RETIREMENT_LETTER.jpg"),
-            new DocumentType("Covid Certification", "COVID_CERT", "COVID_CERT.jpg", "Covid Certificate"),
-            new DocumentType("DISCIPLINARY_I", "DISCIPLINARY_I", "DISCIPLINARY_I.jpg"),
-            new DocumentType("DISCIPLINARY_II", "DISCIPLINARY_II", "DISCIPLINARY_II.jpg"),
-            new DocumentType("DISCIPLINARY_III", "DISCIPLINARY_III", "DISCIPLINARY_III.jpg")
+            new DocumentType("Medical", "MEDICAL_DOC", "MEDICAL_DOC.jpg", "Medical Document"),
+            new DocumentType("Interview Forms", "INTERVIEW_FORMS", "INTERVIEW_FORMS.jpg", "Interview Form"),
+            new DocumentType("Covid Certificate", "COVID_CERTIFICATE", "COVID_CERTIFICATE.jpg", "Cvoid Certificate", "Covid Certification"),
+            new DocumentType("Disciplinary I", "DISCIPLINARY_I", "DISCIPLINARY_I.jpg"),
+            new DocumentType("Disciplinary II", "DISCIPLINARY_II", "DISCIPLINARY_II.jpg"),
+            new DocumentType("Disciplinary III", "DISCIPLINARY_III", "DISCIPLINARY_III.jpg"),
+            new DocumentType("Miscellaneous I", "MISCELLANEOUS_I", "MISCELLANEOUS_I.jpg", "Miscellaneous-I"),
+            new DocumentType("Miscellaneous II", "MISCELLANEOUS_II", "MISCELLANEOUS_II.jpg", "Miscellaneous-II"),
+            new DocumentType("Miscellaneous III", "MISCELLANEOUS_III", "MISCELLANEOUS_III.jpg", "Miscellaneous-III")
     );
 
     private EmployeeDocumentUtil() {
     }
 
     public static List<DocumentType> documentTypes() {
-        return DOCUMENT_TYPES;
+        List<DocumentType> cached = cachedDocumentTypes;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (EmployeeDocumentUtil.class) {
+            if (cachedDocumentTypes == null) {
+                cachedDocumentTypes = loadDocumentTypes();
+            }
+            return cachedDocumentTypes;
+        }
+    }
+
+    public static void refreshDocumentTypes() {
+        synchronized (EmployeeDocumentUtil.class) {
+            cachedDocumentTypes = null;
+        }
+    }
+
+    private static List<DocumentType> loadDocumentTypes() {
+        List<DocumentType> types = new ArrayList<>();
+        try {
+            Map<String, EmployeeFieldDefinition> metadata = new LinkedHashMap<>();
+            for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao().listFields()) {
+                if (definition.documentField()) {
+                    metadata.put(definition.columnName().toUpperCase(Locale.ROOT), definition);
+                }
+            }
+
+            for (DocumentType type : DOCUMENT_TYPES) {
+                EmployeeFieldDefinition definition = metadata.get(type.employeeFieldName().toUpperCase(Locale.ROOT));
+                if (definition == null) {
+                    types.add(type);
+                } else {
+                    types.add(new DocumentType(
+                            definition.label(),
+                            type.employeeFieldName(),
+                            type.storageName(),
+                            aliasesWithOriginalLabel(type)
+                    ));
+                }
+            }
+
+            for (EmployeeFieldDefinition definition : metadata.values()) {
+                if (hasStaticDocumentColumn(definition.columnName())) {
+                    continue;
+                }
+                types.add(new DocumentType(
+                        definition.label(),
+                        definition.columnName(),
+                        definition.columnName() + ".jpg"
+                ));
+            }
+        } catch (RuntimeException exception) {
+            return DOCUMENT_TYPES;
+        }
+        return List.copyOf(types);
+    }
+
+    private static List<String> aliasesWithOriginalLabel(DocumentType type) {
+        List<String> aliases = new ArrayList<>();
+        aliases.add(type.label());
+        aliases.addAll(type.aliases());
+        return aliases;
     }
 
     public static int documentCount() {
-        return DOCUMENT_TYPES.size();
+        return documentTypes().size();
     }
 
     public static DocumentType documentType(int index) {
-        return DOCUMENT_TYPES.get(index);
+        return documentTypes().get(index);
     }
 
     public static String documentPath(Employee employee, int index) {
@@ -58,7 +130,7 @@ public final class EmployeeDocumentUtil {
             Object value = field.get(employee);
             return value == null ? null : value.toString();
         } catch (ReflectiveOperationException exception) {
-            return null;
+            return employee.getDynamicField(documentType(index).employeeFieldName());
         }
     }
 
@@ -71,11 +143,17 @@ public final class EmployeeDocumentUtil {
             field.setAccessible(true);
             field.set(employee, path);
         } catch (ReflectiveOperationException exception) {
-            throw new IllegalArgumentException(
-                    "Document field is not available: " + documentType(index).employeeFieldName(),
-                    exception
-            );
+            employee.setDynamicField(documentType(index).employeeFieldName(), path);
         }
+    }
+
+    private static boolean hasStaticDocumentColumn(String columnName) {
+        for (DocumentType documentType : DOCUMENT_TYPES) {
+            if (documentType.employeeFieldName().equalsIgnoreCase(columnName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean hasStoredPath(String value) {
@@ -179,7 +257,8 @@ public final class EmployeeDocumentUtil {
         int bestIndex = -1;
         boolean ambiguous = false;
 
-        for (int index = 0; index < DOCUMENT_TYPES.size(); index++) {
+        List<DocumentType> types = documentTypes();
+        for (int index = 0; index < types.size(); index++) {
             int score = documentFileMatchScore(fileName, index);
             if (score < bestScore) {
                 bestScore = score;

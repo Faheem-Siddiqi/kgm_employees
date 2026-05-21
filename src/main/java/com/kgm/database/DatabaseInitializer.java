@@ -2,10 +2,14 @@ package com.kgm.database;
 
 import com.kgm.config.DatabaseConfig;
 import com.kgm.config.DatabaseConnection;
+import com.kgm.dao.EmployeeFieldDefinitionDao;
+import com.kgm.util.EmployeeDocumentUtil;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
 
 public class DatabaseInitializer {
     private static final String EMPLOYEES_TABLE = """
@@ -132,30 +136,47 @@ public class DatabaseInitializer {
                 SECOND_VACC_DATE TEXT,
 
                 -- DOCUMENTS
-                CNIC_COPY TEXT,
-                SS_CARD_COPY TEXT,
-                EOBI_CARD_COPY TEXT,
+                CNIC_FRONT TEXT,
+                CNIC_BACK TEXT,
+                EOBI TEXT,
+                SS_CARD TEXT,
                 FINAL_SETTLEMENT TEXT,
-                CLEARANCE_CERT TEXT,
-                JOB_APPOINTMENT TEXT,
-                APPLICATION_DOC TEXT,
-                ISSUANCE_DOC TEXT,
-                SETTLEMENT_DOC TEXT,
+                APPOINTMENT_LETTER_FRONT TEXT,
+                APPOINTMENT_LETTER_BACK TEXT,
+                APPLICATION_FRONT TEXT,
+                APPLICATION_BACK TEXT,
+                CLEARANCE_CERTIFICATE TEXT,
+                SERVICE_CERTIFICATE TEXT,
+                PAYMENT_VOUCHER TEXT,
                 TRIAL_CARD TEXT,
-                INTERVIEW_DOC TEXT,
-                SERVICE_LETTER TEXT,
-                EXTENSION_LETTER TEXT,
-                RETIREMENT_LETTER TEXT,
-                COVID_CERT TEXT,
+                MEDICAL_DOC TEXT,
+                INTERVIEW_FORMS TEXT,
+                COVID_CERTIFICATE TEXT,
                 DISCIPLINARY_I TEXT,
                 DISCIPLINARY_II TEXT,
                 DISCIPLINARY_III TEXT,
+                MISCELLANEOUS_I TEXT,
+                MISCELLANEOUS_II TEXT,
+                MISCELLANEOUS_III TEXT,
                 EMP_IMG TEXT,
 
                 PRIMARY KEY (ID),
                 UNIQUE KEY uk_employee_code (EMPLOYEE_CODE)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """;
+
+    private static final Map<String, String> LEGACY_DOCUMENT_MAPPINGS = Map.ofEntries(
+            Map.entry("CNIC_COPY", "CNIC_FRONT"),
+            Map.entry("EOBI_CARD_COPY", "EOBI"),
+            Map.entry("SS_CARD_COPY", "SS_CARD"),
+            Map.entry("CLEARANCE_CERT", "CLEARANCE_CERTIFICATE"),
+            Map.entry("JOB_APPOINTMENT", "APPOINTMENT_LETTER_FRONT"),
+            Map.entry("APPLICATION_DOC", "APPLICATION_FRONT"),
+            Map.entry("SETTLEMENT_DOC", "PAYMENT_VOUCHER"),
+            Map.entry("INTERVIEW_DOC", "INTERVIEW_FORMS"),
+            Map.entry("SERVICE_LETTER", "SERVICE_CERTIFICATE"),
+            Map.entry("COVID_CERT", "COVID_CERTIFICATE")
+    );
 
     public static void init() {
         try {
@@ -171,6 +192,12 @@ public class DatabaseInitializer {
 
             boolean exists = tableExists(conn);
             stmt.execute(EMPLOYEES_TABLE);
+            ensureDocumentColumns(conn);
+            migrateLegacyDocumentColumns(conn);
+            EmployeeFieldDefinitionDao fieldDefinitionDao = new EmployeeFieldDefinitionDao(conn);
+            fieldDefinitionDao.ensureMetadata();
+            fieldDefinitionDao.syncMetadataWithDatabase();
+            ensureSearchIndexes(conn);
 
             System.out.println(exists ? "=> MySQL schema already exists." : "=> MySQL schema created.");
 
@@ -194,5 +221,72 @@ public class DatabaseInitializer {
         try (ResultSet rs = conn.getMetaData().getTables(conn.getCatalog(), null, "employees", new String[]{"TABLE"})) {
             return rs.next();
         }
+    }
+
+    private static void ensureDocumentColumns(Connection conn) throws SQLException {
+        for (EmployeeDocumentUtil.DocumentType documentType : EmployeeDocumentUtil.documentTypes()) {
+            String column = documentType.employeeFieldName();
+            if (!columnExists(conn, column)) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE employees ADD COLUMN " + quoteIdentifier(column) + " TEXT");
+                }
+            }
+        }
+    }
+
+    private static void migrateLegacyDocumentColumns(Connection conn) throws SQLException {
+        for (Map.Entry<String, String> mapping : LEGACY_DOCUMENT_MAPPINGS.entrySet()) {
+            String oldColumn = mapping.getKey();
+            String newColumn = mapping.getValue();
+            if (!columnExists(conn, oldColumn) || !columnExists(conn, newColumn)) {
+                continue;
+            }
+
+            String sql = "UPDATE employees SET " + quoteIdentifier(newColumn) + " = " + quoteIdentifier(oldColumn)
+                    + " WHERE " + emptyOrPlaceholder(newColumn)
+                    + " AND NOT " + emptyOrPlaceholder(oldColumn);
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(sql);
+            }
+        }
+    }
+
+    private static void ensureSearchIndexes(Connection conn) throws SQLException {
+        if (indexExists(conn, "uk_employee_code") || indexExists(conn, "idx_employee_code")) {
+            return;
+        }
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE INDEX idx_employee_code ON employees (EMPLOYEE_CODE)");
+        }
+    }
+
+    private static boolean columnExists(Connection conn, String columnName) throws SQLException {
+        DatabaseMetaData metaData = conn.getMetaData();
+        try (ResultSet rs = metaData.getColumns(conn.getCatalog(), null, "employees", columnName)) {
+            return rs.next();
+        }
+    }
+
+    private static boolean indexExists(Connection conn, String indexName) throws SQLException {
+        DatabaseMetaData metaData = conn.getMetaData();
+        try (ResultSet rs = metaData.getIndexInfo(conn.getCatalog(), null, "employees", false, false)) {
+            while (rs.next()) {
+                if (indexName.equalsIgnoreCase(rs.getString("INDEX_NAME"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static String emptyOrPlaceholder(String column) {
+        String quoted = quoteIdentifier(column);
+        return "(" + quoted + " IS NULL OR TRIM(" + quoted + ") = '' OR UPPER(TRIM(" + quoted
+                + ")) IN ('N/A', 'NA', 'NULL') OR TRIM(" + quoted + ") = '-')";
+    }
+
+    private static String quoteIdentifier(String identifier) {
+        return "`" + identifier.replace("`", "``") + "`";
     }
 }

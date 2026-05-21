@@ -1,7 +1,10 @@
 package com.kgm.service;
 
 import com.kgm.dao.EmployeeRecordDao;
+import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
+import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.util.EmployeeDocumentUtil;
 
 import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
@@ -21,8 +24,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class EmployeeReportService {
@@ -78,7 +83,7 @@ public class EmployeeReportService {
             throw new IllegalArgumentException("Select the PDF profile, all documents PDF, or at least one saved document.");
         }
         if (effectiveOptions.includeMergedDocumentsPdf() && mergedPdfDocuments.isEmpty()) {
-            throw new IllegalArgumentException("No saved document image files are available for the All Documents PDF.");
+            throw new IllegalArgumentException(" No saved document image files are available for the All Documents PDF.");
         }
 
         Path baseDirectory = selectedDirectory.toPath().toAbsolutePath().normalize();
@@ -207,24 +212,12 @@ public class EmployeeReportService {
     private List<DocumentEntry> documentEntries(Employee employee) {
         List<DocumentEntry> entries = new ArrayList<>();
         entries.add(new DocumentEntry("Employee Photo", employee.getEMP_IMG(), true));
-        entries.add(new DocumentEntry("CNIC Copy", employee.getCNIC_COPY()));
-        entries.add(new DocumentEntry("EOBI Card Copy", employee.getEOBI_CARD_COPY()));
-        entries.add(new DocumentEntry("Social Security Card Copy", employee.getSS_CARD_COPY()));
-        entries.add(new DocumentEntry("Final Settlement", employee.getFINAL_SETTLEMENT()));
-        entries.add(new DocumentEntry("Clearance Certificate", employee.getCLEARANCE_CERT()));
-        entries.add(new DocumentEntry("Job Appointment Letter", employee.getJOB_APPOINTMENT()));
-        entries.add(new DocumentEntry("Application Letter", employee.getAPPLICATION_DOC()));
-        entries.add(new DocumentEntry("Issuance Form", employee.getISSUANCE_DOC()));
-        entries.add(new DocumentEntry("Settlement Document", employee.getSETTLEMENT_DOC()));
-        entries.add(new DocumentEntry("Trial Card", employee.getTRIAL_CARD()));
-        entries.add(new DocumentEntry("Interview Form", employee.getINTERVIEW_DOC()));
-        entries.add(new DocumentEntry("Service Letter", employee.getSERVICE_LETTER()));
-        entries.add(new DocumentEntry("Extension Letter", employee.getEXTENSION_LETTER()));
-        entries.add(new DocumentEntry("Retirement Letter", employee.getRETIREMENT_LETTER()));
-        entries.add(new DocumentEntry("Covid Certificate", employee.getCOVID_CERT()));
-        entries.add(new DocumentEntry("Disciplinary I", employee.getDISCIPLINARY_I()));
-        entries.add(new DocumentEntry("Disciplinary II", employee.getDISCIPLINARY_II()));
-        entries.add(new DocumentEntry("Disciplinary III", employee.getDISCIPLINARY_III()));
+        for (int index = 0; index < EmployeeDocumentUtil.documentCount(); index++) {
+            entries.add(new DocumentEntry(
+                    EmployeeDocumentUtil.cleanDocumentLabel(index),
+                    EmployeeDocumentUtil.documentPath(employee, index)
+            ));
+        }
         return entries;
     }
 
@@ -268,7 +261,7 @@ public class EmployeeReportService {
     ) throws IOException {
         List<DocumentImage> images = readDocumentImages(entries);
         if (images.isEmpty()) {
-            throw new IllegalArgumentException("No saved document image files are available for the All Documents PDF.");
+            throw new IllegalArgumentException(" No saved document image files are available for the All Documents PDF.");
         }
 
         Path targetPath = target.toAbsolutePath().normalize();
@@ -442,10 +435,32 @@ public class EmployeeReportService {
                 {"Wellness Card No", display(employee.getWELLNESS_CARD_NO())}
         });
 
+        for (Map.Entry<String, List<String[]>> customSection : customReportRows(employee).entrySet()) {
+            writer.drawSection(customSection.getKey());
+            writer.drawRows(customSection.getValue().toArray(new String[0][]));
+        }
+
         writer.drawSection("Document Checklist");
         writer.drawDocumentTable(documents);
         document.addFooters();
         return document;
+    }
+
+    private Map<String, List<String[]>> customReportRows(Employee employee) {
+        Map<String, List<String[]>> rows = new LinkedHashMap<>();
+        try {
+            for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao().listDetailFields()) {
+                if (!definition.customField()) {
+                    continue;
+                }
+                String value = employee.getDynamicField(definition.columnName());
+                rows.computeIfAbsent(definition.heading(), ignored -> new ArrayList<>())
+                        .add(new String[]{definition.label(), display(value)});
+            }
+        } catch (RuntimeException exception) {
+            exception.printStackTrace();
+        }
+        return rows;
     }
 
     private Path uniqueDirectory(Path target) throws IOException {
@@ -869,23 +884,23 @@ public class EmployeeReportService {
 
     private static final class ImagePdfPage {
         private final int imageIndex;
-        private final double pageWidth;
-        private final double pageHeight;
-        private final double imageTopOffset;
-        private final double visibleHeight;
+        private final double imageX;
+        private final double imageY;
+        private final double imageWidth;
+        private final double imageHeight;
 
         private ImagePdfPage(
                 int imageIndex,
-                double pageWidth,
-                double pageHeight,
-                double imageTopOffset,
-                double visibleHeight
+                double imageX,
+                double imageY,
+                double imageWidth,
+                double imageHeight
         ) {
             this.imageIndex = imageIndex;
-            this.pageWidth = pageWidth;
-            this.pageHeight = pageHeight;
-            this.imageTopOffset = imageTopOffset;
-            this.visibleHeight = visibleHeight;
+            this.imageX = imageX;
+            this.imageY = imageY;
+            this.imageWidth = imageWidth;
+            this.imageHeight = imageHeight;
         }
     }
 
@@ -893,6 +908,7 @@ public class EmployeeReportService {
         private static final double SIDE_MARGIN = 36;
         private static final double TOP_MARGIN = 36;
         private static final double BOTTOM_MARGIN = 36;
+        private static final double MAX_BODY_WIDTH = PAGE_WIDTH - (SIDE_MARGIN * 2);
         private static final double MAX_BODY_HEIGHT = PAGE_HEIGHT - TOP_MARGIN - BOTTOM_MARGIN;
 
         private final List<DocumentImage> images;
@@ -906,14 +922,15 @@ public class EmployeeReportService {
         private void buildPages() {
             for (int imageIndex = 0; imageIndex < images.size(); imageIndex++) {
                 DocumentImage image = images.get(imageIndex);
-                double pageWidth = Math.max(PAGE_WIDTH, image.width() + (SIDE_MARGIN * 2));
-                double offset = 0;
-                while (offset < image.height()) {
-                    double visibleHeight = Math.min(MAX_BODY_HEIGHT, image.height() - offset);
-                    double pageHeight = Math.max(PAGE_HEIGHT, visibleHeight + TOP_MARGIN + BOTTOM_MARGIN);
-                    pages.add(new ImagePdfPage(imageIndex, pageWidth, pageHeight, offset, visibleHeight));
-                    offset += visibleHeight;
-                }
+                double scale = Math.min(1.0, Math.min(
+                        MAX_BODY_WIDTH / image.width(),
+                        MAX_BODY_HEIGHT / image.height()
+                ));
+                double imageWidth = image.width() * scale;
+                double imageHeight = image.height() * scale;
+                double imageX = (PAGE_WIDTH - imageWidth) / 2;
+                double imageY = PAGE_HEIGHT - TOP_MARGIN - imageHeight;
+                pages.add(new ImagePdfPage(imageIndex, imageX, imageY, imageWidth, imageHeight));
             }
         }
 
@@ -938,7 +955,7 @@ public class EmployeeReportService {
                 int imageObject = firstImageObject + page.imageIndex;
                 String imageName = "Im" + (page.imageIndex + 1);
                 objects.add(pdfObject("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "
-                        + fmt(page.pageWidth) + " " + fmt(page.pageHeight)
+                        + fmt(PAGE_WIDTH) + " " + fmt(PAGE_HEIGHT)
                         + "] /Resources << /XObject << /" + imageName + " "
                         + imageObject + " 0 R >> >> /Contents " + contentObject + " 0 R >>"));
             }
@@ -975,21 +992,13 @@ public class EmployeeReportService {
         }
 
         private String contentStream(ImagePdfPage page) {
-            DocumentImage image = images.get(page.imageIndex);
             String imageName = "Im" + (page.imageIndex + 1);
-            double imageX = SIDE_MARGIN;
-            double imageY = page.pageHeight - TOP_MARGIN - image.height() + page.imageTopOffset;
-            double clipY = page.pageHeight - TOP_MARGIN - page.visibleHeight;
 
             StringBuilder content = new StringBuilder();
             content.append("q\n")
-                    .append(fmt(imageX)).append(' ').append(fmt(clipY)).append(' ')
-                    .append(fmt(image.width())).append(' ').append(fmt(page.visibleHeight)).append(" re W n\n")
-                    .append("q\n")
-                    .append(fmt(image.width())).append(" 0 0 ").append(fmt(image.height())).append(' ')
-                    .append(fmt(imageX)).append(' ').append(fmt(imageY)).append(" cm\n")
+                    .append(fmt(page.imageWidth)).append(" 0 0 ").append(fmt(page.imageHeight)).append(' ')
+                    .append(fmt(page.imageX)).append(' ').append(fmt(page.imageY)).append(" cm\n")
                     .append('/').append(imageName).append(" Do\n")
-                    .append("Q\n")
                     .append("Q\n");
             return content.toString();
         }

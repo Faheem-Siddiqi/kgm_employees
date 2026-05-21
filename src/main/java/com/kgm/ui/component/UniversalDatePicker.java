@@ -13,6 +13,9 @@ import java.util.Calendar;
 import java.util.Date;
 
 public class UniversalDatePicker extends JPanel {
+    private static final String PLACEHOLDER_TEXT = "Choose Date";
+    private static final Color PLACEHOLDER_COLOR = new Color(130, 140, 150);
+    private static final Color VALUE_COLOR = Color.BLACK;
 
     private final JTextField displayField;
     private final JPanel iconPanel;
@@ -30,18 +33,19 @@ public class UniversalDatePicker extends JPanel {
     private Runnable dateChangeListener;
 
     public UniversalDatePicker() {
-        this(new Date());
+        this(null);
     }
 
     public UniversalDatePicker(Date initialDate) {
 
         super(new BorderLayout());
 
-        this.selectedDate = initialDate != null ? initialDate : new Date();
+        this.selectedDate = initialDate;
 
         UniversalDatePickerHelper.stylePicker(this);
 
-        displayField = UniversalDatePickerHelper.createDisplayField(formatDate(selectedDate));
+        displayField = UniversalDatePickerHelper.createDisplayField(displayText(initialDate));
+        applyDisplayState();
 
         add(displayField, BorderLayout.CENTER);
 
@@ -51,7 +55,7 @@ public class UniversalDatePicker extends JPanel {
 
         calendar = new JCalendar();
 
-        calendar.setDate(selectedDate);
+        calendar.setDate(calendarDate());
 
         UniversalDatePickerHelper.styleCalendar(calendar);
 
@@ -91,7 +95,7 @@ public class UniversalDatePicker extends JPanel {
 
                 Calendar current = Calendar.getInstance();
 
-                current.setTime(selectedDate);
+                current.setTime(selectedDate == null ? newDate : selectedDate);
 
                 Calendar picked = Calendar.getInstance();
 
@@ -120,7 +124,7 @@ public class UniversalDatePicker extends JPanel {
 
         Calendar cal = Calendar.getInstance();
 
-        cal.setTime(selectedDate);
+        cal.setTime(calendarDate());
 
         JLabel hourLabel = smallLabel("Hr");
 
@@ -200,7 +204,7 @@ public class UniversalDatePicker extends JPanel {
 
         Calendar c = Calendar.getInstance();
 
-        c.setTime(selectedDate);
+        c.setTime(selectedDate == null ? calendarDate() : selectedDate);
 
         c.set(Calendar.HOUR_OF_DAY, (Integer) hourSpinner.getValue());
 
@@ -245,7 +249,7 @@ public class UniversalDatePicker extends JPanel {
 
         Calendar cal = Calendar.getInstance();
 
-        cal.setTime(selectedDate);
+        cal.setTime(calendarDate());
 
         hourSpinner.setValue(cal.get(Calendar.HOUR_OF_DAY));
 
@@ -272,7 +276,7 @@ public class UniversalDatePicker extends JPanel {
             return;
         }
 
-        calendar.setDate(selectedDate);
+        calendar.setDate(calendarDate());
 
         updateSpinners();
 
@@ -309,20 +313,17 @@ public class UniversalDatePicker extends JPanel {
 
         setSelectedDate(date);
 
-        calendar.setDate(this.selectedDate);
+        calendar.setDate(calendarDate());
 
         updateSpinners();
     }
 
     private void setSelectedDate(Date date) {
 
-        if (date == null) {
-            date = new Date();
-        }
-
         this.selectedDate = date;
 
-        displayField.setText(formatDate(date));
+        displayField.setText(displayText(date));
+        applyDisplayState();
 
         if (dateChangeListener != null) {
             dateChangeListener.run();
@@ -341,6 +342,9 @@ public class UniversalDatePicker extends JPanel {
         iconPanel.setEnabled(enabled);
 
         UniversalDatePickerHelper.applyEnabledStyle(displayField, iconPanel, enabled);
+        if (enabled) {
+            applyDisplayState();
+        }
 
         if (!enabled) {
             calendarDialog.setVisible(false);
@@ -371,6 +375,22 @@ public class UniversalDatePicker extends JPanel {
 
     public void applyProjectStyling() {
         UniversalDatePickerHelper.applyProjectStyling(this);
+    }
+
+    private Date calendarDate() {
+        if (selectedDate != null) {
+            return selectedDate;
+        }
+        Date visibleDate = calendar == null ? null : calendar.getDate();
+        return visibleDate == null ? new Date() : visibleDate;
+    }
+
+    private String displayText(Date date) {
+        return date == null ? PLACEHOLDER_TEXT : formatDate(date);
+    }
+
+    private void applyDisplayState() {
+        displayField.setForeground(selectedDate == null ? PLACEHOLDER_COLOR : VALUE_COLOR);
     }
 
 }

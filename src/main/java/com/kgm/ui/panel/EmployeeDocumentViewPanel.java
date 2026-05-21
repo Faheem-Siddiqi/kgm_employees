@@ -233,14 +233,20 @@ public class EmployeeDocumentViewPanel extends JPanel {
     }
 
     private void showFullTableWithoutScroll(JScrollPane scrollPane) {
+        if (table == null || scrollPane == null) {
+            return;
+        }
+        TablePaginationHelper.autoResizeColumns(table);
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
         table.setFillsViewportHeight(false);
 
         int headerHeight = table.getTableHeader() == null ? 0 : table.getTableHeader().getPreferredSize().height;
         int tableHeight = headerHeight + (table.getRowHeight() * table.getRowCount()) + 2;
-        scrollPane.setPreferredSize(new Dimension(scrollPane.getPreferredSize().width, tableHeight));
+        int tableWidth = Math.max(320, table.getPreferredSize().width + 2);
+        scrollPane.setPreferredSize(new Dimension(tableWidth, tableHeight));
         scrollPane.setMinimumSize(new Dimension(320, tableHeight));
+        scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, tableHeight));
     }
 
     private void updateCount() {
@@ -352,16 +358,11 @@ public class EmployeeDocumentViewPanel extends JPanel {
                 return;
             }
 
-            JLabel label = new JLabel(new ImageIcon(img));
-            label.setHorizontalAlignment(SwingConstants.CENTER);
-            label.setVerticalAlignment(SwingConstants.CENTER);
-
-            JPanel previewPanel = new JPanel(new GridBagLayout());
-            previewPanel.setBackground(Color.WHITE);
-            previewPanel.add(label);
-
             JFrame frame = new JFrame("Document Preview - " + file.getName());
-            frame.getContentPane().add(new JScrollPane(previewPanel));
+            JScrollPane previewScroll = new JScrollPane(new DocumentImagePreviewPanel(img));
+            previewScroll.setBorder(null);
+            previewScroll.getViewport().setBackground(Color.WHITE);
+            frame.getContentPane().add(previewScroll);
             EmployeeDocumentViewPanelHelper.stylePreviewFrame(frame, this);
             frame.setVisible(true);
         } catch (Exception e) {

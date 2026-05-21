@@ -6,4 +6,5 @@ target/
 *.iml
 
 uploads/
-employees/
+employees/**
+!employees/.gitkeep

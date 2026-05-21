@@ -260,8 +260,8 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         reasonCombo.addActionListener(e -> reasonChanged = true);
         addRow(panel, gbc, y++, "Gender", genderCombo, "Reason", reasonCombo);
 
-        appointmentPicker = new UniversalDatePicker(new Date());
-        leavingPicker = new UniversalDatePicker(new Date());
+        appointmentPicker = new UniversalDatePicker();
+        leavingPicker = new UniversalDatePicker();
         appointmentPicker.addDateChangeListener(() -> appointmentDateChanged = true);
         leavingPicker.addDateChangeListener(() -> leavingDateChanged = true);
         addRow(panel, gbc, y++, "Appointment Date", appointmentPicker, "Leaving Date", leavingPicker);

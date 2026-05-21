@@ -2,9 +2,11 @@ package com.kgm.dao;
 
 import com.kgm.config.DatabaseConnection;
 import com.kgm.model.Employee;
+import com.kgm.util.EmployeeDocumentUtil;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class EmployeeRecordDao {
     private final Connection con;
@@ -295,25 +297,12 @@ public class EmployeeRecordDao {
                 e.setSECOND_VACC_DATE(safe(rs.getString("SECOND_VACC_DATE")));
 
                 // ================= DOCUMENTS =================
-                e.setCNIC_COPY(safe(rs.getString("CNIC_COPY")));
-                e.setSS_CARD_COPY(safe(rs.getString("SS_CARD_COPY")));
-                e.setEOBI_CARD_COPY(safe(rs.getString("EOBI_CARD_COPY")));
-                e.setFINAL_SETTLEMENT(safe(rs.getString("FINAL_SETTLEMENT")));
-                e.setCLEARANCE_CERT(safe(rs.getString("CLEARANCE_CERT")));
-                e.setJOB_APPOINTMENT(safe(rs.getString("JOB_APPOINTMENT")));
-                e.setAPPLICATION_DOC(safe(rs.getString("APPLICATION_DOC")));
-                e.setISSUANCE_DOC(safe(rs.getString("ISSUANCE_DOC")));
-                e.setSETTLEMENT_DOC(safe(rs.getString("SETTLEMENT_DOC")));
-                e.setTRIAL_CARD(safe(rs.getString("TRIAL_CARD")));
-                e.setINTERVIEW_DOC(safe(rs.getString("INTERVIEW_DOC")));
-                e.setSERVICE_LETTER(safe(rs.getString("SERVICE_LETTER")));
-                e.setEXTENSION_LETTER(safe(rs.getString("EXTENSION_LETTER")));
-                e.setRETIREMENT_LETTER(safe(rs.getString("RETIREMENT_LETTER")));
-                e.setCOVID_CERT(safe(rs.getString("COVID_CERT")));
-                e.setDISCIPLINARY_I(safe(rs.getString("DISCIPLINARY_I")));
-                e.setDISCIPLINARY_II(safe(rs.getString("DISCIPLINARY_II")));
-                e.setDISCIPLINARY_III(safe(rs.getString("DISCIPLINARY_III")));
+                for (int index = 0; index < EmployeeDocumentUtil.documentCount(); index++) {
+                    String column = EmployeeDocumentUtil.documentType(index).employeeFieldName();
+                    EmployeeDocumentUtil.setDocumentPath(e, index, safe(rs.getString(column)));
+                }
                 e.setEMP_IMG(safe(rs.getString("EMP_IMG")));
+                loadDynamicFields(e, rs);
 
                 return e;
             }
@@ -343,22 +332,30 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
         field.setAccessible(true);
         String column = field.getName();
 
-        // ❌ skip ID and primary key
-        if (column.equalsIgnoreCase("ID") || column.equalsIgnoreCase("EMPLOYEE_CODE")) {
+        // Skip ID, primary key, and the dynamic field map itself.
+        if (column.equalsIgnoreCase("ID")
+                || column.equalsIgnoreCase("EMPLOYEE_CODE")
+                || column.equalsIgnoreCase("dynamicFields")) {
             continue;
         }
 
         Object value = field.get(emp);
+        if (isWritableValue(value)) {
+            sql.append(quoteIdentifier(column)).append(" = ?, ");
+            values.add(value.toString().trim());
+        }
+    }
 
-        // only update if value is NOT empty
-        if (value != null) {
-            String strVal = value.toString().trim();
+    for (Map.Entry<String, String> dynamicField : emp.getDynamicFields().entrySet()) {
+        String column = dynamicField.getKey();
+        if (column.equalsIgnoreCase("ID") || column.equalsIgnoreCase("EMPLOYEE_CODE")) {
+            continue;
+        }
 
-            if (!strVal.isEmpty() && !strVal.equalsIgnoreCase("N/A")) {
-
-                sql.append(quoteIdentifier(column)).append(" = ?, ");
-                values.add(strVal);
-            }
+        String value = dynamicField.getValue();
+        if (isWritableValue(value)) {
+            sql.append(quoteIdentifier(column)).append(" = ?, ");
+            values.add(value.trim());
         }
     }
 
@@ -384,6 +381,33 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
 
     private String quoteIdentifier(String identifier) {
         return "`" + identifier.replace("`", "``") + "`";
+    }
+
+    private void loadDynamicFields(Employee employee, ResultSet rs) throws SQLException {
+        ResultSetMetaData metaData = rs.getMetaData();
+        for (int index = 1; index <= metaData.getColumnCount(); index++) {
+            String column = metaData.getColumnLabel(index);
+            if (column == null || column.isBlank()) {
+                column = metaData.getColumnName(index);
+            }
+            if (column == null || column.isBlank()) {
+                continue;
+            }
+            employee.setDynamicField(column, safe(rs.getString(index)));
+        }
+    }
+
+    private boolean isWritableValue(Object value) {
+        if (value == null) {
+            return false;
+        }
+
+        String text = value.toString().trim();
+        return !text.isEmpty()
+                && !text.equalsIgnoreCase("N/A")
+                && !text.equalsIgnoreCase("NA")
+                && !text.equalsIgnoreCase("NULL")
+                && !text.equals("-");
     }
 }
 

@@ -132,9 +132,9 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         reasonCombo = new JComboBox<>(new String[]{"Layoff", "Retirement", "Others"});
         addRow(panel, gbc, y++, "Gender", genderCombo, "Reason", reasonCombo);
 
-        appointmentPicker = new UniversalDatePicker(new Date());
+        appointmentPicker = new UniversalDatePicker();
 
-        leavingPicker = new UniversalDatePicker(new Date());
+        leavingPicker = new UniversalDatePicker();
 
         addRow(panel, gbc, y++, "Date of Arrival", appointmentPicker, "Leaving Date", leavingPicker);
 
@@ -272,8 +272,8 @@ Image scaled = img.getScaledInstance(
         designationField.setText("");
         resetCombo(genderCombo);
         resetCombo(reasonCombo);
-        appointmentPicker.setDate(new Date());
-        leavingPicker.setDate(new Date());
+        appointmentPicker.setDate(null);
+        leavingPicker.setDate(null);
         addressArea.setText("");
         selectedImage = null;
         photoPreview.setIcon(null);

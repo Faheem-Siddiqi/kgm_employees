@@ -97,8 +97,16 @@ public class HomeView extends JFrame {
         HomeViewHelper.styleRefreshButton(refreshBtn);
         refreshBtn.addActionListener(e -> tablePanel.reload());
 
+        JButton settingsBtn = new JButton("Settings");
+        HomeViewHelper.styleAddButton(settingsBtn);
+        settingsBtn.addActionListener(e -> {
+            new SettingsView();
+            dispose();
+        });
+
         btnRow.add(excelBtn);
         btnRow.add(addBtn);
+        btnRow.add(settingsBtn);
         btnRow.add(refreshBtn);
         northContainer.add(btnRow, BorderLayout.SOUTH);
 

@@ -35,7 +35,7 @@ public class EmployeeTablePanel extends JPanel {
         setBackground(Color.WHITE);
         setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
 
-        tablePanel = new UniversalTablePanel(COLUMNS, "No employee records found.");
+        tablePanel = new UniversalTablePanel(COLUMNS, "No employee records yet");
         tablePanel.setLinkColumn(EMPLOYEE_CODE_COLUMN, this::openEmployeeDetail, true);
         tablePanel.setActionColumn(ACTION_COLUMN, "View", this::openEmployeeDetail);
         tablePanel.setColumnAlignment(1, SwingConstants.LEFT);

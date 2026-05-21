@@ -28,24 +28,14 @@ public class EmployeeDetailView extends JFrame {
     private String empCode;
     private JButton updateBtn;
     private Employee employee;
+    private JDialog loadingDialog;
 
     public EmployeeDetailView(String empCode) {
         this.empCode = (empCode != null) ? empCode.trim() : null;
-        Employee emp = null;
-
-        try {
-            if (this.empCode != null && !this.empCode.isEmpty()) {
-                emp = new EmployeeRecordDao().getFullEmployeeByCode(this.empCode);
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            DialogHelper.error(
-                    null,
-                    "Error",
-                    "An unexpected error occurred.\nPlease contact the administrator.");
-        }
-
-        initializeUI(emp, true);
+        showLoadingShell();
+        setVisible(true);
+        showLoadingDialog();
+        loadEmployeeAsync();
     }
 
     public EmployeeDetailView() {
@@ -54,6 +44,7 @@ public class EmployeeDetailView extends JFrame {
 
     private void initializeUI(Employee emp, boolean isWithData) {
         this.employee = emp;
+        getContentPane().removeAll();
         EmployeeDetailViewHelper.applyFrame(this);
 
         JPanel topContainer = EmployeeDetailViewHelper.createTopContainer();
@@ -201,7 +192,129 @@ public class EmployeeDetailView extends JFrame {
                 DialogHelper.error(this, "Update Failed", "Update failed.");
             }
         });
+        revalidate();
+        repaint();
         setVisible(true);
+    }
+
+    private void showLoadingShell() {
+        getContentPane().removeAll();
+        EmployeeDetailViewHelper.applyFrame(this);
+
+        JPanel topContainer = EmployeeDetailViewHelper.createTopContainer();
+        topContainer.add(new HeaderPanel("Employee Record"), BorderLayout.NORTH);
+        add(topContainer, BorderLayout.NORTH);
+
+        JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
+        centerWrapper.add(EmployeeDetailViewHelper.screenHeader(
+                "Loading employee details",
+                empCode == null ? "" : empCode,
+                () -> {
+                    closeLoadingDialog();
+                    dispose();
+                    new HomeView();
+                },
+                null
+        ), EmployeeDetailViewHelper.pageConstraints(0));
+
+        JPanel loadingPanel = new JPanel(new GridBagLayout());
+        loadingPanel.setBackground(Color.WHITE);
+        loadingPanel.setBorder(BorderFactory.createEmptyBorder(70, 28, 80, 28));
+
+        JPanel box = new JPanel();
+        box.setBackground(Color.WHITE);
+        box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
+        JLabel label = new JLabel("Loading employee details...");
+        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 16));
+        label.setForeground(new Color(35, 43, 54));
+        label.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JProgressBar progress = new JProgressBar();
+        progress.setIndeterminate(true);
+        progress.setPreferredSize(new Dimension(260, 8));
+        progress.setMaximumSize(new Dimension(260, 8));
+        progress.setAlignmentX(Component.CENTER_ALIGNMENT);
+        box.add(label);
+        box.add(Box.createVerticalStrut(16));
+        box.add(progress);
+        loadingPanel.add(box);
+
+        centerWrapper.add(loadingPanel, EmployeeDetailViewHelper.pageConstraints(1));
+        add(EmployeeDetailViewHelper.createPageScrollPane(centerWrapper), BorderLayout.CENTER);
+        add(new FooterPanel(), BorderLayout.SOUTH);
+        revalidate();
+        repaint();
+    }
+
+    private void loadEmployeeAsync() {
+        SwingWorker<Employee, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Employee doInBackground() {
+                if (empCode == null || empCode.isBlank()) {
+                    return null;
+                }
+                return new EmployeeRecordDao().getFullEmployeeByCode(empCode);
+            }
+
+            @Override
+            protected void done() {
+                closeLoadingDialog();
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    Employee loadedEmployee = get();
+                    if (loadedEmployee == null) {
+                        DialogHelper.warning(
+                                EmployeeDetailView.this,
+                                "Employee Not Found",
+                                "This employee record could not be found.");
+                        dispose();
+                        new HomeView();
+                        return;
+                    }
+                    initializeUI(loadedEmployee, true);
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                    DialogHelper.error(
+                            EmployeeDetailView.this,
+                            "Load Failed",
+                            "Employee details could not be loaded.");
+                    dispose();
+                    new HomeView();
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void showLoadingDialog() {
+        loadingDialog = new JDialog(this, "Loading", false);
+        JPanel root = new JPanel(new BorderLayout(14, 12));
+        root.setBackground(Color.WHITE);
+        root.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
+
+        JLabel label = new JLabel("Loading employee details...");
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        label.setForeground(new Color(35, 43, 54));
+        JProgressBar progress = new JProgressBar();
+        progress.setIndeterminate(true);
+        progress.setPreferredSize(new Dimension(260, 8));
+
+        root.add(label, BorderLayout.NORTH);
+        root.add(progress, BorderLayout.CENTER);
+        loadingDialog.setContentPane(root);
+        loadingDialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+        loadingDialog.pack();
+        loadingDialog.setResizable(false);
+        loadingDialog.setLocationRelativeTo(this);
+        loadingDialog.setVisible(true);
+    }
+
+    private void closeLoadingDialog() {
+        if (loadingDialog != null) {
+            loadingDialog.dispose();
+            loadingDialog = null;
+        }
     }
 
     private String copyProfileImage(File source, String employeeCode) throws IOException {
@@ -258,18 +371,44 @@ public class EmployeeDetailView extends JFrame {
             String mergedPdfStatus = result.mergedDocumentsPdfFile() == null
                     ? "Not included"
                     : "Saved (" + result.mergedDocumentCount() + " documents)";
-            DialogHelper.success(this, "Download folder is ready.\nFolder: "
-                    + result.folder().getAbsolutePath()
+            String message = "Folder: " + result.folder().getAbsolutePath()
                     + "\nPDF profile: " + pdfStatus
                     + "\nAll documents PDF: " + mergedPdfStatus
                     + "\nDocuments copied: " + result.copiedDocumentCount()
-                    + " / " + result.totalDocumentCount());
+                    + " / " + result.totalDocumentCount();
+            int choice = DialogHelper.successOption(
+                    this,
+                    "Download Folder Ready",
+                    message,
+                    "Open Folder",
+                    "OK"
+            );
+            if (choice == 0) {
+                openReportFolder(result.folder());
+            }
         } catch (Exception exception) {
             exception.printStackTrace();
             String message = exception.getMessage() == null || exception.getMessage().isBlank()
                     ? "Employee report package could not be generated."
                     : exception.getMessage();
             DialogHelper.error(this, "Download Report Failed", message);
+        }
+    }
+
+    private void openReportFolder(File folder) {
+        if (folder == null || !folder.isDirectory()) {
+            DialogHelper.warning(this, "Folder Not Found", "The report folder could not be found.");
+            return;
+        }
+        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+            DialogHelper.warning(this, "Open Folder Unavailable", "This computer does not support opening folders from the app.");
+            return;
+        }
+
+        try {
+            Desktop.getDesktop().open(folder);
+        } catch (IOException exception) {
+            DialogHelper.error(this, "Open Folder Failed", "Could not open folder:\n" + folder.getAbsolutePath());
         }
     }
 
@@ -404,7 +543,7 @@ public class EmployeeDetailView extends JFrame {
             boolean hasMergedDocumentPdfSelection = allDocumentsPdf.isSelected()
                     && hasReadyMergeableDocument(availableDocuments);
             if (allDocumentsPdf.isSelected() && !hasMergedDocumentPdfSelection) {
-                validation.setText("No saved document images are available for the All Documents PDF.");
+                validation.setText(" No saved document images are available for the All Documents PDF.");
                 return;
             }
 

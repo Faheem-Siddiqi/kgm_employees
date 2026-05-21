@@ -1,4 +1,9 @@
 package com.kgm.model;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 public class Employee {
     // ================= EMPLOYEES =================
     private int ID;
@@ -111,25 +116,30 @@ public class Employee {
     private String FIRST_VACC_DATE;
     private String SECOND_VACC_DATE;
     // ================= DOCUMENTS =================
-    private String CNIC_COPY;
-    private String SS_CARD_COPY;
-    private String EOBI_CARD_COPY;
+    private String CNIC_FRONT;
+    private String CNIC_BACK;
+    private String EOBI;
+    private String SS_CARD;
     private String FINAL_SETTLEMENT;
-    private String CLEARANCE_CERT;
-    private String JOB_APPOINTMENT;
-    private String APPLICATION_DOC;
-    private String ISSUANCE_DOC;
-    private String SETTLEMENT_DOC;
+    private String APPOINTMENT_LETTER_FRONT;
+    private String APPOINTMENT_LETTER_BACK;
+    private String APPLICATION_FRONT;
+    private String APPLICATION_BACK;
+    private String CLEARANCE_CERTIFICATE;
+    private String SERVICE_CERTIFICATE;
+    private String PAYMENT_VOUCHER;
     private String TRIAL_CARD;
-    private String INTERVIEW_DOC;
-    private String SERVICE_LETTER;
-    private String EXTENSION_LETTER;
-    private String RETIREMENT_LETTER;
-    private String COVID_CERT;
+    private String MEDICAL_DOC;
+    private String INTERVIEW_FORMS;
+    private String COVID_CERTIFICATE;
     private String DISCIPLINARY_I;
     private String DISCIPLINARY_II;
     private String DISCIPLINARY_III;
+    private String MISCELLANEOUS_I;
+    private String MISCELLANEOUS_II;
+    private String MISCELLANEOUS_III;
     private String EMP_IMG;
+    private final Map<String, String> dynamicFields = new LinkedHashMap<>();
     public Employee() {
     }
     // ================= BASIC GETTERS =================
@@ -260,23 +270,29 @@ public class Employee {
         this.PERMANENT_ADR = PERMANENT_ADR;
     }
     // ================= DOCUMENT GETTERS =================
-    public String getCNIC_COPY() {
-        return CNIC_COPY;
+    public String getCNIC_FRONT() {
+        return CNIC_FRONT;
     }
-    public void setCNIC_COPY(String CNIC_COPY) {
-        this.CNIC_COPY = CNIC_COPY;
+    public void setCNIC_FRONT(String CNIC_FRONT) {
+        this.CNIC_FRONT = CNIC_FRONT;
     }
-    public String getSS_CARD_COPY() {
-        return SS_CARD_COPY;
+    public String getCNIC_BACK() {
+        return CNIC_BACK;
     }
-    public void setSS_CARD_COPY(String SS_CARD_COPY) {
-        this.SS_CARD_COPY = SS_CARD_COPY;
+    public void setCNIC_BACK(String CNIC_BACK) {
+        this.CNIC_BACK = CNIC_BACK;
     }
-    public String getEOBI_CARD_COPY() {
-        return EOBI_CARD_COPY;
+    public String getEOBI() {
+        return EOBI;
     }
-    public void setEOBI_CARD_COPY(String EOBI_CARD_COPY) {
-        this.EOBI_CARD_COPY = EOBI_CARD_COPY;
+    public void setEOBI(String EOBI) {
+        this.EOBI = EOBI;
+    }
+    public String getSS_CARD() {
+        return SS_CARD;
+    }
+    public void setSS_CARD(String SS_CARD) {
+        this.SS_CARD = SS_CARD;
     }
     public String getEMP_IMG() {
         return EMP_IMG;
@@ -290,35 +306,47 @@ public class Employee {
     public void setFINAL_SETTLEMENT(String FINAL_SETTLEMENT) {
         this.FINAL_SETTLEMENT = FINAL_SETTLEMENT;
     }
-    public String getCLEARANCE_CERT() {
-        return CLEARANCE_CERT;
+    public String getAPPOINTMENT_LETTER_FRONT() {
+        return APPOINTMENT_LETTER_FRONT;
     }
-    public void setCLEARANCE_CERT(String CLEARANCE_CERT) {
-        this.CLEARANCE_CERT = CLEARANCE_CERT;
+    public void setAPPOINTMENT_LETTER_FRONT(String APPOINTMENT_LETTER_FRONT) {
+        this.APPOINTMENT_LETTER_FRONT = APPOINTMENT_LETTER_FRONT;
     }
-    public String getJOB_APPOINTMENT() {
-        return JOB_APPOINTMENT;
+    public String getAPPOINTMENT_LETTER_BACK() {
+        return APPOINTMENT_LETTER_BACK;
     }
-    public void setJOB_APPOINTMENT(String JOB_APPOINTMENT) {
-        this.JOB_APPOINTMENT = JOB_APPOINTMENT;
+    public void setAPPOINTMENT_LETTER_BACK(String APPOINTMENT_LETTER_BACK) {
+        this.APPOINTMENT_LETTER_BACK = APPOINTMENT_LETTER_BACK;
     }
-    public String getAPPLICATION_DOC() {
-        return APPLICATION_DOC;
+    public String getAPPLICATION_FRONT() {
+        return APPLICATION_FRONT;
     }
-    public void setAPPLICATION_DOC(String APPLICATION_DOC) {
-        this.APPLICATION_DOC = APPLICATION_DOC;
+    public void setAPPLICATION_FRONT(String APPLICATION_FRONT) {
+        this.APPLICATION_FRONT = APPLICATION_FRONT;
     }
-    public String getISSUANCE_DOC() {
-        return ISSUANCE_DOC;
+    public String getAPPLICATION_BACK() {
+        return APPLICATION_BACK;
     }
-    public void setISSUANCE_DOC(String ISSUANCE_DOC) {
-        this.ISSUANCE_DOC = ISSUANCE_DOC;
+    public void setAPPLICATION_BACK(String APPLICATION_BACK) {
+        this.APPLICATION_BACK = APPLICATION_BACK;
     }
-    public String getSETTLEMENT_DOC() {
-        return SETTLEMENT_DOC;
+    public String getCLEARANCE_CERTIFICATE() {
+        return CLEARANCE_CERTIFICATE;
     }
-    public void setSETTLEMENT_DOC(String SETTLEMENT_DOC) {
-        this.SETTLEMENT_DOC = SETTLEMENT_DOC;
+    public void setCLEARANCE_CERTIFICATE(String CLEARANCE_CERTIFICATE) {
+        this.CLEARANCE_CERTIFICATE = CLEARANCE_CERTIFICATE;
+    }
+    public String getSERVICE_CERTIFICATE() {
+        return SERVICE_CERTIFICATE;
+    }
+    public void setSERVICE_CERTIFICATE(String SERVICE_CERTIFICATE) {
+        this.SERVICE_CERTIFICATE = SERVICE_CERTIFICATE;
+    }
+    public String getPAYMENT_VOUCHER() {
+        return PAYMENT_VOUCHER;
+    }
+    public void setPAYMENT_VOUCHER(String PAYMENT_VOUCHER) {
+        this.PAYMENT_VOUCHER = PAYMENT_VOUCHER;
     }
     public String getTRIAL_CARD() {
         return TRIAL_CARD;
@@ -326,35 +354,23 @@ public class Employee {
     public void setTRIAL_CARD(String TRIAL_CARD) {
         this.TRIAL_CARD = TRIAL_CARD;
     }
-    public String getINTERVIEW_DOC() {
-        return INTERVIEW_DOC;
+    public String getMEDICAL_DOC() {
+        return MEDICAL_DOC;
     }
-    public void setINTERVIEW_DOC(String INTERVIEW_DOC) {
-        this.INTERVIEW_DOC = INTERVIEW_DOC;
+    public void setMEDICAL_DOC(String MEDICAL_DOC) {
+        this.MEDICAL_DOC = MEDICAL_DOC;
     }
-    public String getSERVICE_LETTER() {
-        return SERVICE_LETTER;
+    public String getINTERVIEW_FORMS() {
+        return INTERVIEW_FORMS;
     }
-    public void setSERVICE_LETTER(String SERVICE_LETTER) {
-        this.SERVICE_LETTER = SERVICE_LETTER;
+    public void setINTERVIEW_FORMS(String INTERVIEW_FORMS) {
+        this.INTERVIEW_FORMS = INTERVIEW_FORMS;
     }
-    public String getEXTENSION_LETTER() {
-        return EXTENSION_LETTER;
+    public String getCOVID_CERTIFICATE() {
+        return COVID_CERTIFICATE;
     }
-    public void setEXTENSION_LETTER(String EXTENSION_LETTER) {
-        this.EXTENSION_LETTER = EXTENSION_LETTER;
-    }
-    public String getRETIREMENT_LETTER() {
-        return RETIREMENT_LETTER;
-    }
-    public void setRETIREMENT_LETTER(String RETIREMENT_LETTER) {
-        this.RETIREMENT_LETTER = RETIREMENT_LETTER;
-    }
-    public String getCOVID_CERT() {
-        return COVID_CERT;
-    }
-    public void setCOVID_CERT(String COVID_CERT) {
-        this.COVID_CERT = COVID_CERT;
+    public void setCOVID_CERTIFICATE(String COVID_CERTIFICATE) {
+        this.COVID_CERTIFICATE = COVID_CERTIFICATE;
     }
     public String getDISCIPLINARY_I() {
         return DISCIPLINARY_I;
@@ -373,6 +389,24 @@ public class Employee {
     }
     public void setDISCIPLINARY_III(String DISCIPLINARY_III) {
         this.DISCIPLINARY_III = DISCIPLINARY_III;
+    }
+    public String getMISCELLANEOUS_I() {
+        return MISCELLANEOUS_I;
+    }
+    public void setMISCELLANEOUS_I(String MISCELLANEOUS_I) {
+        this.MISCELLANEOUS_I = MISCELLANEOUS_I;
+    }
+    public String getMISCELLANEOUS_II() {
+        return MISCELLANEOUS_II;
+    }
+    public void setMISCELLANEOUS_II(String MISCELLANEOUS_II) {
+        this.MISCELLANEOUS_II = MISCELLANEOUS_II;
+    }
+    public String getMISCELLANEOUS_III() {
+        return MISCELLANEOUS_III;
+    }
+    public void setMISCELLANEOUS_III(String MISCELLANEOUS_III) {
+        this.MISCELLANEOUS_III = MISCELLANEOUS_III;
     }
     public String getDOB() {
         return DOB;
@@ -838,4 +872,26 @@ public void setFIRST_VACC_DATE(String FIRST_VACC_DATE) { this.FIRST_VACC_DATE = 
 
 public String getSECOND_VACC_DATE() { return SECOND_VACC_DATE; }
 public void setSECOND_VACC_DATE(String SECOND_VACC_DATE) { this.SECOND_VACC_DATE = SECOND_VACC_DATE; }
+
+public void setDynamicField(String columnName, String value) {
+    if (columnName == null || columnName.isBlank()) {
+        return;
+    }
+    dynamicFields.put(columnName.trim().toUpperCase(), value);
+}
+
+public String getDynamicField(String columnName) {
+    if (columnName == null || columnName.isBlank()) {
+        return null;
+    }
+    return dynamicFields.get(columnName.trim().toUpperCase());
+}
+
+public Map<String, String> getDynamicFields() {
+    return Collections.unmodifiableMap(dynamicFields);
+}
+
+public void clearDynamicFields() {
+    dynamicFields.clear();
+}
 }

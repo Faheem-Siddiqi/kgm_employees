@@ -129,14 +129,39 @@ public final class TableThemeHelper {
         ));
     }
 
-    public static JLabel emptyState(String text) {
-        JLabel empty = new JLabel(text, SwingConstants.CENTER);
-        empty.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        empty.setForeground(TEXT_SECONDARY);
+    public static JComponent emptyState(String text) {
+        JPanel empty = new JPanel(new GridBagLayout());
+        empty.setBackground(new Color(248, 250, 252));
         empty.setBorder(new CompoundBorder(
-                new LineBorder(BORDER),
-                new EmptyBorder(34, 20, 34, 20)
+                new RoundedBorder(8, BORDER),
+                new EmptyBorder(38, 24, 38, 24)
         ));
+
+        JPanel copy = new JPanel();
+        copy.setOpaque(false);
+        copy.setLayout(new BoxLayout(copy, BoxLayout.Y_AXIS));
+
+        JLabel title = new JLabel(text);
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        title.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 18));
+        title.setForeground(TEXT_PRIMARY);
+
+        JLabel subtitle = new JLabel("Add an employee record to start building the archive.");
+        subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        subtitle.setForeground(TEXT_SECONDARY);
+
+        JLabel hint = new JLabel("New records appear here automatically after saving.");
+        hint.setAlignmentX(Component.CENTER_ALIGNMENT);
+        hint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        hint.setForeground(new Color(118, 132, 146));
+
+        copy.add(title);
+        copy.add(Box.createVerticalStrut(8));
+        copy.add(subtitle);
+        copy.add(Box.createVerticalStrut(4));
+        copy.add(hint);
+        empty.add(copy);
         return empty;
     }
 

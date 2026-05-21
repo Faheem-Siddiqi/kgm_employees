@@ -29,7 +29,7 @@ The project follows a layered desktop-application architecture:
 
 | File | Functionality |
 | --- | --- |
-| **Main.java** | Application entry point. Starts on the Swing event thread, initializes the database schema, and opens `LoginView`. |
+| **Main.java** | Application entry point. Prints the configured MySQL server location, initializes the database schema, starts on the Swing event thread, and opens `LoginView`. |
 
 ---
 
@@ -46,7 +46,7 @@ The project follows a layered desktop-application architecture:
 
 | File | Functionality |
 | --- | --- |
-| **DatabaseInitializer.java** | Creates the configured MySQL database and ensures the `employees` table exists on startup. |
+| **DatabaseInitializer.java** | Creates the configured MySQL database, ensures the `employees` table exists, adds required document columns for existing installs, migrates obvious legacy document paths, and ensures the employee-code search index. |
 
 #### `src/main/resources`
 
@@ -62,8 +62,8 @@ The project follows a layered desktop-application architecture:
 
 | File | Functionality |
 | --- | --- |
-| **EmployeeRegistrationDao.java** | Inserts newly registered employee records, including profile image and document path fields. |
-| **EmployeeRecordDao.java** | Reads employee records, supports lookup/listing/counts, and updates employee data. |
+| **EmployeeRegistrationDao.java** | Inserts newly registered employee records with a generated column list, including profile image and the centralized document path fields. |
+| **EmployeeRecordDao.java** | Reads employee records, supports indexed lookup/listing/counts, dynamically maps document fields, and updates only meaningful submitted employee data. |
 
 ---
 
@@ -178,7 +178,7 @@ The project follows a layered desktop-application architecture:
 | --- | --- |
 | **SessionManager.java** | Stores and clears the current `UserSession`, checks expiry, and exposes remaining session time. |
 | **SessionWatcher.java** | Monitors active session expiry and closes/redirects windows when the session is no longer valid. |
-| **EmployeeDocumentUtil.java** | Shared document metadata, validation, path handling, and filename matching utilities. |
+| **EmployeeDocumentUtil.java** | Shared document metadata, validation, path handling, filename matching, and bulk-upload matching for the 22 required document fields. |
 | **FileUtil.java** | Reserved file utility boundary for shared file handling logic. |
 | **FilterUtil.java** | Reserved filtering utility boundary for reusable search/filter behavior. |
 | **ValidationUtil.java** | Reserved validation utility boundary for shared input validation rules. |
@@ -219,7 +219,7 @@ The project follows a layered desktop-application architecture:
    -> EmployeeRecordDao.updateEmployeeDynamic -> MySQL
 
 7. Document Handling
-   EmployeeDocumentUploadPanel -> dynamic search, single upload, or Upload All filename matching
+   EmployeeDocumentUploadPanel -> dynamic search, single upload, or Upload All filename matching for the 22 configured document fields
    -> local employees/{employeeCode}/documents storage
    EmployeeDocumentViewPanel -> searchable saved documents, locked-document checks, single or Upload All upload for missing documents
    -> missing documents uploaded through detail update
@@ -247,7 +247,36 @@ Key schema areas:
 - Payroll and banking: salary, pay categories, bank account, SS/EOBI/tax/PF fields.
 - Contact: phone, addresses, email, emergency number.
 - Compliance and benefits: clearance, verification, wellness, vaccination.
-- Documents: CNIC, EOBI, social security, settlement, clearance, appointment, service, retirement, disciplinary, and profile image paths.
+- Documents: 22 required document path columns plus the employee profile image path. Database columns use uppercase underscore names; UI labels use readable business names.
+
+### Required Document Fields
+
+The application uses `EmployeeDocumentUtil` as the single source of truth for document labels, database columns, storage filenames, search aliases, upload-all matching, detail-view locking, and report/download selection.
+
+| # | Database Column | UI Label |
+| ---: | --- | --- |
+| 1 | `CNIC_FRONT` | CNIC Front |
+| 2 | `CNIC_BACK` | CNIC Back |
+| 3 | `EOBI` | EOBI |
+| 4 | `SS_CARD` | Social Security Card |
+| 5 | `FINAL_SETTLEMENT` | Final Settlement |
+| 6 | `APPOINTMENT_LETTER_FRONT` | Appointment Letter Front |
+| 7 | `APPOINTMENT_LETTER_BACK` | Appointment Letter Back |
+| 8 | `APPLICATION_FRONT` | Application Front |
+| 9 | `APPLICATION_BACK` | Application Back |
+| 10 | `CLEARANCE_CERTIFICATE` | Clearance Certificate |
+| 11 | `SERVICE_CERTIFICATE` | Service Certificate |
+| 12 | `PAYMENT_VOUCHER` | Payment Voucher |
+| 13 | `TRIAL_CARD` | Trial Card |
+| 14 | `MEDICAL_DOC` | Medical |
+| 15 | `INTERVIEW_FORMS` | Interview Forms |
+| 16 | `COVID_CERTIFICATE` | Covid Certificate |
+| 17 | `DISCIPLINARY_I` | Disciplinary I |
+| 18 | `DISCIPLINARY_II` | Disciplinary II |
+| 19 | `DISCIPLINARY_III` | Disciplinary III |
+| 20 | `MISCELLANEOUS_I` | Miscellaneous I |
+| 21 | `MISCELLANEOUS_II` | Miscellaneous II |
+| 22 | `MISCELLANEOUS_III` | Miscellaneous III |
 
 ---
 
@@ -260,6 +289,7 @@ Key schema areas:
 - If a document field is empty or a placeholder, the detail screen allows upload. The file is copied to `employees/{employeeCode}/documents/` and the database path is saved on Update.
 - Profile image follows the same safety rule: it can be uploaded only when `EMP_IMG` is empty or a placeholder.
 - Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be JPG/JPEG, must be 400KB or smaller, and must match a document label, Employee field name, or storage filename after normalizing spaces, underscores, punctuation, and case.
+- Upload matching accepts database-style names such as `SS_CARD` and user-facing names such as `Social Security Card`; files are saved using the configured storage filename for the matching document type.
 - Detail document upload keeps saved DB document records locked. If `Upload All` includes a file matching an already-saved document, the file is skipped and the dialog explains that the document already exists in DB and cannot be replaced.
 - After a bulk upload attempt, the user receives a summary showing how many documents are ready to save and which files were discarded with the reason.
 - Employee detail downloads first ask what to include: PDF profile, all saved documents, `All Documents (PDF)`, or specific saved document names when `All saved documents` is turned off. Saved records with missing source files are still named in the picker so the user can see their status.
@@ -314,6 +344,7 @@ com.kgm.Main
 ```
 
 The application initializes the configured database and employee schema automatically on startup.
+At startup, the console also prints `MySQL Server Running On` with the configured host and port.
 
 Default application login:
 

@@ -10,9 +10,11 @@ public class Main {
         System.out.println("========================================");
         System.out.println("  KGM Ex-Employees Management System");
         System.out.println("========================================");
+        System.out.println("  MySQL Server Running On : " + DatabaseConfig.host() + ":" + DatabaseConfig.port());
         System.out.println("  IP Address : " + DatabaseConfig.host());
         System.out.println("  Username   : " + DatabaseConfig.username());
         System.out.println("  Port       : " + DatabaseConfig.port());
+        System.out.println("  Database   : " + DatabaseConfig.databaseName());
         System.out.println("========================================");
 
         SwingUtilities.invokeLater(() -> {
@@ -22,5 +24,4 @@ public class Main {
         });
     }
 }
-
 
