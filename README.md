@@ -52,7 +52,7 @@ The project follows a layered desktop-application architecture:
 
 | File | Functionality |
 | --- | --- |
-| **schema.sql** | Reference MySQL schema for the `employees` table and document path columns. |
+| **schema.sql** | Reference MySQL schema for the `employees` table, document path columns, and employee field metadata. |
 
 ---
 
@@ -64,6 +64,7 @@ The project follows a layered desktop-application architecture:
 | --- | --- |
 | **EmployeeRegistrationDao.java** | Inserts newly registered employee records with a generated column list, including profile image and the centralized document path fields. |
 | **EmployeeRecordDao.java** | Reads employee records, supports indexed lookup/listing/counts, dynamically maps document fields, and updates only meaningful submitted employee data. |
+| **EmployeeFieldDefinitionDao.java** | Manages editable employee field metadata, custom DB columns, date-field flags, document-field flags, and category heading renames. |
 
 ---
 
@@ -87,6 +88,7 @@ The project follows a layered desktop-application architecture:
 | File | Functionality |
 | --- | --- |
 | **Employee.java** | Entity model for employee personal, employment, payroll, contact, compliance, benefit, vaccination, document, and profile-image data. |
+| **EmployeeFieldDefinition.java** | Metadata model for DB-backed fields, including display label, category heading, document usage, custom/built-in origin, date behavior, and sort order. |
 | **UserSession.java** | Immutable model for active user session data: username, login timestamp, and expiry duration. |
 
 ---
@@ -101,6 +103,7 @@ The project follows a layered desktop-application architecture:
 | **HomeView.java** | Main dashboard for employee search, listing, refresh, import entry point, and record creation. |
 | **EmployeeRegistrationView.java** | Registration window for adding a new employee record. Combines employee form entry and document upload tabs before saving to MySQL. |
 | **EmployeeDetailView.java** | Detail, update, document review, and download workflow for an existing employee. |
+| **FieldManagementView.java** | Field-management window for adding custom DB fields, editing built-in/custom labels, assigning date pickers, managing document fields, and renaming detail categories with `UniversalTablePanel`. |
 
 ---
 
@@ -126,6 +129,7 @@ The project follows a layered desktop-application architecture:
 | **EmployeeRegistrationFormPanel.java** | Employee registration form with profile photo upload and core fields required to create a record. |
 | **EmployeeDocumentUploadPanel.java** | Registration document upload panel with search, single/bulk upload, validation, and preview. |
 | **EmployeeDocumentViewPanel.java** | Employee document review/update panel for viewing saved documents and uploading missing ones. |
+| **DocumentImagePreviewPanel.java** | Image preview panel that scales document images for viewing while preserving original aspect ratio. |
 | **EmployeeBasicDetailsPanel.java** | Basic employee detail form used in detail/edit flows. Allows updates to normal employee fields, keeps employee code locked, handles missing profile-image upload, and ignores empty placeholders such as `N/A`. |
 | **EmployeeAdditionalDetailsPanel.java** | Additional employee detail panel for employment, payroll, banking, reporting, compliance, benefits, and vaccination fields. Allows normal employee-field updates while ignoring empty placeholders. |
 | **ExcelImportButton.java** | Reusable styled button for triggering Excel import workflows. |
@@ -227,6 +231,10 @@ The project follows a layered desktop-application architecture:
 8. Download Employee Report Package
    EmployeeDetailView selection dialog -> EmployeeReportService -> EmployeeRecordDao.getFullEmployeeByCode
    -> optional PDF profile + optional all-documents PDF + all or selected saved documents in a selected local folder
+
+9. Field and Category Management
+   HomeView -> FieldManagementView -> EmployeeFieldDefinitionDao -> employees / employee_field_metadata
+   -> dynamic detail categories, document labels, custom fields, and date-picker behavior
 ```
 
 ---
@@ -238,6 +246,7 @@ The primary table is defined in `src/main/resources/schema.sql` and initialized 
 | Table | Purpose |
 | --- | --- |
 | **employees** | Stores employee identity, employment, organization, payroll, banking, contact, reporting, compliance, benefits, vaccination, document paths, and profile image path. |
+| **employee_field_metadata** | Stores editable field labels, detail category headings, document/detail flags, custom/built-in origin, date-picker flags, and sort order for dynamic UI/report behavior. |
 
 Key schema areas:
 
@@ -248,6 +257,7 @@ Key schema areas:
 - Contact: phone, addresses, email, emergency number.
 - Compliance and benefits: clearance, verification, wellness, vaccination.
 - Documents: 22 required document path columns plus the employee profile image path. Database columns use uppercase underscore names; UI labels use readable business names.
+- Field metadata: category headings, labels, document/date behavior, and custom fields are stored separately so Settings changes appear throughout detail views, document panels, and reports.
 
 ### Required Document Fields
 
@@ -362,17 +372,17 @@ Password: 1234
 | Core entry point | 1 | Application bootstrap |
 | Configuration | 2 | Database configuration and connection creation |
 | Database initializer | 1 | Startup schema/database creation |
-| DAO layer | 2 | Employee persistence, lookup, listing, and updates |
+| DAO layer | 3 | Employee persistence, lookup, listing, updates, and field metadata |
 | Service layer | 4 | Authentication, employee report packaging, and future service boundaries |
-| Models | 2 | Employee and user session data |
-| UI views | 4 | Main application windows |
+| Models | 3 | Employee, field metadata, and user session data |
+| UI views | 5 | Main application windows |
 | UI dialogs | 1 | Reusable modal dialog |
 | UI components | 2 | Reusable date controls |
-| UI panels | 10 | Forms, tables, document panels, header/footer |
+| UI panels | 11 | Forms, tables, document panels, previews, header/footer |
 | UI styling helpers | 17 | Visual design, table styling, layout helpers |
 | Utilities | 6 | Session, document matching, and shared utility boundaries |
 | Resources | 1 | SQL schema |
-| **Total source/resource files** | **53** | Complete application code and schema |
+| **Total source/resource files** | **57** | Complete application code and schema |
 
 ---
 
@@ -426,7 +436,14 @@ Main.java
         |-- EmployeeRecordDao
         |-- EmployeeTablePanel
         |-- ExcelImportButton
+        |-- FieldManagementView
         `-- EmployeeRegistrationView
+
+FieldManagementView
+|-- EmployeeFieldDefinitionDao
+|-- UniversalTablePanel
+|-- EmployeeDocumentUtil
+`-- DialogHelper
 
 EmployeeRegistrationView
 |-- EmployeeRegistrationFormPanel

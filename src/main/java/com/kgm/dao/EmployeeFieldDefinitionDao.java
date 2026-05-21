@@ -301,7 +301,7 @@ public class EmployeeFieldDefinitionDao {
     public EmployeeFieldDefinition renameField(String currentColumn, String newLabel, String newHeading, boolean dateField) {
         EmployeeFieldDefinition current = requireMutableField(currentColumn, "Only custom fields can be renamed.");
         String cleanLabel = requireText(newLabel, "New field label is required.");
-        String cleanHeading = current.documentField() ? "Documents" : normalizeHeading(newHeading);
+        String cleanHeading = current.documentField() ? current.heading() : normalizeHeading(newHeading);
         String newColumn = toColumnName(cleanLabel);
         boolean effectiveDateField = !current.documentField() && dateField;
 
@@ -344,7 +344,7 @@ public class EmployeeFieldDefinitionDao {
     public EmployeeFieldDefinition updateFieldSettings(String columnName, String label, String heading, boolean dateField) {
         EmployeeFieldDefinition current = requireExistingField(columnName);
         String cleanLabel = requireText(label, "Field label is required.");
-        String cleanHeading = current.documentField() ? "Documents" : normalizeHeading(heading);
+        String cleanHeading = current.documentField() ? current.heading() : normalizeHeading(heading);
         boolean effectiveDateField = !current.documentField() && dateField;
 
         try (PreparedStatement ps = conn.prepareStatement("""
@@ -372,6 +372,57 @@ public class EmployeeFieldDefinitionDao {
                 effectiveDateField,
                 current.sortOrder()
         );
+    }
+
+    public int renameHeading(String currentHeading, String newHeading) {
+        String oldHeading = requireText(currentHeading, "Current category is required.");
+        String cleanHeading = normalizeHeading(newHeading);
+
+        try (PreparedStatement ps = conn.prepareStatement("""
+                UPDATE employee_field_metadata
+                SET heading = ?
+                WHERE UPPER(heading) = UPPER(?)
+                """)) {
+            ps.setString(1, cleanHeading);
+            ps.setString(2, oldHeading);
+            return ps.executeUpdate();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to rename category: " + exception.getMessage(), exception);
+        }
+    }
+
+    public int deleteHeading(String heading) {
+        String cleanHeading = requireText(heading, "Category is required.");
+        List<EmployeeFieldDefinition> fields = new ArrayList<>();
+        for (EmployeeFieldDefinition definition : listFields()) {
+            if (definition.heading().equalsIgnoreCase(cleanHeading)) {
+                fields.add(definition);
+            }
+        }
+        if (fields.isEmpty()) {
+            throw new IllegalArgumentException("Category was not found: " + cleanHeading);
+        }
+        for (EmployeeFieldDefinition definition : fields) {
+            if (!definition.customField() || definition.protectedField()) {
+                throw new IllegalArgumentException("Only categories with custom fields can be deleted.");
+            }
+        }
+
+        try (Statement stmt = conn.createStatement()) {
+            for (EmployeeFieldDefinition definition : fields) {
+                stmt.execute("ALTER TABLE employees DROP COLUMN " + quoteIdentifier(definition.columnName()));
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to delete category fields: " + exception.getMessage(), exception);
+        }
+
+        try (PreparedStatement ps = conn.prepareStatement(
+                "DELETE FROM employee_field_metadata WHERE UPPER(heading) = UPPER(?)")) {
+            ps.setString(1, cleanHeading);
+            return ps.executeUpdate();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Category columns were deleted, but metadata could not be removed.", exception);
+        }
     }
 
     public void deleteField(String columnName) {

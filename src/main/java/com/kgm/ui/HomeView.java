@@ -100,7 +100,7 @@ public class HomeView extends JFrame {
         JButton settingsBtn = new JButton("Settings");
         HomeViewHelper.styleAddButton(settingsBtn);
         settingsBtn.addActionListener(e -> {
-            new SettingsView();
+            new FieldManagementView();
             dispose();
         });
 

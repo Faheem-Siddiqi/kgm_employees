@@ -54,6 +54,27 @@ public final class UniversalDialog {
         return selected[0];
     }
 
+    public static int formOption(
+            Component parent,
+            Type type,
+            String title,
+            JComponent form,
+            String primaryOption,
+            String... secondaryOptions
+    ) {
+        Window owner = owner(parent);
+        JDialog dialog = new JDialog(owner, title, Dialog.ModalityType.APPLICATION_MODAL);
+        int[] selected = {-1};
+
+        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dialog.setContentPane(formContent(dialog, selected, type, title, form, primaryOption, secondaryOptions));
+        dialog.pack();
+        dialog.setMinimumSize(new Dimension(430, 220));
+        dialog.setLocationRelativeTo(owner);
+        dialog.setVisible(true);
+        return selected[0];
+    }
+
     private static JPanel content(
             JDialog dialog,
             int[] selected,
@@ -67,6 +88,23 @@ public final class UniversalDialog {
         UniversalDialogHelper.styleRoot(root);
         root.add(header(title, type.accent), BorderLayout.NORTH);
         root.add(body(type, message), BorderLayout.CENTER);
+        root.add(footer(dialog, selected, type.accent, primaryOption, secondaryOptions), BorderLayout.SOUTH);
+        return root;
+    }
+
+    private static JPanel formContent(
+            JDialog dialog,
+            int[] selected,
+            Type type,
+            String title,
+            JComponent form,
+            String primaryOption,
+            String[] secondaryOptions
+    ) {
+        JPanel root = new JPanel(new BorderLayout());
+        UniversalDialogHelper.styleRoot(root);
+        root.add(header(title, type.accent), BorderLayout.NORTH);
+        root.add(formBody(form), BorderLayout.CENTER);
         root.add(footer(dialog, selected, type.accent, primaryOption, secondaryOptions), BorderLayout.SOUTH);
         return root;
     }
@@ -91,6 +129,15 @@ public final class UniversalDialog {
         }
 
         return UniversalDialogHelper.createBodyScroll(panel, preferredMessageHeight(sections));
+    }
+
+    private static JComponent formBody(JComponent form) {
+        JPanel panel = UniversalDialogHelper.createBodyPanel();
+        JComponent content = form == null ? new JPanel() : form;
+        content.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(content);
+        int height = Math.min(520, Math.max(160, content.getPreferredSize().height + 48));
+        return UniversalDialogHelper.createBodyScroll(panel, height);
     }
 
     private static JPanel messageBox(Type type, String message) {

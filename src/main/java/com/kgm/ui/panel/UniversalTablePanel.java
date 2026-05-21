@@ -30,6 +30,7 @@ public class UniversalTablePanel extends JPanel {
     private final List<Object[]> rows = new ArrayList<>();
     private final Set<Integer> hugColumns = new HashSet<>();
     private final Set<Integer> nonSelectingColumns = new HashSet<>();
+    private final Set<Integer> wrappedTextColumns = new HashSet<>();
     private final Map<Integer, Integer> preferredWidthLimits = new HashMap<>();
     private final JPanel content = new JPanel(new BorderLayout());
     private final JLabel rangeLabel = new JLabel();
@@ -42,12 +43,16 @@ public class UniversalTablePanel extends JPanel {
     private java.util.function.Predicate<Integer> statusDeletePredicate;
     private int statusColumn = -1;
     private int linkColumn = -1;
+    private int checkboxColumn = -1;
     private Consumer<Integer> onLink;
+    private Consumer<Integer> onCheckboxToggle;
+    private java.util.function.Predicate<Integer> checkboxSelectedPredicate;
     private boolean linkHighlightOnlyOnHover = false;
     private int hoveredRow = -1;
     private boolean hugRows = true;
     private boolean paginationEnabled = true;
     private int paginationBottomGap = 0;
+    private int minimumViewportRows = 0;
     private int currentPage = 0;
 
     public UniversalTablePanel(String[] columns, String emptyText) {
@@ -79,6 +84,11 @@ public class UniversalTablePanel extends JPanel {
             public void mouseClicked(MouseEvent event) {
                 int row = table.rowAtPoint(event.getPoint());
                 int column = table.columnAtPoint(event.getPoint());
+                if (isCheckboxCell(row, column) && onCheckboxToggle != null) {
+                    onCheckboxToggle.accept(toAbsoluteRow(row));
+                    return;
+                }
+
                 if (isLinkCell(row, column) && onLink != null) {
                     onLink.accept(toAbsoluteRow(row));
                     return;
@@ -101,9 +111,10 @@ public class UniversalTablePanel extends JPanel {
                 int column = table.columnAtPoint(event.getPoint());
                 updateHoveredLink(row, column);
                 boolean hoveringLink = isLinkCell(row, column);
+                boolean hoveringCheckbox = isCheckboxCell(row, column) && onCheckboxToggle != null;
                 boolean hoveringAction = actionColumn >= 0 && row >= 0 && column == actionColumn;
                 table.setCursor(Cursor.getPredefinedCursor(
-                        hoveringLink || hoveringAction ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR
+                        hoveringLink || hoveringCheckbox || hoveringAction ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR
                 ));
             }
         });
@@ -144,6 +155,38 @@ public class UniversalTablePanel extends JPanel {
         table.getColumnModel().getColumn(column).setCellRenderer(UniversalTablePanelHelper.alignmentRenderer(alignment));
     }
 
+    public void setCheckboxColumn(int column, java.util.function.Predicate<Integer> selectedPredicate) {
+        setCheckboxColumn(column, selectedPredicate, null);
+    }
+
+    public void setCheckboxColumn(
+            int column,
+            java.util.function.Predicate<Integer> selectedPredicate,
+            Consumer<Integer> onToggle
+    ) {
+        this.checkboxColumn = column;
+        this.checkboxSelectedPredicate = selectedPredicate;
+        this.onCheckboxToggle = onToggle;
+        nonSelectingColumns.add(column);
+        table.getColumnModel().getColumn(column).setCellRenderer((table, value, isSelected, hasFocus, row, col) -> {
+            JPanel panel = new JPanel(new GridBagLayout());
+            panel.setOpaque(true);
+            panel.setBackground(isSelected ? TableThemeHelper.ROW_SELECTION : Color.WHITE);
+            panel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, new Color(232, 236, 240)));
+
+            JCheckBox checkbox = new JCheckBox();
+            checkbox.setOpaque(false);
+            checkbox.setFocusable(false);
+            checkbox.setEnabled(onToggle != null);
+            int absoluteRow = toAbsoluteRow(row);
+            boolean checked = selectedPredicate != null && selectedPredicate.test(absoluteRow);
+            checkbox.setSelected(checked);
+            panel.add(checkbox);
+            return panel;
+        });
+        configureColumnWidths();
+    }
+
     public void setHugColumn(int column) {
         hugColumns.add(column);
         configureColumnWidths();
@@ -157,6 +200,13 @@ public class UniversalTablePanel extends JPanel {
     public void setClippedTextColumn(int column) {
         nonSelectingColumns.add(column);
         table.getColumnModel().getColumn(column).setCellRenderer(new ClippedTextCellRenderer());
+    }
+
+    public void setWrappedTextColumn(int column) {
+        nonSelectingColumns.add(column);
+        wrappedTextColumns.add(column);
+        table.getColumnModel().getColumn(column).setCellRenderer(new WrappedTextCellRenderer());
+        configureColumnWidths();
     }
 
     public void setLinkColumn(int column, Consumer<Integer> onLink) {
@@ -278,9 +328,10 @@ public class UniversalTablePanel extends JPanel {
 
                 updateHoveredLink(viewRow, viewColumn);
                 boolean hoveringLink = isLinkCell(viewRow, viewColumn);
+                boolean hoveringCheckbox = isCheckboxCell(viewRow, viewColumn) && onCheckboxToggle != null;
                 boolean hoveringAction = actionColumn >= 0 && viewRow >= 0 && viewColumn == actionColumn;
                 table.setCursor(Cursor.getPredefinedCursor(
-                        hoveringLink || hoveringAction ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR
+                        hoveringLink || hoveringCheckbox || hoveringAction ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR
                 ));
             }
         });
@@ -299,6 +350,11 @@ public class UniversalTablePanel extends JPanel {
 
     public void setPaginationBottomGap(int paginationBottomGap) {
         this.paginationBottomGap = Math.max(0, paginationBottomGap);
+        refresh();
+    }
+
+    public void setMinimumViewportRows(int minimumViewportRows) {
+        this.minimumViewportRows = Math.max(0, minimumViewportRows);
         refresh();
     }
 
@@ -468,15 +524,44 @@ public class UniversalTablePanel extends JPanel {
             model.addRow(rows.get(index));
         }
         configureColumnWidths();
+        applyWrappedRowHeights();
         if (hugRows) {
             int headerHeight = table.getTableHeader().getPreferredSize().height;
             int horizontalScrollbarHeight = preferredTableWidth() > availableTableWidth()
                     ? UIManager.getInt("ScrollBar.width")
                     : 0;
-            int contentHeight = headerHeight + table.getRowHeight() * Math.max(1, model.getRowCount()) + horizontalScrollbarHeight;
+            int minimumRowsHeight = minimumViewportRows * table.getRowHeight();
+            int contentHeight = headerHeight
+                    + Math.max(renderedRowsHeight(), minimumRowsHeight)
+                    + horizontalScrollbarHeight;
             int height = Math.max(MIN_VIEWPORT_HEIGHT, contentHeight);
             table.setPreferredScrollableViewportSize(new Dimension(availableTableWidth(), height));
         }
+    }
+
+    private void applyWrappedRowHeights() {
+        int defaultHeight = table.getRowHeight();
+        for (int row = 0; row < model.getRowCount(); row++) {
+            int height = defaultHeight;
+            for (Integer column : wrappedTextColumns) {
+                Object value = model.getValueAt(row, column);
+                int columnWidth = table.getColumnModel().getColumn(column).getPreferredWidth();
+                height = Math.max(height, wrappedTextHeight(value == null ? "" : String.valueOf(value), columnWidth));
+            }
+            table.setRowHeight(row, height);
+        }
+    }
+
+    private int renderedRowsHeight() {
+        if (model.getRowCount() == 0) {
+            return table.getRowHeight();
+        }
+
+        int height = 0;
+        for (int row = 0; row < model.getRowCount(); row++) {
+            height += table.getRowHeight(row);
+        }
+        return height;
     }
 
     private void configureColumnWidths() {
@@ -534,6 +619,9 @@ public class UniversalTablePanel extends JPanel {
         for (Object[] row : rows) {
             Object value = row[column];
             int cellWidth = cellMetrics.stringWidth(value == null ? "" : String.valueOf(value)) + padding;
+            if (wrappedTextColumns.contains(column)) {
+                cellWidth = Math.min(cellWidth, Math.max(260, availableTableWidth() / 2));
+            }
 
             if (column == statusColumn && statusDeleteAction != null && statusDeletePredicate != null) {
                 int deleteWidth = cellMetrics.stringWidth("Delete") + 12;
@@ -544,6 +632,42 @@ public class UniversalTablePanel extends JPanel {
         }
 
         return Math.max(72, width);
+    }
+
+    private int wrappedTextHeight(String text, int columnWidth) {
+        FontMetrics metrics = table.getFontMetrics(table.getFont());
+        int innerWidth = Math.max(48, columnWidth - 34);
+        int lineCount = 0;
+        for (String paragraph : text.split("\\R", -1)) {
+            lineCount += wrappedLineCount(paragraph, innerWidth, metrics);
+        }
+        return Math.max(table.getRowHeight(), lineCount * metrics.getHeight() + 22);
+    }
+
+    private int wrappedLineCount(String text, int innerWidth, FontMetrics metrics) {
+        if (text == null || text.isBlank()) {
+            return 1;
+        }
+
+        int lines = 1;
+        int currentWidth = 0;
+        int spaceWidth = metrics.stringWidth(" ");
+        for (String word : text.trim().split("\\s+")) {
+            int wordWidth = metrics.stringWidth(word);
+            if (wordWidth > innerWidth) {
+                lines += Math.max(0, (int) Math.ceil(wordWidth / (double) innerWidth) - 1);
+                currentWidth = wordWidth % innerWidth;
+                continue;
+            }
+            int nextWidth = currentWidth == 0 ? wordWidth : currentWidth + spaceWidth + wordWidth;
+            if (nextWidth > innerWidth) {
+                lines++;
+                currentWidth = wordWidth;
+            } else {
+                currentWidth = nextWidth;
+            }
+        }
+        return lines;
     }
 
     private int preferredTableWidth() {
@@ -586,6 +710,13 @@ public class UniversalTablePanel extends JPanel {
                 && viewRow >= 0
                 && viewColumn >= 0
                 && table.convertColumnIndexToModel(viewColumn) == linkColumn;
+    }
+
+    private boolean isCheckboxCell(int viewRow, int viewColumn) {
+        return checkboxColumn >= 0
+                && viewRow >= 0
+                && viewColumn >= 0
+                && table.convertColumnIndexToModel(viewColumn) == checkboxColumn;
     }
 
     private void updateHoveredLink(int viewRow, int viewColumn) {
@@ -659,6 +790,35 @@ public class UniversalTablePanel extends JPanel {
             g2.drawString(text, x, y);
             g2.setClip(oldClip);
             g2.dispose();
+        }
+    }
+
+    private static class WrappedTextCellRenderer extends JTextArea implements TableCellRenderer {
+        WrappedTextCellRenderer() {
+            setLineWrap(true);
+            setWrapStyleWord(true);
+            setEditable(false);
+            setFocusable(false);
+            setOpaque(true);
+        }
+
+        public Component getTableCellRendererComponent(
+                JTable table,
+                Object value,
+                boolean isSelected,
+                boolean hasFocus,
+                int row,
+                int column
+        ) {
+            setText(value == null ? "" : String.valueOf(value));
+            setFont(table.getFont());
+            setForeground(TableThemeHelper.TEXT_PRIMARY);
+            setBackground(isSelected ? TableThemeHelper.ROW_SELECTION : Color.WHITE);
+            setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, 1, 1, new Color(232, 236, 240)),
+                    BorderFactory.createEmptyBorder(8, 16, 8, 14)));
+            setToolTipText(getText().isBlank() ? null : getText());
+            return this;
         }
     }
 }

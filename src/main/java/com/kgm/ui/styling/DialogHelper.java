@@ -3,6 +3,7 @@ package com.kgm.ui.styling;
 import com.kgm.ui.dialog.UniversalDialog;
 
 import java.awt.Component;
+import javax.swing.JComponent;
 
 public final class DialogHelper {
     private DialogHelper() {
@@ -71,6 +72,23 @@ public final class DialogHelper {
                 UniversalDialog.Type.INFO,
                 title,
                 message,
+                primaryOption,
+                secondaryOption
+        );
+    }
+
+    public static int formOption(
+            Component parent,
+            String title,
+            JComponent form,
+            String primaryOption,
+            String secondaryOption
+    ) {
+        return UniversalDialog.formOption(
+                parent,
+                UniversalDialog.Type.INFO,
+                title,
+                form,
                 primaryOption,
                 secondaryOption
         );
