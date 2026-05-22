@@ -164,17 +164,96 @@ public final class UniversalTablePanelHelper {
         label.setVerticalAlignment(SwingConstants.CENTER);
     }
 
+    // Predefined professional color palette for status badges
+    private static final Color[] STATUS_COLORS = {
+            new Color(38, 128, 64),      // Green - for positive statuses
+            new Color(0, 112, 210),      // Blue - PRIMARY
+            new Color(180, 60, 45),      // Red - DANGER
+            new Color(245, 158, 11),     // Amber/Orange
+            new Color(139, 92, 246),     // Purple
+            new Color(236, 72, 153),     // Pink
+            new Color(20, 184, 166),     // Teal
+            new Color(249, 115, 22),     // Orange
+            new Color(34, 197, 94),      // Lime Green
+            new Color(59, 130, 246),     // Sky Blue
+            new Color(168, 85, 247),     // Violet
+            new Color(244, 63, 94),      // Rose
+            new Color(16, 185, 129),     // Emerald
+            new Color(251, 146, 60),     // Light Orange
+            new Color(14, 165, 233),     // Light Blue
+            new Color(217, 119, 6),      // Dark Amber
+    };
+
     public static Color statusColor(String status) {
-        if (status.equalsIgnoreCase("Currently Staying")) {
-            return new Color(38, 128, 64);
+        if (status == null || status.isEmpty()) {
+            return TableThemeHelper.TEXT_SECONDARY;
         }
-        if (status.equalsIgnoreCase("Upcoming")) {
-            return TableThemeHelper.PRIMARY;
+
+        String normalized = status.trim().toLowerCase();
+
+        // Handle known statuses with specific colors
+        switch (normalized) {
+            case "currently staying":
+            case "active":
+            case "employed":
+            case "present":
+            case "approved":
+            case "completed":
+            case "yes":
+                return new Color(38, 128, 64); // Green
+
+            case "upcoming":
+            case "pending":
+            case "in progress":
+            case "processing":
+            case "scheduled":
+                return TableThemeHelper.PRIMARY; // Blue
+
+            case "departed":
+            case "inactive":
+            case "terminated":
+            case "resigned":
+            case "rejected":
+            case "cancelled":
+            case "failed":
+            case "no":
+            case "expired":
+                return TableThemeHelper.DANGER; // Red
+
+            case "on leave":
+            case "probation":
+            case "notice period":
+                return new Color(245, 158, 11); // Amber
+
+            case "remote":
+            case "work from home":
+                return new Color(139, 92, 246); // Purple
+
+            case "part-time":
+            case "contract":
+                return new Color(20, 184, 166); // Teal
+
+            case "holiday":
+            case "vacation":
+                return new Color(249, 115, 22); // Orange
         }
-        if (status.equalsIgnoreCase("Departed")) {
-            return TableThemeHelper.DANGER;
+
+        // For unknown statuses, generate a consistent color based on hash
+        return getStatusColorFromHash(status);
+    }
+
+    /**
+     * Generates a consistent color for a status string based on its hash code.
+     * This ensures that the same status always gets the same color.
+     */
+    private static Color getStatusColorFromHash(String status) {
+        if (status == null || status.isEmpty()) {
+            return TableThemeHelper.TEXT_SECONDARY;
         }
-        return TableThemeHelper.TEXT_SECONDARY;
+
+        int hash = Math.abs(status.toLowerCase().hashCode());
+        int index = hash % STATUS_COLORS.length;
+        return STATUS_COLORS[index];
     }
 
     private static void styleActionLabel(JLabel label, boolean selected, String text) {

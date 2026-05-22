@@ -243,7 +243,6 @@ public final class TablePaginationHelper {
                         table, value, isSelected, hasFocus, row, column);
                 label.setOpaque(true);
                 label.setBackground(isSelected ? ROW_SELECTION : PAGE_BACKGROUND);
-                label.setForeground(TEXT_PRIMARY);
                 label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
                 label.setBorder(new CompoundBorder(
                         new MatteBorder(0, 0, 1, 1, CELL_DIVIDER),
@@ -260,12 +259,70 @@ public final class TablePaginationHelper {
                             "<font color='red'>*</font>") + "</html>");
                 }
 
+                // Apply status color for the Status column (column 2)
+                if (column == 2 && value != null) {
+                    label.setForeground(getDocumentStatusColor(value.toString()));
+                    label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
+                } else {
+                    label.setForeground(isSelected ? TEXT_PRIMARY : TEXT_PRIMARY);
+                }
+
                 return label;
             }
         };
         for (int i = 0; i < Math.min(3, table.getColumnCount()); i++) {
             table.getColumnModel().getColumn(i).setCellRenderer(renderer);
         }
+    }
+
+    /**
+     * Returns a color for document status values.
+     * Uses the same color logic as UniversalTablePanelHelper.statusColor for consistency.
+     */
+    private static Color getDocumentStatusColor(String status) {
+        if (status == null || status.isEmpty()) {
+            return TEXT_SECONDARY;
+        }
+
+        String normalized = status.toLowerCase().trim();
+
+        // Handle document-specific statuses
+        if (normalized.equals("uploaded") || normalized.equals("locked")) {
+            return new Color(38, 128, 64); // Green
+        }
+        if (normalized.equals("not uploaded")) {
+            return TEXT_SECONDARY; // Gray
+        }
+        if (normalized.contains("ready to save") || normalized.equals("pending")) {
+            return PRIMARY; // Blue
+        }
+        if (normalized.contains("missing") || normalized.contains("error") || normalized.contains("failed")) {
+            return new Color(180, 60, 45); // Red/DANGER
+        }
+
+        // For any other status, use hash-based color from the palette
+        return getStatusColorFromHash(status);
+    }
+
+    // Color palette for unknown statuses (same as UniversalTablePanelHelper)
+    private static final Color[] DOCUMENT_STATUS_COLORS = {
+            new Color(38, 128, 64),      // Green
+            new Color(0, 112, 210),      // Blue - PRIMARY
+            new Color(180, 60, 45),      // Red
+            new Color(245, 158, 11),     // Amber
+            new Color(139, 92, 246),     // Purple
+            new Color(236, 72, 153),     // Pink
+            new Color(20, 184, 166),     // Teal
+            new Color(249, 115, 22),     // Orange
+    };
+
+    private static Color getStatusColorFromHash(String status) {
+        if (status == null || status.isEmpty()) {
+            return TEXT_SECONDARY;
+        }
+        int hash = Math.abs(status.toLowerCase().hashCode());
+        int index = hash % DOCUMENT_STATUS_COLORS.length;
+        return DOCUMENT_STATUS_COLORS[index];
     }
 
     private static void applyCenteredDocumentRenderers(JTable table) {
