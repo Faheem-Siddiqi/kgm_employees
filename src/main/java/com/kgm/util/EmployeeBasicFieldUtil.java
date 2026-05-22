@@ -16,6 +16,7 @@ import java.util.Set;
 
 public final class EmployeeBasicFieldUtil {
     public static final String FUNDAMENTALS_HEADING = "Fundamentals";
+    private static final Set<String> FUNDAMENTALS_HEADING_KEYS = Set.of("fundamental", "fundamentals");
     public static final List<String> BASIC_COLUMNS = List.of(
             "EMPLOYEE_CODE",
             "EMP_NAME",
@@ -92,7 +93,11 @@ public final class EmployeeBasicFieldUtil {
     }
 
     public static boolean isFundamentalsField(EmployeeFieldDefinition definition) {
-        return definition != null && FUNDAMENTALS_HEADING.equalsIgnoreCase(definition.heading());
+        return definition != null && isFundamentalsHeading(definition.heading());
+    }
+
+    public static boolean isFundamentalsHeading(String heading) {
+        return FUNDAMENTALS_HEADING_KEYS.contains(headingKey(heading));
     }
 
     public static boolean isDateField(String columnName) {
@@ -224,6 +229,10 @@ public final class EmployeeBasicFieldUtil {
         }
         int index = BASIC_COLUMNS.indexOf(columnName.toUpperCase(Locale.ROOT));
         return index < 0 ? Integer.MAX_VALUE : index;
+    }
+
+    private static String headingKey(String heading) {
+        return heading == null ? "" : heading.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
     private static Map<String, String> defaultLabels() {

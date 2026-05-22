@@ -65,7 +65,7 @@ public final class DialogHelper {
             String title,
             String message,
             String primaryOption,
-            String secondaryOption
+            String... secondaryOptions
     ) {
         return UniversalDialog.option(
                 parent,
@@ -73,7 +73,7 @@ public final class DialogHelper {
                 title,
                 message,
                 primaryOption,
-                secondaryOption
+                secondaryOptions
         );
     }
 

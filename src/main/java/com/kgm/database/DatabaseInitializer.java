@@ -6,9 +6,11 @@ import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.util.EmployeeDocumentUtil;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 
 public class DatabaseInitializer {
@@ -179,6 +181,109 @@ public class DatabaseInitializer {
             Map.entry("COVID_CERT", "COVID_CERTIFICATE")
     );
 
+    private static final List<String> STANDARD_EMPLOYEE_TEXT_COLUMNS = List.of(
+            "UNT_CODE",
+            "EMP_NAME",
+            "FATHER_NAME",
+            "MOTHER_NAME",
+            "GENDER",
+            "DOB",
+            "CITY_OF_BIRTH",
+            "NATIONALITY",
+            "RELIGION",
+            "BLOOD_GROUP",
+            "M_STATUS",
+            "NID",
+            "DEPARTMENT",
+            "DESIG_CODE",
+            "DESIGNATION",
+            "SECTION",
+            "GRADE",
+            "JOINING_DATE",
+            "CONFIRMING_ON",
+            "EMP_STATUS",
+            "SHIFT",
+            "PROB_PERIOD",
+            "EXP_IN_KTML",
+            "APPLICATION_DATE",
+            "RESIGN_REASON",
+            "RESIGN_DATE",
+            "ORG_ID",
+            "DIVISION",
+            "BRANCH_CODE",
+            "BRANCH_NAME",
+            "DESCR",
+            "GROSS_SALARY",
+            "PAY_CATEGORY",
+            "BASIC",
+            "COLA1",
+            "COLA2",
+            "COLA3",
+            "COLA4",
+            "COLA5",
+            "COLA6_7",
+            "COLA8",
+            "COLA9",
+            "COLA10",
+            "COLA11",
+            "PB_SPECIAL1_2",
+            "PB_SPECIAL3",
+            "PB_SPECIAL4",
+            "SPECIAL",
+            "OTHER1",
+            "OTHER2",
+            "OTHER3",
+            "MEDICAL",
+            "CONVEYANCE",
+            "UTILITY",
+            "ENTERTAINMENT",
+            "PAY_GROUP",
+            "PAY_GROUP_DESC",
+            "PAY_AT_JOINING",
+            "EXTRA_DUTY",
+            "PAYROLL_FLAG",
+            "BANK_NAME",
+            "BANK_AC_NO",
+            "SS_NO",
+            "EOBI_NO",
+            "TAX_NO",
+            "PFUND_DEDUCTION",
+            "PF_INTEREST",
+            "PFUND_CODE",
+            "CLIPPER_PFUND_CODE",
+            "EFU",
+            "EFU_NO",
+            "EOBI_STATUS",
+            "EMP_CONTNO",
+            "CURRENT_ADR",
+            "PERMANENT_ADR",
+            "PERSONAL_EMAIL",
+            "OFFICIAL_EMAIL",
+            "EMERGENCY_NO",
+            "REP_UNT",
+            "REP_EMP_ID",
+            "REP_EMP_DESIG_CODE",
+            "REP_EMP_DEPT_CODE",
+            "REP_EMP_TYPE",
+            "FLAG",
+            "CLEARANCE_STATUS",
+            "HOD_CHECK",
+            "SEC_HEAD_CHK",
+            "NIC_VERIFY",
+            "NIC_VERIFY_DATE",
+            "ATT_CATEG",
+            "DIS_CERTIFICATE",
+            "WELLNESS_CLUB",
+            "WELLNESS_CARD_ISSUE",
+            "WELLNESS_CARD_NO",
+            "WELLNESS_CLUB_VALID_DATE",
+            "FIRST_DOSE",
+            "SECOND_DOSE",
+            "FIRST_VACC_DATE",
+            "SECOND_VACC_DATE",
+            "EMP_IMG"
+    );
+
     public static void init() {
         try {
             createDatabaseIfNeeded();
@@ -193,6 +298,7 @@ public class DatabaseInitializer {
 
             boolean exists = tableExists(conn);
             stmt.execute(EMPLOYEES_TABLE);
+            migrateCurrentAddressColumn(conn);
             ensureCoreColumns(conn);
             ensureDocumentColumns(conn);
             migrateLegacyDocumentColumns(conn);
@@ -220,7 +326,11 @@ public class DatabaseInitializer {
     }
 
     private static boolean tableExists(Connection conn) throws SQLException {
-        try (ResultSet rs = conn.getMetaData().getTables(conn.getCatalog(), null, "employees", new String[]{"TABLE"})) {
+        return tableExists(conn, "employees");
+    }
+
+    private static boolean tableExists(Connection conn, String tableName) throws SQLException {
+        try (ResultSet rs = conn.getMetaData().getTables(conn.getCatalog(), null, tableName, new String[]{"TABLE"})) {
             return rs.next();
         }
     }
@@ -237,10 +347,50 @@ public class DatabaseInitializer {
     }
 
     private static void ensureCoreColumns(Connection conn) throws SQLException {
-        ensureColumn(conn, "SECTION");
-        ensureColumn(conn, "DOB");
-        ensureColumn(conn, "GRADE");
-        ensureColumn(conn, "SHIFT");
+        for (String column : STANDARD_EMPLOYEE_TEXT_COLUMNS) {
+            ensureColumn(conn, column);
+        }
+    }
+
+    private static void migrateCurrentAddressColumn(Connection conn) throws SQLException {
+        boolean hasLegacyColumn = columnExists(conn, "CURRENT_ADDRESS");
+        boolean hasCurrentColumn = columnExists(conn, "CURRENT_ADR");
+        if (hasLegacyColumn && !hasCurrentColumn) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("ALTER TABLE employees CHANGE COLUMN "
+                        + quoteIdentifier("CURRENT_ADDRESS") + " "
+                        + quoteIdentifier("CURRENT_ADR") + " TEXT");
+            }
+        } else if (hasLegacyColumn) {
+            String sql = "UPDATE employees SET " + quoteIdentifier("CURRENT_ADR")
+                    + " = " + quoteIdentifier("CURRENT_ADDRESS")
+                    + " WHERE " + emptyOrPlaceholder("CURRENT_ADR")
+                    + " AND NOT " + emptyOrPlaceholder("CURRENT_ADDRESS");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(sql);
+                stmt.execute("ALTER TABLE employees DROP COLUMN " + quoteIdentifier("CURRENT_ADDRESS"));
+            }
+        }
+        migrateCurrentAddressMetadata(conn);
+    }
+
+    private static void migrateCurrentAddressMetadata(Connection conn) throws SQLException {
+        if (!tableExists(conn, "employee_field_metadata")
+                || !metadataRowExists(conn, "CURRENT_ADDRESS")) {
+            return;
+        }
+
+        if (metadataRowExists(conn, "CURRENT_ADR")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("DELETE FROM employee_field_metadata WHERE UPPER(column_name) = 'CURRENT_ADDRESS'");
+            }
+            return;
+        }
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("UPDATE employee_field_metadata SET column_name = 'CURRENT_ADR' "
+                    + "WHERE UPPER(column_name) = 'CURRENT_ADDRESS'");
+        }
     }
 
     private static void ensureColumn(Connection conn, String column) throws SQLException {
@@ -283,6 +433,16 @@ public class DatabaseInitializer {
         DatabaseMetaData metaData = conn.getMetaData();
         try (ResultSet rs = metaData.getColumns(conn.getCatalog(), null, "employees", columnName)) {
             return rs.next();
+        }
+    }
+
+    private static boolean metadataRowExists(Connection conn, String columnName) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT 1 FROM employee_field_metadata WHERE UPPER(column_name) = UPPER(?) LIMIT 1")) {
+            ps.setString(1, columnName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 

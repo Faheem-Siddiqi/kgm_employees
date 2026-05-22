@@ -23,7 +23,7 @@ public record EmployeeFieldDefinition(
         if (documentField) {
             return "Documents";
         }
-        if ("Fundamentals".equalsIgnoreCase(heading)) {
+        if (isFundamentalsHeading()) {
             return "Fundamentals";
         }
         if (coreField) {
@@ -57,6 +57,13 @@ public record EmployeeFieldDefinition(
 
     public String normalizedColumnName() {
         return columnName == null ? "" : columnName.toUpperCase(Locale.ROOT);
+    }
+
+    private boolean isFundamentalsHeading() {
+        String normalized = heading == null
+                ? ""
+                : heading.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+        return normalized.equals("fundamental") || normalized.equals("fundamentals");
     }
 
     private static boolean containsIgnoreCase(List<String> values, String candidate) {

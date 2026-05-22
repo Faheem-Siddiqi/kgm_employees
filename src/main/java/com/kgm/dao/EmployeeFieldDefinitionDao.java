@@ -21,7 +21,7 @@ import java.util.Set;
 
 public class EmployeeFieldDefinitionDao {
     private static final String TABLE = "employee_field_metadata";
-    private static final String FUNDAMENTALS_HEADING = "Fundamentals";
+    public static final String FUNDAMENTALS_HEADING = "Fundamentals";
 
     private static final List<EmployeeFieldDefinition> BUILT_IN_FIELDS = List.of(
             def("ID", "ID", "System", false, false, 1),
@@ -256,12 +256,23 @@ public class EmployeeFieldDefinitionDao {
         for (EmployeeFieldDefinition definition : listFields()) {
             if (!definition.documentField()
                     && definition.detailField()
-                    && !EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING.equalsIgnoreCase(definition.heading())) {
+                    && !EmployeeBasicFieldUtil.isFundamentalsHeading(definition.heading())) {
                 definitions.add(definition);
             }
         }
         definitions.sort(fieldOrder());
         return definitions;
+    }
+
+    public List<EmployeeFieldDefinition> listFundamentalsFields() {
+        List<EmployeeFieldDefinition> list = new ArrayList<>();
+        for (EmployeeFieldDefinition def : listFields()) {
+            if (isFundamentalsHeading(def.heading())) {
+                list.add(def);
+            }
+        }
+        list.sort(Comparator.comparingInt(EmployeeFieldDefinition::sortOrder));
+        return list;
     }
 
     public List<EmployeeFieldDefinition> listDocumentFields() {
@@ -280,7 +291,7 @@ public class EmployeeFieldDefinitionDao {
         for (EmployeeFieldDefinition definition : listFields()) {
             if (!definition.documentField()
                     && definition.detailField()
-                    && !EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING.equalsIgnoreCase(definition.heading())) {
+                    && !EmployeeBasicFieldUtil.isFundamentalsHeading(definition.heading())) {
                 headings.add(definition.heading());
             }
         }
@@ -351,6 +362,7 @@ public class EmployeeFieldDefinitionDao {
             cleanHeading = EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING;
         }
         String newColumn = toColumnName(cleanLabel);
+        boolean fundamentalsField = !current.documentField() && isFundamentalsHeading(cleanHeading);
         boolean effectiveDateField = !current.documentField() && dateField;
 
         try {
@@ -374,12 +386,12 @@ public class EmployeeFieldDefinitionDao {
                     cleanLabel,
                     cleanHeading,
                     current.documentField(),
-                    true,
-                    false,
-                    !current.documentField(),
+                    !current.documentField() && !fundamentalsField,
+                    current.documentField() || fundamentalsField,
+                    !current.documentField() && !fundamentalsField,
                     effectiveDateField,
                     current.sortOrder(),
-                    current.coreField(),
+                    fundamentalsField || current.coreField(),
                     current.dropdownField(),
                     current.variableOptionField(),
                     current.dropdownOptions()
@@ -490,6 +502,9 @@ public class EmployeeFieldDefinitionDao {
     public int renameHeading(String currentHeading, String newHeading) {
         String oldHeading = requireText(currentHeading, "Current category is required.");
         String cleanHeading = normalizeHeading(newHeading);
+        if (isFundamentalsHeading(cleanHeading)) {
+            cleanHeading = EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING;
+        }
 
         try (PreparedStatement ps = conn.prepareStatement("""
                 UPDATE employee_field_metadata
@@ -512,11 +527,17 @@ public class EmployeeFieldDefinitionDao {
         try (PreparedStatement ps = conn.prepareStatement("""
                 UPDATE employee_field_metadata
                 SET custom_field = 0, protected_field = 1, detail_field = 0, core_field = 1
-                WHERE document_field = 0 AND UPPER(heading) = UPPER(?)
-                """)) {
-            ps.setString(1, EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING);
+                WHERE document_field = 0
+                  AND %s
+                """.formatted(fundamentalsHeadingSqlCondition("heading")))) {
             ps.executeUpdate();
         }
+    }
+
+    private static String fundamentalsHeadingSqlCondition(String columnExpression) {
+        String keyExpression = "UPPER(REPLACE(REPLACE(REPLACE(TRIM(" + columnExpression
+                + "), ' ', ''), '-', ''), '_', ''))";
+        return keyExpression + " IN ('FUNDAMENTAL', 'FUNDAMENTALS')";
     }
 
     public int deleteHeading(String heading) {
@@ -691,6 +712,7 @@ public class EmployeeFieldDefinitionDao {
             insertMetadataReplace(systemDefinition(builtIn, existing, core, document, internal));
         }
         demoteNonCoreDetailMetadata();
+        promoteFundamentalsFields();
     }
 
     private EmployeeFieldDefinition customDetailDefinition(
@@ -699,6 +721,10 @@ public class EmployeeFieldDefinitionDao {
     ) {
         String label = existing == null || isBlank(existing.label()) ? builtIn.label() : existing.label();
         String heading = existing == null || isBlank(existing.heading()) ? builtIn.heading() : existing.heading();
+        if (isFundamentalsHeading(heading)) {
+            heading = EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING;
+        }
+        boolean fundamentalsField = isFundamentalsHeading(heading);
         boolean dateField = existing != null && existing.dateField();
         boolean dropdownField = existing != null && existing.dropdownField();
         boolean variableOptionField = dropdownField && existing != null && existing.variableOptionField();
@@ -709,12 +735,12 @@ public class EmployeeFieldDefinitionDao {
                 label,
                 heading,
                 false,
-                true,
-                false,
-                true,
+                !fundamentalsField,
+                fundamentalsField,
+                !fundamentalsField,
                 dateField,
                 builtIn.sortOrder(),
-                false,
+                fundamentalsField,
                 dropdownField,
                 variableOptionField,
                 dropdownOptions
@@ -731,6 +757,9 @@ public class EmployeeFieldDefinitionDao {
         String column = builtIn.columnName().toUpperCase(Locale.ROOT);
         String label = existing == null ? builtIn.label() : builtInLabel(existing, builtIn);
         String heading = existing == null ? builtIn.heading() : builtInHeading(existing, builtIn);
+        if (isFundamentalsHeading(heading)) {
+            heading = EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING;
+        }
         boolean defaultDateField = EmployeeBasicFieldUtil.DATE_COLUMNS.contains(column);
         boolean defaultDropdownField = isDefaultDropdownColumn(column);
         String defaultOptions = defaultDropdownOptions(column);
@@ -1073,7 +1102,7 @@ public class EmployeeFieldDefinitionDao {
     }
 
     private static boolean isFundamentalsHeading(String heading) {
-        return EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING.equalsIgnoreCase(normalizeHeading(heading));
+        return EmployeeBasicFieldUtil.isFundamentalsHeading(normalizeHeading(heading));
     }
 
     private static String normalizeOptions(String options) {

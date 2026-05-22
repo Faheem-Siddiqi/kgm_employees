@@ -4,9 +4,11 @@ import com.kgm.config.DatabaseConnection;
 import com.kgm.model.Employee;
 import com.kgm.util.EmployeeDocumentUtil;
 import java.sql.*;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class EmployeeRecordDao {
     private final Connection con;
@@ -49,6 +51,8 @@ public class EmployeeRecordDao {
                         PERSONAL_EMAIL,
                         DEPARTMENT,
                         DESIGNATION,
+                        SECTION,
+                        GRADE,
                         GENDER,
                         RESIGN_REASON,
                         JOINING_DATE,
@@ -74,6 +78,8 @@ public class EmployeeRecordDao {
                 e.setPERSONAL_EMAIL(safe(rs.getString("PERSONAL_EMAIL")));
                 e.setDEPARTMENT(safe(rs.getString("DEPARTMENT")));
                 e.setDESIGNATION(safe(rs.getString("DESIGNATION")));
+                e.setSECTION(safe(rs.getString("SECTION")));
+                e.setGRADE(safe(rs.getString("GRADE")));
                 e.setGENDER(safe(rs.getString("GENDER")));
                 e.setRESIGN_REASON(safe(rs.getString("RESIGN_REASON")));
                 e.setJOINING_DATE(safe(rs.getString("JOINING_DATE")));
@@ -121,6 +127,8 @@ public class EmployeeRecordDao {
                         PERSONAL_EMAIL,
                         DEPARTMENT,
                         DESIGNATION,
+                        SECTION,
+                        GRADE,
                         GENDER,
                         RESIGN_REASON,
                         JOINING_DATE,
@@ -145,6 +153,8 @@ public class EmployeeRecordDao {
                 e.setPERSONAL_EMAIL(safe(rs.getString("PERSONAL_EMAIL")));
                 e.setDEPARTMENT(rs.getString("DEPARTMENT"));
                 e.setDESIGNATION(safe(rs.getString("DESIGNATION")));
+                e.setSECTION(safe(rs.getString("SECTION")));
+                e.setGRADE(safe(rs.getString("GRADE")));
                 e.setGENDER(safe(rs.getString("GENDER")));
                 e.setRESIGN_REASON(safe(rs.getString("RESIGN_REASON")));
                 e.setJOINING_DATE(safe(rs.getString("JOINING_DATE")));
@@ -192,6 +202,7 @@ public class EmployeeRecordDao {
                 e.setDEPARTMENT(safe(rs.getString("DEPARTMENT")));
                 e.setDESIG_CODE(safe(rs.getString("DESIG_CODE")));
                 e.setDESIGNATION(safe(rs.getString("DESIGNATION")));
+                e.setSECTION(safe(rs.getString("SECTION")));
                 e.setGRADE(safe(rs.getString("GRADE")));
                 e.setJOINING_DATE(safe(rs.getString("JOINING_DATE")));
                 e.setCONFIRMING_ON(safe(rs.getString("CONFIRMING_ON")));
@@ -323,6 +334,7 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
 
     StringBuilder sql = new StringBuilder("UPDATE employees SET ");
     List<Object> values = new ArrayList<>();
+    Set<String> writtenColumns = new HashSet<>();
 
     // 🔥 reflect all fields of Employee class
     java.lang.reflect.Field[] fields = Employee.class.getDeclaredFields();
@@ -341,8 +353,7 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
 
         Object value = field.get(emp);
         if (isWritableValue(value)) {
-            sql.append(quoteIdentifier(column)).append(" = ?, ");
-            values.add(value.toString().trim());
+            addUpdateValue(sql, values, writtenColumns, column, value.toString().trim());
         }
     }
 
@@ -354,8 +365,7 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
 
         String value = dynamicField.getValue();
         if (isWritableValue(value)) {
-            sql.append(quoteIdentifier(column)).append(" = ?, ");
-            values.add(value.trim());
+            addUpdateValue(sql, values, writtenColumns, column, value.trim());
         }
     }
 
@@ -381,6 +391,22 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
 
     private String quoteIdentifier(String identifier) {
         return "`" + identifier.replace("`", "``") + "`";
+    }
+
+    private void addUpdateValue(
+            StringBuilder sql,
+            List<Object> values,
+            Set<String> writtenColumns,
+            String column,
+            String value
+    ) {
+        String normalizedColumn = column == null ? "" : column.trim().toUpperCase();
+        if (normalizedColumn.isEmpty() || writtenColumns.contains(normalizedColumn)) {
+            return;
+        }
+        writtenColumns.add(normalizedColumn);
+        sql.append(quoteIdentifier(normalizedColumn)).append(" = ?, ");
+        values.add(value);
     }
 
     private void loadDynamicFields(Employee employee, ResultSet rs) throws SQLException {

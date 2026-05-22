@@ -1,5 +1,7 @@
 package com.kgm.ui.styling;
 
+import com.kgm.ui.component.DropdownFieldSupport;
+
 import javax.swing.*;
 import javax.swing.border.AbstractBorder;
 import javax.swing.border.CompoundBorder;
@@ -232,8 +234,15 @@ public Insets getBorderInsets(Component c) {
         comboBox.setBorder(fieldBorder());
         comboBox.setBackground(PAGE_BACKGROUND);
         comboBox.setOpaque(true);
-        comboBox.setFocusable(false);
-        comboBox.setRequestFocusEnabled(false);
+        comboBox.setFocusable(comboBox.isEditable());
+        comboBox.setRequestFocusEnabled(comboBox.isEditable());
+        if (comboBox.isEditable()
+                && comboBox.getEditor().getEditorComponent() instanceof JComponent editor) {
+            editor.setFocusable(true);
+            editor.setRequestFocusEnabled(true);
+            editor.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 0));
+            editor.setBackground(PAGE_BACKGROUND);
+        }
         comboBox.setRenderer(new DefaultListCellRenderer() {
             public Component getListCellRendererComponent(
                     JList<?> list,
@@ -255,6 +264,14 @@ public Insets getBorderInsets(Component c) {
                 return label;
             }
         });
+        if (comboBox.isEditable()) {
+            installEditableDropdownSupport(comboBox);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void installEditableDropdownSupport(JComboBox<?> comboBox) {
+        DropdownFieldSupport.configure((JComboBox<String>) comboBox, true);
     }
 
 }

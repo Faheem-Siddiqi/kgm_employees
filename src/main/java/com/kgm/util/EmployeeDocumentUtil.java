@@ -70,7 +70,7 @@ public final class EmployeeDocumentUtil {
         try {
             Map<String, EmployeeFieldDefinition> metadata = new LinkedHashMap<>();
             for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao().listFields()) {
-                if (definition.documentField()) {
+                if (definition.documentField() && !isProfileImageColumn(definition.columnName())) {
                     metadata.put(definition.columnName().toUpperCase(Locale.ROOT), definition);
                 }
             }
@@ -154,6 +154,10 @@ public final class EmployeeDocumentUtil {
             }
         }
         return false;
+    }
+
+    private static boolean isProfileImageColumn(String columnName) {
+        return "EMP_IMG".equalsIgnoreCase(columnName);
     }
 
     public static boolean hasStoredPath(String value) {

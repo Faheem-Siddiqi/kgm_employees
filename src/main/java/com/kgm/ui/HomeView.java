@@ -1,6 +1,7 @@
 package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRecordDao;
+import com.kgm.service.ExcelExportService;
 import com.kgm.service.ExcelImportService;
 import com.kgm.service.ExcelSampleGenerator;
 import com.kgm.ui.panel.EmployeeTablePanel;
@@ -21,6 +22,7 @@ import java.util.concurrent.ExecutionException;
 
 public class HomeView extends JFrame {
     private final ExcelImportService excelImportService = new ExcelImportService();
+    private final ExcelExportService excelExportService = new ExcelExportService();
     private EmployeeTablePanel tablePanel;
     private ExcelImportButton excelBtn;
 
@@ -133,15 +135,18 @@ public class HomeView extends JFrame {
     private void showExcelImportActions() {
         int selected = DialogHelper.option(
                 this,
-                "Excel Import",
-                "Choose an Excel action.\n\nThe sample is rebuilt from current Field Management settings each time. Document fields are not imported.",
+                "Excel",
+                "Choose an Excel action.\n\nThe sample and export are rebuilt from current database fields. Document upload fields are not exported as dynamic columns.",
                 "Import Excel",
-                "Download Sample"
+                "Download Sample",
+                "Export Excel"
         );
         if (selected == 0) {
             chooseExcelImportFile();
         } else if (selected == 1) {
             downloadSampleExcel();
+        } else if (selected == 2) {
+            exportEmployeeExcel();
         }
     }
 
@@ -267,6 +272,52 @@ public class HomeView extends JFrame {
         } catch (RuntimeException exception) {
             DialogHelper.error(this, "Sample not saved", exception.getMessage());
         }
+    }
+
+    private void exportEmployeeExcel() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Save Employee Excel Export");
+        chooser.setSelectedFile(new File("employee_export.xlsx"));
+        chooser.setFileFilter(new FileNameExtensionFilter("Excel workbook (*.xlsx)", "xlsx"));
+        chooser.setAcceptAllFileFilterUsed(false);
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File target = xlsxFile(chooser.getSelectedFile());
+        setExcelButtonBusy("Exporting...");
+        SwingWorker<ExcelExportService.ExportResult, Void> worker = new SwingWorker<>() {
+            protected ExcelExportService.ExportResult doInBackground() throws Exception {
+                return excelExportService.exportEmployees(target);
+            }
+
+            protected void done() {
+                setExcelButtonReady();
+                try {
+                    ExcelExportService.ExportResult result = get();
+                    showDownloadedFileSuccess(
+                            target,
+                            "Employee Export Ready",
+                            "Employee Excel export saved:\n" + target.getAbsolutePath()
+                                    + "\n\nEmployees: " + result.employeeCount()
+                                    + "\nColumns: " + result.columnCount()
+                                    + "\nDynamic columns highlighted: " + result.dynamicColumnCount()
+                    );
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    DialogHelper.error(HomeView.this, "Excel export stopped", "Export was interrupted.");
+                } catch (ExecutionException exception) {
+                    Throwable cause = exception.getCause();
+                    String detail = cause == null ? exception.getMessage() : cause.getMessage();
+                    DialogHelper.error(
+                            HomeView.this,
+                            "Export not saved",
+                            friendlyExportSaveFailure(target, detail)
+                    );
+                }
+            }
+        };
+        worker.execute();
     }
 
     private void showUnsupportedImportFileDialog() {
@@ -410,6 +461,18 @@ public class HomeView extends JFrame {
         return "The sample file could not be saved:\n" + target.getAbsolutePath() + "\n\nDetails: " + detail;
     }
 
+    private String friendlyExportSaveFailure(File target, String detail) {
+        String cleanDetail = detail == null ? "" : detail.trim();
+        if (cleanDetail.toLowerCase().contains("open or locked")
+                || cleanDetail.toLowerCase().contains("being used by another process")
+                || cleanDetail.toLowerCase().contains("process cannot access")
+                || cleanDetail.toLowerCase().contains("denied")) {
+            return "The export file could not be replaced because it is open or locked.\nClose the existing file, then export again.";
+        }
+        return "The export file could not be saved:\n" + target.getAbsolutePath()
+                + (cleanDetail.isBlank() ? "" : "\n\nDetails: " + cleanDetail);
+    }
+
     private File xlsxFile(File file) {
         String path = file.getAbsolutePath();
         return path.toLowerCase().endsWith(".xlsx") ? file : new File(path + ".xlsx");
@@ -420,12 +483,29 @@ public class HomeView extends JFrame {
     }
 
     private void setImportButtonEnabled(boolean enabled) {
+        if (enabled) {
+            setExcelButtonReady();
+        } else {
+            setExcelButtonBusy("Importing...");
+        }
+    }
+
+    private void setExcelButtonBusy(String text) {
         if (excelBtn == null) {
             return;
         }
-        excelBtn.setEnabled(enabled);
-        excelBtn.setText(enabled ? "Import Excel" : "Importing...");
-        excelBtn.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
+        excelBtn.setEnabled(false);
+        excelBtn.setText(text);
+        excelBtn.setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+    }
+
+    private void setExcelButtonReady() {
+        if (excelBtn == null) {
+            return;
+        }
+        excelBtn.setEnabled(true);
+        excelBtn.setText("Import Excel");
+        excelBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 }
 

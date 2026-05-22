@@ -1,6 +1,7 @@
 package com.kgm.dao;
 
 import com.kgm.model.Employee;
+import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.EmployeeDocumentUtil;
 
 import java.lang.reflect.Field;
@@ -45,10 +46,7 @@ public class EmployeeRegistrationDao {
     public void insertEmployee(Employee employee, List<String> extraColumns) {
         List<String> columns = insertColumns();
         for (String column : extraColumns) {
-            if (column == null || column.isBlank() || containsColumn(columns, column)) {
-                continue;
-            }
-            columns.add(column.trim().toUpperCase());
+            addColumn(columns, column);
         }
         String sql = "INSERT INTO employees (" + quotedColumns(columns) + ") VALUES (" + placeholders(columns.size()) + ")";
 
@@ -64,12 +62,25 @@ public class EmployeeRegistrationDao {
     }
 
     private List<String> insertColumns() {
-        List<String> columns = new ArrayList<>(BASE_INSERT_COLUMNS);
-        for (EmployeeDocumentUtil.DocumentType documentType : EmployeeDocumentUtil.documentTypes()) {
-            columns.add(documentType.employeeFieldName());
+        List<String> columns = new ArrayList<>();
+        for (String column : BASE_INSERT_COLUMNS) {
+            addColumn(columns, column);
         }
-        columns.add("EMP_IMG");
+        for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao(conn).listFundamentalsFields()) {
+            addColumn(columns, definition.columnName());
+        }
+        for (EmployeeDocumentUtil.DocumentType documentType : EmployeeDocumentUtil.documentTypes()) {
+            addColumn(columns, documentType.employeeFieldName());
+        }
+        addColumn(columns, "EMP_IMG");
         return columns;
+    }
+
+    private void addColumn(List<String> columns, String column) {
+        if (column == null || column.isBlank() || containsColumn(columns, column)) {
+            return;
+        }
+        columns.add(column.trim().toUpperCase());
     }
 
     private boolean containsColumn(List<String> columns, String column) {

@@ -24,6 +24,7 @@ public class Employee {
     private String DEPARTMENT;
     private String DESIG_CODE;
     private String DESIGNATION;
+    private String SECTION;
     private String GRADE;
     private String JOINING_DATE;
     private String CONFIRMING_ON;
@@ -190,6 +191,12 @@ public class Employee {
     }
     public void setDESIGNATION(String DESIGNATION) {
         this.DESIGNATION = DESIGNATION;
+    }
+    public String getSECTION() {
+        return SECTION;
+    }
+    public void setSECTION(String SECTION) {
+        this.SECTION = SECTION;
     }
     public String getJOINING_DATE() {
         return JOINING_DATE;
