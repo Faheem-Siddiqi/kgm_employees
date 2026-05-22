@@ -35,6 +35,7 @@ public class DatabaseInitializer {
                 DEPARTMENT TEXT,
                 DESIG_CODE TEXT,
                 DESIGNATION TEXT,
+                SECTION TEXT,
                 GRADE TEXT,
                 JOINING_DATE TEXT,
                 CONFIRMING_ON TEXT,
@@ -192,6 +193,7 @@ public class DatabaseInitializer {
 
             boolean exists = tableExists(conn);
             stmt.execute(EMPLOYEES_TABLE);
+            ensureCoreColumns(conn);
             ensureDocumentColumns(conn);
             migrateLegacyDocumentColumns(conn);
             EmployeeFieldDefinitionDao fieldDefinitionDao = new EmployeeFieldDefinitionDao(conn);
@@ -231,6 +233,22 @@ public class DatabaseInitializer {
                     stmt.execute("ALTER TABLE employees ADD COLUMN " + quoteIdentifier(column) + " TEXT");
                 }
             }
+        }
+    }
+
+    private static void ensureCoreColumns(Connection conn) throws SQLException {
+        ensureColumn(conn, "SECTION");
+        ensureColumn(conn, "DOB");
+        ensureColumn(conn, "GRADE");
+        ensureColumn(conn, "SHIFT");
+    }
+
+    private static void ensureColumn(Connection conn, String column) throws SQLException {
+        if (columnExists(conn, column)) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE employees ADD COLUMN " + quoteIdentifier(column) + " TEXT");
         }
     }
 

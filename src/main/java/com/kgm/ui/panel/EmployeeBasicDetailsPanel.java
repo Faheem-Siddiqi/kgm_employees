@@ -1,9 +1,12 @@
 package com.kgm.ui.panel;
 
 import com.kgm.model.Employee;
+import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.ui.component.DropdownFieldSupport;
 import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeBasicDetailsPanelHelper;
+import com.kgm.util.EmployeeBasicFieldUtil;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -13,34 +16,21 @@ import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public class EmployeeBasicDetailsPanel extends JPanel {
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+
+    private final List<EmployeeFieldDefinition> definitions = EmployeeBasicFieldUtil.loadBasicDefinitions();
+    private final Map<String, JComponent> inputsByColumn = new LinkedHashMap<>();
 
     private JLabel photoPreview;
     private JLabel uploadLabel;
     private JLabel infoLabel;
     private File selectedImage;
     private Employee employee;
-
-    private JTextField empIdField;
-    private JTextField nameField;
-    private JTextField fatherNameField;
-    private JTextField cnicField;
-    private JTextField phoneField;
-    private JTextField emailField;
-    private JTextField departmentField;
-    private JTextField designationField;
-    private JComboBox<String> genderCombo;
-    private JComboBox<String> reasonCombo;
-    private boolean genderChanged;
-    private boolean reasonChanged;
-    private UniversalDatePicker appointmentPicker;
-    private UniversalDatePicker leavingPicker;
-    private boolean appointmentDateChanged;
-    private boolean leavingDateChanged;
-    private JTextArea addressArea;
-    private JTextArea currentAddressArea;
 
     public EmployeeBasicDetailsPanel() {
         EmployeeBasicDetailsPanelHelper.stylePanel(this);
@@ -53,17 +43,146 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         loadEmployeeData();
     }
 
-    private boolean isEmpty(String value) {
-        if (value == null) {
-            return true;
+    private JPanel buildForm() {
+        JPanel root = EmployeeBasicDetailsPanelHelper.createFormRoot();
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weightx = 1.0;
+
+        gbc.gridy = 0;
+        gbc.gridx = 0;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.NORTH;
+        root.add(buildLeftPanel(), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        root.add(buildRightForm(), gbc);
+        return root;
+    }
+
+    private JPanel buildLeftPanel() {
+        JPanel left = EmployeeBasicDetailsPanelHelper.createPhotoPanel();
+        photoPreview = EmployeeBasicDetailsPanelHelper.createPhotoPreview("Photo");
+        photoPreview.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                if (selectedImageCanChange()) {
+                    chooseImage(photoPreview);
+                }
+            }
+        });
+
+        uploadLabel = new JLabel("Upload");
+        EmployeeBasicDetailsPanelHelper.styleUploadLabel(uploadLabel);
+        uploadLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                if (selectedImageCanChange()) {
+                    chooseImage(photoPreview);
+                }
+            }
+        });
+
+        JPanel bottom = EmployeeBasicDetailsPanelHelper.createPhotoInfoPanel();
+        infoLabel = EmployeeBasicDetailsPanelHelper.createPhotoInfoLabel("JPEG only - Max 400KB");
+        bottom.add(infoLabel);
+        bottom.add(Box.createVerticalStrut(5));
+        bottom.add(uploadLabel);
+
+        left.add(photoPreview, BorderLayout.CENTER);
+        left.add(bottom, BorderLayout.SOUTH);
+        return left;
+    }
+
+    private JPanel buildRightForm() {
+        JPanel panel = EmployeeBasicDetailsPanelHelper.createRightFormPanel();
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
+
+        int row = 0;
+        for (int index = 0; index < definitions.size(); index += 2) {
+            EmployeeFieldDefinition first = definitions.get(index);
+            if (EmployeeBasicFieldUtil.isMultilineField(first.columnName())) {
+                addFullWidthField(panel, gbc, row++, first);
+                continue;
+            }
+
+            EmployeeFieldDefinition second = index + 1 < definitions.size() ? definitions.get(index + 1) : null;
+            if (second != null && EmployeeBasicFieldUtil.isMultilineField(second.columnName())) {
+                addSingleField(panel, gbc, row++, first);
+                addFullWidthField(panel, gbc, row++, second);
+                continue;
+            }
+            addRow(panel, gbc, row++, first, second);
+        }
+        return panel;
+    }
+
+    private void addRow(JPanel panel, GridBagConstraints gbc, int y,
+                        EmployeeFieldDefinition first,
+                        EmployeeFieldDefinition second) {
+        gbc.gridy = y;
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        panel.add(new FormField(first.label(), inputFor(first)), gbc);
+
+        gbc.gridx = 1;
+        if (second == null) {
+            panel.add(Box.createHorizontalStrut(1), gbc);
+        } else {
+            panel.add(new FormField(second.label(), inputFor(second)), gbc);
+        }
+    }
+
+    private void addSingleField(JPanel panel, GridBagConstraints gbc, int y, EmployeeFieldDefinition definition) {
+        gbc.gridy = y;
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        panel.add(new FormField(definition.label(), inputFor(definition)), gbc);
+        gbc.gridx = 1;
+        panel.add(Box.createHorizontalStrut(1), gbc);
+    }
+
+    private void addFullWidthField(JPanel panel, GridBagConstraints gbc, int y, EmployeeFieldDefinition definition) {
+        gbc.gridy = y;
+        gbc.gridx = 0;
+        gbc.gridwidth = 2;
+        panel.add(new FormField(definition.label(), inputFor(definition)), gbc);
+        gbc.gridwidth = 1;
+    }
+
+    private JComponent inputFor(EmployeeFieldDefinition definition) {
+        String column = definition.columnName();
+        JComponent input;
+        if (EmployeeBasicFieldUtil.isDateField(definition)) {
+            input = new UniversalDatePicker();
+        } else if (EmployeeBasicFieldUtil.isDropdownField(definition)) {
+            JComboBox<String> combo = new JComboBox<>(EmployeeBasicFieldUtil.dropdownOptions(definition, true));
+            DropdownFieldSupport.configure(combo, definition.variableOptionField());
+            input = combo;
+        } else if (EmployeeBasicFieldUtil.isMultilineField(column)) {
+            JTextArea area = new JTextArea(4, 20);
+            area.setLineWrap(true);
+            area.setWrapStyleWord(true);
+            EmployeeBasicDetailsPanelHelper.styleTextArea(area);
+            input = EmployeeBasicDetailsPanelHelper.createTextAreaScrollPane(area);
+        } else {
+            input = new JTextField();
         }
 
-        String trimmed = value.trim();
-        return trimmed.isEmpty()
-                || trimmed.equalsIgnoreCase("N/A")
-                || trimmed.equalsIgnoreCase("NA")
-                || trimmed.equalsIgnoreCase("NULL")
-                || trimmed.equals("-");
+        if ("EMPLOYEE_CODE".equalsIgnoreCase(column)) {
+            input.setEnabled(false);
+            if (input instanceof JTextField textField) {
+                textField.setEditable(false);
+            }
+        }
+        EmployeeBasicDetailsPanelHelper.styleInput(input);
+        inputsByColumn.put(column, input);
+        return input;
     }
 
     private void loadEmployeeData() {
@@ -71,47 +190,31 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             return;
         }
 
-        empIdField.setText(employee.getEMPLOYEE_CODE());
-        empIdField.setEditable(false);
-
-        nameField.setText(employee.getEMP_NAME());
-        fatherNameField.setText(employee.getFATHER_NAME());
-        cnicField.setText(employee.getNID());
-        phoneField.setText(employee.getEMP_CONTNO());
-        emailField.setText(employee.getPERSONAL_EMAIL());
-        departmentField.setText(employee.getDEPARTMENT());
-        designationField.setText(employee.getDESIGNATION());
-
-        if (!isEmpty(employee.getGENDER())) {
-            genderCombo.setSelectedItem(employee.getGENDER());
-        } else {
-            genderCombo.setSelectedIndex(0);
+        for (EmployeeFieldDefinition definition : definitions) {
+            setValue(definition.columnName(), EmployeeBasicFieldUtil.valueFor(employee, definition.columnName()));
         }
-        if (!isEmpty(employee.getRESIGN_REASON())) {
-            reasonCombo.setSelectedItem(employee.getRESIGN_REASON());
-        } else {
-            reasonCombo.setSelectedIndex(0);
-        }
-        genderChanged = false;
-        reasonChanged = false;
-
-        setDateIfPresent(appointmentPicker, employee.getJOINING_DATE());
-        setDateIfPresent(leavingPicker, employee.getRESIGN_DATE());
-        appointmentDateChanged = false;
-        leavingDateChanged = false;
-
-        addressArea.setText(employee.getPERMANENT_ADR());
-        currentAddressArea.setText(employee.getCURRENT_ADR());
-
         loadProfileImage();
     }
 
-    private void setDateIfPresent(UniversalDatePicker picker, String value) {
-        Date parsed = parseDate(value);
-        if (parsed != null) {
-            picker.setDate(parsed);
+    private void setValue(String column, String value) {
+        JComponent input = inputsByColumn.get(column);
+        if (input instanceof UniversalDatePicker picker) {
+            Date parsed = parseDate(value);
+            if (parsed != null) {
+                picker.setDate(parsed);
+            }
+        } else if (input instanceof JComboBox<?> combo) {
+            if (value != null && !value.trim().isEmpty()) {
+                setComboValue(combo, value);
+            } else if (combo.getItemCount() > 0) {
+                combo.setSelectedIndex(0);
+            }
+        } else if (input instanceof JScrollPane scrollPane
+                && scrollPane.getViewport().getView() instanceof JTextArea area) {
+            area.setText(displayValue(value));
+        } else if (input instanceof JTextField textField) {
+            textField.setText(displayValue(value));
         }
-        picker.setEnabled(true);
     }
 
     private Date parseDate(String value) {
@@ -119,10 +222,12 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             return null;
         }
 
-        String[] patterns = {"yyyy-MM-dd", "dd-MM-yyyy HH:mm", "dd-MM-yyyy", "yyyy/MM/dd"};
+        String[] patterns = {"yyyy-MM-dd", "dd-MM-yyyy HH:mm", "dd-MM-yyyy", "yyyy/MM/dd", "dd/MM/yyyy"};
         for (String pattern : patterns) {
             try {
-                return new SimpleDateFormat(pattern).parse(value.trim());
+                SimpleDateFormat format = new SimpleDateFormat(pattern);
+                format.setLenient(false);
+                return format.parse(value.trim());
             } catch (ParseException ignored) {
             }
         }
@@ -180,212 +285,126 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         return new File(System.getProperty("user.dir"), imagePath);
     }
 
-    private JPanel buildForm() {
-        JPanel root = EmployeeBasicDetailsPanelHelper.createFormRoot();
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
-        gbc.fill = GridBagConstraints.BOTH;
-        gbc.weightx = 1.0;
-        gbc.gridy = 0;
-        gbc.gridx = 0;
-        gbc.weightx = 0;
-        gbc.fill = GridBagConstraints.NONE;
-        gbc.anchor = GridBagConstraints.NORTH;
-        root.add(buildLeftPanel(), gbc);
-        gbc.gridx = 1;
-        gbc.weightx = 1.0;
-        gbc.fill = GridBagConstraints.BOTH;
-        root.add(buildRightForm(), gbc);
-        return root;
-    }
-
-    private JPanel buildLeftPanel() {
-        JPanel left = EmployeeBasicDetailsPanelHelper.createPhotoPanel();
-        photoPreview = EmployeeBasicDetailsPanelHelper.createPhotoPreview("Photo");
-        photoPreview.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                if (selectedImageCanChange()) {
-                    chooseImage(photoPreview);
-                }
-            }
-        });
-
-        uploadLabel = new JLabel("Upload");
-        EmployeeBasicDetailsPanelHelper.styleUploadLabel(uploadLabel);
-        uploadLabel.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                if (selectedImageCanChange()) {
-                    chooseImage(photoPreview);
-                }
-            }
-        });
-
-        JPanel bottom = EmployeeBasicDetailsPanelHelper.createPhotoInfoPanel();
-        infoLabel = EmployeeBasicDetailsPanelHelper.createPhotoInfoLabel("JPEG only - Max 400KB");
-        bottom.add(infoLabel);
-        bottom.add(Box.createVerticalStrut(5));
-        bottom.add(uploadLabel);
-        left.add(photoPreview, BorderLayout.CENTER);
-        left.add(bottom, BorderLayout.SOUTH);
-        return left;
-    }
-
-    private JPanel buildRightForm() {
-        JPanel panel = EmployeeBasicDetailsPanelHelper.createRightFormPanel();
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1.0;
-        int y = 0;
-
-        empIdField = new JTextField();
-        nameField = new JTextField();
-        addRow(panel, gbc, y++, "Employee ID", empIdField, "Name", nameField);
-
-        fatherNameField = new JTextField();
-        cnicField = new JTextField();
-        addRow(panel, gbc, y++, "Father Name", fatherNameField, "CNIC", cnicField);
-
-        phoneField = new JTextField();
-        emailField = new JTextField();
-        addRow(panel, gbc, y++, "Phone", phoneField, "Email", emailField);
-
-        departmentField = new JTextField();
-        designationField = new JTextField();
-        addRow(panel, gbc, y++, "Department", departmentField, "Designation", designationField);
-
-        genderCombo = new JComboBox<>(new String[] {"", "Male", "Female", "Other"});
-        reasonCombo = new JComboBox<>(new String[] {"", "Layoff", "Retirement", "Others"});
-        genderCombo.addActionListener(e -> genderChanged = true);
-        reasonCombo.addActionListener(e -> reasonChanged = true);
-        addRow(panel, gbc, y++, "Gender", genderCombo, "Reason", reasonCombo);
-
-        appointmentPicker = new UniversalDatePicker();
-        leavingPicker = new UniversalDatePicker();
-        appointmentPicker.addDateChangeListener(() -> appointmentDateChanged = true);
-        leavingPicker.addDateChangeListener(() -> leavingDateChanged = true);
-        addRow(panel, gbc, y++, "Appointment Date", appointmentPicker, "Leaving Date", leavingPicker);
-
-        addressArea = new JTextArea(4, 20);
-        addressArea.setLineWrap(true);
-        addressArea.setWrapStyleWord(true);
-        EmployeeBasicDetailsPanelHelper.styleTextArea(addressArea);
-        JScrollPane permanentAddressScroll = EmployeeBasicDetailsPanelHelper.createTextAreaScrollPane(addressArea);
-
-        currentAddressArea = new JTextArea(4, 20);
-        currentAddressArea.setLineWrap(true);
-        currentAddressArea.setWrapStyleWord(true);
-        EmployeeBasicDetailsPanelHelper.styleTextArea(currentAddressArea);
-        JScrollPane currentAddressScroll = EmployeeBasicDetailsPanelHelper.createTextAreaScrollPane(currentAddressArea);
-
-        addRow(panel, gbc, y++, "Permanent Address", permanentAddressScroll, "Current Address", currentAddressScroll);
-        return panel;
-    }
-
-    private void addRow(JPanel panel, GridBagConstraints gbc, int y,
-                        String l1, JComponent c1,
-                        String l2, JComponent c2) {
-        gbc.gridy = y;
-        gbc.gridx = 0;
-        panel.add(new FormField(l1, c1), gbc);
-        gbc.gridx = 1;
-        panel.add(new FormField(l2, c2), gbc);
-    }
-
     private void chooseImage(JLabel target) {
-        JFileChooser fc = new JFileChooser();
-        javax.swing.filechooser.FileNameExtensionFilter filter = new javax.swing.filechooser.FileNameExtensionFilter(
-                "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg");
-        fc.setFileFilter(filter);
-        fc.setAcceptAllFileFilterUsed(false);
-        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            File file = fc.getSelectedFile();
-            if (file.length() > 400 * 1024) {
-                DialogHelper.warning(this, "File Too Large", "Max 400KB allowed.");
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg"));
+        chooser.setAcceptAllFileFilterUsed(false);
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File file = chooser.getSelectedFile();
+        if (file.length() > 400 * 1024) {
+            DialogHelper.warning(this, "File Too Large", "Max 400KB allowed.");
+            return;
+        }
+        try {
+            BufferedImage img = ImageIO.read(file);
+            if (img == null) {
+                DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
                 return;
             }
-            try {
-                BufferedImage img = ImageIO.read(file);
-                if (img == null) {
-                    DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
-                    return;
-                }
-                selectedImage = file;
-                Image scaled = img.getScaledInstance(
-                        EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
-                        EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
-                        Image.SCALE_SMOOTH);
-                target.setIcon(new ImageIcon(scaled));
-                target.setText("");
-                uploadLabel.setText("Replace before saving");
-            } catch (Exception e) {
-                DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
-            }
-        }
-    }
-
-    class FormField extends JPanel {
-        JLabel label;
-        JComponent input;
-
-        public FormField(String text, JComponent comp) {
-            EmployeeBasicDetailsPanelHelper.styleFormField(this);
-            label = EmployeeBasicDetailsPanelHelper.createFieldLabel(text);
-            input = comp;
-            EmployeeBasicDetailsPanelHelper.styleInput(input);
-            add(label, BorderLayout.NORTH);
-            add(input, BorderLayout.CENTER);
+            selectedImage = file;
+            Image scaled = img.getScaledInstance(
+                    EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
+                    EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
+                    Image.SCALE_SMOOTH);
+            target.setIcon(new ImageIcon(scaled));
+            target.setText("");
+            uploadLabel.setText("Replace before saving");
+        } catch (Exception e) {
+            DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
         }
     }
 
     public Employee getEmployeeFromForm() {
-        Employee e = new Employee();
+        Employee updated = new Employee();
+        for (EmployeeFieldDefinition definition : definitions) {
+            String column = definition.columnName();
+            if ("EMPLOYEE_CODE".equalsIgnoreCase(column)) {
+                continue;
+            }
+            String value = valueFor(column);
+            if (isEmpty(value)) {
+                continue;
+            }
+            if ("NID".equalsIgnoreCase(column)) {
+                value = value.replaceAll("\\D", "");
+            }
+            EmployeeBasicFieldUtil.writeValue(updated, column, value);
+        }
+        return updated;
+    }
 
-        if (!isEmpty(nameField.getText())) {
-            e.setEMP_NAME(nameField.getText());
+    public String validationMessage() {
+        String cnic = valueFor("NID").replaceAll("\\D", "");
+        if (!cnic.isEmpty() && cnic.length() != 13) {
+            return "CNIC must contain exactly 13 digits.";
         }
-        if (!isEmpty(fatherNameField.getText())) {
-            e.setFATHER_NAME(fatherNameField.getText());
+
+        Date joining = dateFor("JOINING_DATE");
+        Date resignation = dateFor("RESIGN_DATE");
+        if (joining != null && resignation != null && !joining.before(resignation)) {
+            return "Date of Joining must be before Date of Resignation.";
         }
-        if (!isEmpty(cnicField.getText())) {
-            e.setNID(cnicField.getText());
+        return null;
+    }
+
+    private String valueFor(String column) {
+        JComponent input = inputsByColumn.get(column);
+        if (input instanceof UniversalDatePicker picker) {
+            Date date = picker.getDate();
+            return date == null ? "" : DB_DATE_FORMAT.format(date);
         }
-        if (!isEmpty(phoneField.getText())) {
-            e.setEMP_CONTNO(phoneField.getText());
+        if (input instanceof JComboBox<?> combo) {
+            return DropdownFieldSupport.value(combo);
         }
-        if (!isEmpty(emailField.getText())) {
-            e.setPERSONAL_EMAIL(emailField.getText());
+        if (input instanceof JScrollPane scrollPane
+                && scrollPane.getViewport().getView() instanceof JTextArea area) {
+            return area.getText().trim();
         }
-        if (!isEmpty(departmentField.getText())) {
-            e.setDEPARTMENT(departmentField.getText());
+        if (input instanceof JTextField textField) {
+            return textField.getText().trim();
         }
-        if (!isEmpty(designationField.getText())) {
-            e.setDESIGNATION(designationField.getText());
+        return "";
+    }
+
+    private Date dateFor(String column) {
+        JComponent input = inputsByColumn.get(column);
+        return input instanceof UniversalDatePicker picker ? picker.getDate() : null;
+    }
+
+    private boolean isEmpty(String value) {
+        if (value == null) {
+            return true;
         }
-        if (genderChanged && genderCombo.getSelectedItem() != null
-                && !isEmpty(genderCombo.getSelectedItem().toString())) {
-            e.setGENDER(genderCombo.getSelectedItem().toString());
-        }
-        if (reasonChanged && reasonCombo.getSelectedItem() != null
-                && !isEmpty(reasonCombo.getSelectedItem().toString())) {
-            e.setRESIGN_REASON(reasonCombo.getSelectedItem().toString());
-        }
-        if (appointmentDateChanged && appointmentPicker.getDate() != null) {
-            e.setJOINING_DATE(DB_DATE_FORMAT.format(appointmentPicker.getDate()));
-        }
-        if (leavingDateChanged && leavingPicker.getDate() != null) {
-            e.setRESIGN_DATE(DB_DATE_FORMAT.format(leavingPicker.getDate()));
-        }
-        if (!isEmpty(addressArea.getText())) {
-            e.setPERMANENT_ADR(addressArea.getText());
-        }
-        if (!isEmpty(currentAddressArea.getText())) {
-            e.setCURRENT_ADR(currentAddressArea.getText());
-        }
-        return e;
+        String trimmed = value.trim();
+        return trimmed.isEmpty()
+                || trimmed.equalsIgnoreCase("N/A")
+                || trimmed.equalsIgnoreCase("NA")
+                || trimmed.equalsIgnoreCase("NULL")
+                || trimmed.equals("-");
+    }
+
+    private String displayValue(String value) {
+        return isEmpty(value) ? "" : value;
     }
 
     public File getSelectedImage() {
         return selectedImage;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void setComboValue(JComboBox<?> combo, String value) {
+        DropdownFieldSupport.setValue((JComboBox<String>) combo, value);
+    }
+
+    private class FormField extends JPanel {
+        FormField(String text, JComponent input) {
+            EmployeeBasicDetailsPanelHelper.styleFormField(this);
+            add(EmployeeBasicDetailsPanelHelper.createFieldLabel(text), BorderLayout.NORTH);
+            add(input, BorderLayout.CENTER);
+        }
     }
 }

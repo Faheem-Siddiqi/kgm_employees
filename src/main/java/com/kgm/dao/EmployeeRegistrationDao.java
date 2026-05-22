@@ -15,16 +15,21 @@ public class EmployeeRegistrationDao {
     private static final List<String> BASE_INSERT_COLUMNS = List.of(
             "NID",
             "EMP_NAME",
+            "FATHER_NAME",
             "DEPARTMENT",
             "DESIGNATION",
             "PERSONAL_EMAIL",
+            "DOB",
             "JOINING_DATE",
             "RESIGN_DATE",
             "EMP_CONTNO",
             "PERMANENT_ADR",
             "EMPLOYEE_CODE",
             "GENDER",
-            "RESIGN_REASON"
+            "RESIGN_REASON",
+            "SECTION",
+            "GRADE",
+            "SHIFT"
     );
 
     private final Connection conn;
@@ -34,7 +39,17 @@ public class EmployeeRegistrationDao {
     }
 
     public void insertEmployee(Employee employee) {
+        insertEmployee(employee, new ArrayList<>(employee.getDynamicFields().keySet()));
+    }
+
+    public void insertEmployee(Employee employee, List<String> extraColumns) {
         List<String> columns = insertColumns();
+        for (String column : extraColumns) {
+            if (column == null || column.isBlank() || containsColumn(columns, column)) {
+                continue;
+            }
+            columns.add(column.trim().toUpperCase());
+        }
         String sql = "INSERT INTO employees (" + quotedColumns(columns) + ") VALUES (" + placeholders(columns.size()) + ")";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -55,6 +70,15 @@ public class EmployeeRegistrationDao {
         }
         columns.add("EMP_IMG");
         return columns;
+    }
+
+    private boolean containsColumn(List<String> columns, String column) {
+        for (String existing : columns) {
+            if (existing.equalsIgnoreCase(column)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String quotedColumns(List<String> columns) {

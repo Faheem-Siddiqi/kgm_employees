@@ -64,7 +64,7 @@ The project follows a layered desktop-application architecture:
 | --- | --- |
 | **EmployeeRegistrationDao.java** | Inserts newly registered employee records with a generated column list, including profile image and the centralized document path fields. |
 | **EmployeeRecordDao.java** | Reads employee records, supports indexed lookup/listing/counts, dynamically maps document fields, and updates only meaningful submitted employee data. |
-| **EmployeeFieldDefinitionDao.java** | Manages editable employee field metadata, custom DB columns, date-field flags, document-field flags, and category heading renames. |
+| **EmployeeFieldDefinitionDao.java** | Manages editable employee field metadata, custom DB columns, Core field flags, date/dropdown behavior, document-field flags, dropdown options, and category heading renames. |
 
 ---
 
@@ -77,7 +77,8 @@ The project follows a layered desktop-application architecture:
 | **AuthService.java** | Handles login validation. Current credential check is `admin` / `1234`; this is the boundary for future DB or directory-based authentication. |
 | **EmployeeService.java** | Reserved business-service boundary for employee workflow rules that should not live directly in UI or DAO classes. |
 | **EmployeeReportService.java** | Generates employee download packages, including PDF profile, selected documents, and merged document PDFs. |
-| **ExcelImportService.java** | Reserved service boundary for parsing and importing employee records from Excel files. |
+| **ExcelImportService.java** | Parses employee Excel workbooks, supports standard/legacy import modes, validates required Basic fields, CNIC/date rules, maps known headers to DB fields, and rejects unknown headers with a sample-download prompt. |
+| **ExcelSampleGenerator.java** | Generates the employee import sample workbook with all non-document fields, sample rows, dynamic dropdown valid values, and date/CNIC rules. Document fields are excluded. |
 
 ---
 
@@ -88,7 +89,7 @@ The project follows a layered desktop-application architecture:
 | File | Functionality |
 | --- | --- |
 | **Employee.java** | Entity model for employee personal, employment, payroll, contact, compliance, benefit, vaccination, document, and profile-image data. |
-| **EmployeeFieldDefinition.java** | Metadata model for DB-backed fields, including display label, category heading, document usage, custom/built-in origin, date behavior, and sort order. |
+| **EmployeeFieldDefinition.java** | Metadata model for DB-backed fields, including display label, category heading, Core/detail/document usage, custom/built-in origin, date/dropdown behavior, variable-option behavior, dropdown options, and sort order. |
 | **UserSession.java** | Immutable model for active user session data: username, login timestamp, and expiry duration. |
 
 ---
@@ -103,7 +104,7 @@ The project follows a layered desktop-application architecture:
 | **HomeView.java** | Main dashboard for employee search, listing, refresh, import entry point, and record creation. |
 | **EmployeeRegistrationView.java** | Registration window for adding a new employee record. Combines employee form entry and document upload tabs before saving to MySQL. |
 | **EmployeeDetailView.java** | Detail, update, document review, and download workflow for an existing employee. |
-| **FieldManagementView.java** | Field-management window for adding custom DB fields, editing built-in/custom labels, assigning date pickers, managing document fields, and renaming detail categories with `UniversalTablePanel`. |
+| **FieldManagementView.java** | Field-management window for filtering Built-in/Custom fields, adding custom DB fields, password-gated built-in edits, editing labels/headings/date/dropdown flags, editable dropdown options, variable-option behavior, document fields, and categories with `UniversalTablePanel`. |
 
 ---
 
@@ -126,13 +127,13 @@ The project follows a layered desktop-application architecture:
 | **HeaderPanel.java** | Shared application header. Displays the current page title and session/logout controls. |
 | **FooterPanel.java** | Shared application footer. Displays company text and optional trailing action space. |
 | **EmployeeTablePanel.java** | Home dashboard employee table built on `UniversalTablePanel`, with paging and detail navigation. |
-| **EmployeeRegistrationFormPanel.java** | Employee registration form with profile photo upload and core fields required to create a record. |
+| **EmployeeRegistrationFormPanel.java** | Employee registration form with profile photo upload and metadata-driven Basic built-in fields required to create a record. |
 | **EmployeeDocumentUploadPanel.java** | Registration document upload panel with search, single/bulk upload, validation, and preview. |
 | **EmployeeDocumentViewPanel.java** | Employee document review/update panel for viewing saved documents and uploading missing ones. |
 | **DocumentImagePreviewPanel.java** | Image preview panel that scales document images for viewing while preserving original aspect ratio. |
-| **EmployeeBasicDetailsPanel.java** | Basic employee detail form used in detail/edit flows. Allows updates to normal employee fields, keeps employee code locked, handles missing profile-image upload, and ignores empty placeholders such as `N/A`. |
+| **EmployeeBasicDetailsPanel.java** | Metadata-driven Basic employee detail form used in detail/edit flows. Allows built-in field updates, keeps employee ID locked, handles missing profile-image upload, and ignores empty placeholders such as `N/A`. |
 | **EmployeeAdditionalDetailsPanel.java** | Additional employee detail panel for employment, payroll, banking, reporting, compliance, benefits, and vaccination fields. Allows normal employee-field updates while ignoring empty placeholders. |
-| **ExcelImportButton.java** | Reusable styled button for triggering Excel import workflows. |
+| **ExcelImportButton.java** | Reusable styled button for triggering Excel import and sample-download workflows. |
 | **UniversalTablePanel.java** | Reusable paginated table component for links, actions, status cells, and responsive row-height layout. |
 
 ---
@@ -182,6 +183,7 @@ The project follows a layered desktop-application architecture:
 | --- | --- |
 | **SessionManager.java** | Stores and clears the current `UserSession`, checks expiry, and exposes remaining session time. |
 | **SessionWatcher.java** | Monitors active session expiry and closes/redirects windows when the session is no longer valid. |
+| **EmployeeBasicFieldUtil.java** | Single source of truth for Core employee field order, required-field rules, date/dropdown defaults, and labels used by Add Employee, Basic Detail, and Excel import/sample generation. |
 | **EmployeeDocumentUtil.java** | Shared document metadata, validation, path handling, filename matching, and bulk-upload matching for the 22 required document fields. |
 | **FileUtil.java** | Reserved file utility boundary for shared file handling logic. |
 | **FilterUtil.java** | Reserved filtering utility boundary for reusable search/filter behavior. |
@@ -234,7 +236,7 @@ The project follows a layered desktop-application architecture:
 
 9. Field and Category Management
    HomeView -> FieldManagementView -> EmployeeFieldDefinitionDao -> employees / employee_field_metadata
-   -> dynamic detail categories, document labels, custom fields, and date-picker behavior
+   -> dynamic Core/detail categories, document labels, custom fields, date-picker behavior, and dropdown options
 ```
 
 ---
@@ -246,18 +248,42 @@ The primary table is defined in `src/main/resources/schema.sql` and initialized 
 | Table | Purpose |
 | --- | --- |
 | **employees** | Stores employee identity, employment, organization, payroll, banking, contact, reporting, compliance, benefits, vaccination, document paths, and profile image path. |
-| **employee_field_metadata** | Stores editable field labels, detail category headings, document/detail flags, custom/built-in origin, date-picker flags, and sort order for dynamic UI/report behavior. |
+| **employee_field_metadata** | Stores editable field labels, category headings, Core/detail/document flags, custom/built-in origin, date/dropdown flags, variable-option flags, dropdown options, and sort order for dynamic UI/report/Excel behavior. |
 
 Key schema areas:
 
+- Basic built-in employee fields: Employee ID, Name, Father Name, CNIC, Phone, Email, Department, Designation, Section, Grade, Shift, Date of Birth, Gender, Resign Reason, Date of Joining, Date of Resignation, and Permanent Address.
 - Core identity: employee code, name, family details, gender, DOB, CNIC/NID.
-- Employment: department, designation, grade, joining date, resignation date, status, shift.
+- Employment: department, designation, grade, section, joining date, resignation date, status, shift.
 - Organization: division, branch, reporting fields.
 - Payroll and banking: salary, pay categories, bank account, SS/EOBI/tax/PF fields.
 - Contact: phone, addresses, email, emergency number.
 - Compliance and benefits: clearance, verification, wellness, vaccination.
 - Documents: 22 required document path columns plus the employee profile image path. Database columns use uppercase underscore names; UI labels use readable business names.
-- Field metadata: category headings, labels, document/date behavior, and custom fields are stored separately so Settings changes appear throughout detail views, document panels, and reports.
+- Field metadata: category headings, labels, Core/detail/document behavior, custom origin, date/dropdown behavior, variable-option behavior, dropdown options, and custom fields are stored separately so Field Management changes appear throughout forms, detail views, document panels, reports, and Excel import.
+
+### Required Basic Employee Fields
+
+`EmployeeBasicFieldUtil` defines the default Core field order used by Add Employee, the first tab of Employee Detail, and the Excel import sample:
+
+`Employee ID`, `Name`, `Father Name`, `CNIC`, `Phone`, `Email`, `Department`, `Designation`, `Section`, `Grade`, `Shift`, `Date of Birth`, `Gender`, `Resign Reason`, `Date of Joining`, `Date of Resignation`, `Permanent Address`.
+
+These fields are seeded as Core and placed in the `Fundamentals` category in `employee_field_metadata`. Add Employee and the first tab of Employee Detail render fields whose category heading is `Fundamentals`, with the Core fields ordered first. A field created or moved into `Fundamentals` is promoted to built-in/protected behavior and appears in those forms. Existing records receive `N/A` for new non-date fields; new date fields stay empty so the picker displays `Choose Date`. Fields currently in `Fundamentals` are required for standard Excel import and cannot be deleted as custom fields.
+
+Field origin is categorized like this:
+
+- **Built-in**: Core fields plus document fields.
+- **Documents**: fields marked `document_field = 1`; they are handled by document upload/view panels and excluded from Excel.
+- **Custom**: every non-document field that is not Core, including older payroll/HR/banking columns and user-created fields.
+- **System internal**: `ID` stays protected and is not part of forms or Excel import.
+
+Dropdown behavior is metadata-driven through `dropdown_field`, `variable_option_field`, and `dropdown_options`. `Gender` and `Resign Reason` are seeded as dropdowns. Any future non-document field can be marked as a dropdown in Field Management, where each option can be edited or removed. Fixed dropdowns only allow listed options, while variable dropdowns allow typing with prefix suggestion from existing options. Existing old values that are no longer in the option list still display for saved records, but they are not added back to the saved option list.
+
+### Excel Import
+
+The Home dashboard Excel action supports importing `.xlsx` / `.xls` files and downloading a generated `.xlsx` sample. The sample is rebuilt from current Field Management metadata every time it is downloaded, includes all non-document fields, excludes document/image columns, includes a Valid Values sheet with dynamic dropdown options, and states the date format `yyyy-MM-dd`.
+
+Standard import requires every field currently in the `Fundamentals` category. Other non-document fields are optional. CNIC must contain exactly 13 digits, and Date of Joining must be before Date of Resignation. Unknown, renamed, document, or extra headers are rejected so users must download the current sample and keep the first row unchanged.
 
 ### Required Document Fields
 
@@ -373,16 +399,16 @@ Password: 1234
 | Configuration | 2 | Database configuration and connection creation |
 | Database initializer | 1 | Startup schema/database creation |
 | DAO layer | 3 | Employee persistence, lookup, listing, updates, and field metadata |
-| Service layer | 4 | Authentication, employee report packaging, and future service boundaries |
+| Service layer | 5 | Authentication, employee report packaging, Excel import/sample generation, and future service boundaries |
 | Models | 3 | Employee, field metadata, and user session data |
 | UI views | 5 | Main application windows |
 | UI dialogs | 1 | Reusable modal dialog |
 | UI components | 2 | Reusable date controls |
 | UI panels | 11 | Forms, tables, document panels, previews, header/footer |
 | UI styling helpers | 17 | Visual design, table styling, layout helpers |
-| Utilities | 6 | Session, document matching, and shared utility boundaries |
+| Utilities | 7 | Session, Basic field catalog, document matching, and shared utility boundaries |
 | Resources | 1 | SQL schema |
-| **Total source/resource files** | **57** | Complete application code and schema |
+| **Total source/resource files** | **59** | Complete application code and schema |
 
 ---
 
@@ -414,7 +440,7 @@ Password: 1234
 ## Known Issues and Future Improvements
 
 1. **Authentication**: Current credentials are hardcoded. Move authentication to database, LDAP, or another managed identity provider.
-2. **Excel Import**: `ExcelImportService` is currently a service boundary and should be implemented behind `ExcelImportButton`.
+2. **Excel Import**: Add focused automated tests for workbook parsing, header rejection, duplicate employee IDs, and date/CNIC validation.
 3. **Service Boundaries**: Move validation and employee workflow rules out of UI classes into `EmployeeService` and `ValidationUtil`.
 4. **Database Defaults**: Keep credentials externalized through environment variables or JVM properties for production use.
 5. **Document Storage**: Replace local `employees/` file storage with managed storage, validation, and cleanup policies.

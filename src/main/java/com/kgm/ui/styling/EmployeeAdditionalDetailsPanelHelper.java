@@ -4,6 +4,7 @@ import javax.swing.*;
 import javax.swing.border.AbstractBorder;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
+import com.kgm.ui.component.DropdownFieldSupport;
 import java.awt.*;
 import java.util.Date;
 
@@ -121,6 +122,18 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         JTextField field = new JTextField(value);
         EmployeeRegistrationFormPanelHelper.styleInput(field);
         return field;
+    }
+
+    public static JComboBox<String> createDropdownField(String[] options, String value, boolean allowCustomValue) {
+        JComboBox<String> combo = new JComboBox<>(options);
+        DropdownFieldSupport.configure(combo, allowCustomValue);
+        EmployeeRegistrationFormPanelHelper.styleInput(combo);
+        if (value != null && !value.isBlank()) {
+            DropdownFieldSupport.setValue(combo, value);
+        } else if (combo.getItemCount() > 0) {
+            combo.setSelectedIndex(0);
+        }
+        return combo;
     }
 
     public static com.kgm.ui.component.UniversalDatePicker createDateField(Date value) {

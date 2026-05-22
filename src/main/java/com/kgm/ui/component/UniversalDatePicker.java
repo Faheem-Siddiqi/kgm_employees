@@ -85,7 +85,7 @@ public class UniversalDatePicker extends JPanel {
 
         displayField.addMouseListener(showCalendarListener);
 
-        iconPanel.addMouseListener(showCalendarListener);
+        installCalendarClickListener(iconPanel, showCalendarListener);
 
         calendar.addPropertyChangeListener("date", evt -> {
 
@@ -303,6 +303,15 @@ public class UniversalDatePicker extends JPanel {
         calendarDialog.setLocation(x, y);
 
         calendarDialog.setVisible(true);
+    }
+
+    private void installCalendarClickListener(Component component, MouseAdapter listener) {
+        component.addMouseListener(listener);
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                installCalendarClickListener(child, listener);
+            }
+        }
     }
 
     public Date getDate() {

@@ -16,6 +16,8 @@ import java.awt.*;
 import java.io.File;
 
 public class EmployeeRegistrationView extends JFrame {
+    private EmployeeRegistrationFormPanel formPanel;
+
     public EmployeeRegistrationView() {
         EmployeeRegistrationViewHelper.applyFrame(this);
 
@@ -32,7 +34,7 @@ public class EmployeeRegistrationView extends JFrame {
         centerWrapper.add(EmployeeRegistrationViewHelper.screenHeader(onBack), EmployeeRegistrationViewHelper.pageConstraints(0));
 
         JTabbedPane tabs = new HugHeightTabbedPane();
-        EmployeeRegistrationFormPanel formPanel = new EmployeeRegistrationFormPanel();
+        formPanel = new EmployeeRegistrationFormPanel();
         EmployeeDocumentUploadPanel documentPanel = new EmployeeDocumentUploadPanel();
 
         JButton backButton = new JButton("Back");
@@ -74,6 +76,12 @@ public class EmployeeRegistrationView extends JFrame {
 
         submitButton.addActionListener(e -> {
             try {
+                String validationMessage = formPanel.validationMessage();
+                if (validationMessage != null) {
+                    DialogHelper.warning(this, "Check Employee Details", validationMessage);
+                    return;
+                }
+
                 Employee emp = formPanel.getEmployeeFromForm();
                 String empCode = emp.getEMPLOYEE_CODE();
                 String basePath = System.getProperty("user.dir") + "/employees/";
@@ -139,6 +147,14 @@ public class EmployeeRegistrationView extends JFrame {
             }
         });
         setVisible(true);
+    }
+
+    public void refreshDynamicFields() {
+        if (formPanel != null) {
+            formPanel.reloadFields();
+        }
+        revalidate();
+        repaint();
     }
 
     private static class HugHeightTabbedPane extends JTabbedPane {

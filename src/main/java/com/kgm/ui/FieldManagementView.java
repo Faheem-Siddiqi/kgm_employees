@@ -27,8 +27,9 @@ public class FieldManagementView extends JFrame {
     private static final int FIELD_HEADING = 2;
     private static final int FIELD_CATEGORY = 3;
     private static final int FIELD_DATE = 4;
-    private static final int FIELD_ORIGIN = 6;
-    private static final int FIELD_ACTION = 7;
+    private static final int FIELD_DROPDOWN = 5;
+    private static final int FIELD_ORIGIN = 7;
+    private static final int FIELD_ACTION = 8;
 
     private static final int CATEGORY_SELECT = 0;
     private static final int CATEGORY_FIELDS = 2;
@@ -36,7 +37,7 @@ public class FieldManagementView extends JFrame {
     private static final int CATEGORY_ACTION = 4;
 
     private static final String[] FIELD_COLUMNS = {
-            "DB Column", "Label", "Heading", "Category", "Date", "Locked", "Origin", "Action"
+            "DB Column", "Label", "Heading", "Category", "Date", "Dropdown", "Locked", "Origin", "Action"
     };
     private static final String[] CATEGORY_COLUMNS = {
             "Select", "Category", "Fields", "Count", "Action"
@@ -51,6 +52,7 @@ public class FieldManagementView extends JFrame {
     private UniversalTablePanel fieldTable;
     private UniversalTablePanel categoryTable;
     private JTextField searchField;
+    private JComboBox<String> originFilter;
     private String selectedCategoryHeading;
 
     public FieldManagementView() {
@@ -176,6 +178,7 @@ public class FieldManagementView extends JFrame {
                 && displayedFields.get(row).customField());
         tablePanel.setActionColumn(FIELD_ACTION, "Edit", this::editFieldAtRow);
         tablePanel.setColumnAlignment(FIELD_DATE, SwingConstants.CENTER);
+        tablePanel.setColumnAlignment(FIELD_DROPDOWN, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(FIELD_CATEGORY, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(FIELD_HEADING, SwingConstants.LEFT);
         tablePanel.setColumnAlignment(FIELD_LABEL, SwingConstants.LEFT);
@@ -234,9 +237,17 @@ public class FieldManagementView extends JFrame {
         actions.add(add);
         actions.add(refresh);
 
-        row.add(createSearchBox(), BorderLayout.WEST);
+        row.add(createFieldFilters(), BorderLayout.WEST);
         row.add(actions, BorderLayout.EAST);
         return row;
+    }
+
+    private JPanel createFieldFilters() {
+        JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        filters.setBackground(Color.WHITE);
+        filters.add(createSearchBox());
+        filters.add(createOriginFilter());
+        return filters;
     }
 
     private JPanel createCategoryTab() {
@@ -367,6 +378,16 @@ public class FieldManagementView extends JFrame {
         return panel;
     }
 
+    private JComponent createOriginFilter() {
+        originFilter = new JComboBox<>(new String[]{"All Fields", "Built-in", "Custom"});
+        originFilter.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        originFilter.setPreferredSize(new Dimension(130, 34));
+        originFilter.setBackground(Color.WHITE);
+        originFilter.setFocusable(false);
+        originFilter.addActionListener(event -> applyFieldSearch());
+        return originFilter;
+    }
+
     private void updateSearch(JButton clear) {
         setClearButtonActive(clear, searchField != null && !searchField.getText().isEmpty());
         applyFieldSearch();
@@ -399,11 +420,24 @@ public class FieldManagementView extends JFrame {
         String query = searchField == null ? "" : searchField.getText().trim().toLowerCase(Locale.ROOT);
         displayedFields.clear();
         for (EmployeeFieldDefinition definition : allFields) {
-            if (query.isEmpty() || matchesFieldSearch(definition, query)) {
+            if (matchesOriginFilter(definition) && (query.isEmpty() || matchesFieldSearch(definition, query))) {
                 displayedFields.add(definition);
             }
         }
         fieldTable.setRows(toFieldRows(displayedFields));
+    }
+
+    private boolean matchesOriginFilter(EmployeeFieldDefinition definition) {
+        String selected = originFilter == null || originFilter.getSelectedItem() == null
+                ? "All Fields"
+                : originFilter.getSelectedItem().toString();
+        if ("Built-in".equals(selected)) {
+            return !definition.customField();
+        }
+        if ("Custom".equals(selected)) {
+            return definition.customField();
+        }
+        return true;
     }
 
     private boolean matchesFieldSearch(EmployeeFieldDefinition definition, String query) {
@@ -419,12 +453,20 @@ public class FieldManagementView extends JFrame {
                     definition.heading(),
                     definition.usageLabel(),
                     definition.dateField(),
+                    dropdownLabel(definition),
                     definition.protectedField() ? "Yes" : "No",
                     definition.sourceLabel(),
                     "Edit"
             });
         }
         return rows;
+    }
+
+    private String dropdownLabel(EmployeeFieldDefinition definition) {
+        if (!definition.dropdownField()) {
+            return "No";
+        }
+        return definition.variableOptionField() ? "Variable" : "Fixed";
     }
 
     private void refreshCategoryTable() {
@@ -510,7 +552,7 @@ public class FieldManagementView extends JFrame {
             );
             return;
         }
-        if (!confirmPassword()) {
+        if (!confirmPassword("Enter admin password to delete this category.")) {
             return;
         }
 
@@ -533,6 +575,7 @@ public class FieldManagementView extends JFrame {
             selectedCategoryHeading = null;
             EmployeeDocumentUtil.refreshDocumentTypes();
             loadData();
+            refreshOpenEmployeeForms();
             DialogHelper.success(this, "Category deleted.\nFields deleted: " + deleted);
         } catch (RuntimeException exception) {
             DialogHelper.error(this, "Delete Category Failed", rootMessage(exception));
@@ -563,12 +606,28 @@ public class FieldManagementView extends JFrame {
         return true;
     }
 
+    private boolean categoryHasBuiltInFields(CategoryRow category) {
+        if (category == null) {
+            return false;
+        }
+        for (EmployeeFieldDefinition field : category.fields()) {
+            if (!field.customField()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void renameCategoryAtRow(int row) {
         if (row < 0 || row >= categoryRows.size()) {
             return;
         }
 
         CategoryRow category = categoryRows.get(row);
+        if (categoryHasBuiltInFields(category)
+                && !confirmPassword("Enter admin password to edit this built-in category.")) {
+            return;
+        }
         String renamed = showCategoryDialog(category);
         if (renamed == null) {
             return;
@@ -578,6 +637,7 @@ public class FieldManagementView extends JFrame {
             int updated = dao.renameHeading(category.heading(), renamed);
             selectedCategoryHeading = renamed;
             loadData();
+            refreshOpenEmployeeForms();
             DialogHelper.success(this, "Category name updated.\nFields updated: " + updated);
         } catch (RuntimeException exception) {
             DialogHelper.error(this, "Edit Category Failed", rootMessage(exception));
@@ -654,10 +714,14 @@ public class FieldManagementView extends JFrame {
                     data.label(),
                     data.heading(),
                     data.documentField(),
-                    data.dateField()
+                    data.dateField(),
+                    data.dropdownField(),
+                    data.variableOptionField(),
+                    data.dropdownOptions()
             );
             EmployeeDocumentUtil.refreshDocumentTypes();
             loadData();
+            refreshOpenEmployeeForms();
             DialogHelper.success(this, "Field added.\nColumn: " + added.columnName());
         } catch (RuntimeException exception) {
             DialogHelper.error(this, "Add Field Failed", rootMessage(exception));
@@ -667,6 +731,10 @@ public class FieldManagementView extends JFrame {
     private void editFieldAtRow(int row) {
         EmployeeFieldDefinition selected = fieldAtRow(row);
         if (selected == null) {
+            return;
+        }
+        if (!selected.customField()
+                && !confirmPassword("Enter admin password to edit this built-in field.")) {
             return;
         }
 
@@ -680,10 +748,14 @@ public class FieldManagementView extends JFrame {
                     selected.columnName(),
                     data.label(),
                     data.heading(),
-                    data.dateField()
+                    data.dateField(),
+                    data.dropdownField(),
+                    data.variableOptionField(),
+                    data.dropdownOptions()
             );
             EmployeeDocumentUtil.refreshDocumentTypes();
             loadData();
+            refreshOpenEmployeeForms();
             DialogHelper.success(this, "Field updated.\nColumn: " + updated.columnName());
         } catch (RuntimeException exception) {
             DialogHelper.error(this, "Edit Field Failed", rootMessage(exception));
@@ -699,7 +771,7 @@ public class FieldManagementView extends JFrame {
             DialogHelper.warning(this, "Built-in Field", "Only custom fields can be deleted.");
             return;
         }
-        if (!confirmPassword()) {
+        if (!confirmPassword("Enter admin password to delete this field.")) {
             return;
         }
 
@@ -719,6 +791,7 @@ public class FieldManagementView extends JFrame {
             dao.deleteField(selected.columnName());
             EmployeeDocumentUtil.refreshDocumentTypes();
             loadData();
+            refreshOpenEmployeeForms();
             DialogHelper.success(this, "Field deleted.");
         } catch (RuntimeException exception) {
             DialogHelper.error(this, "Delete Field Failed", rootMessage(exception));
@@ -753,20 +826,50 @@ public class FieldManagementView extends JFrame {
         JCheckBox dateField = new JCheckBox("Use calendar for this field");
         dateField.setSelected(current != null && current.dateField());
         dateField.setOpaque(false);
+        JCheckBox dropdownField = new JCheckBox("Use dropdown for this field");
+        dropdownField.setSelected(current != null && current.dropdownField());
+        dropdownField.setOpaque(false);
+        JCheckBox variableOption = new JCheckBox("Allow custom value");
+        variableOption.setSelected(current != null && current.variableOptionField());
+        variableOption.setOpaque(false);
+        OptionEditorPanel optionEditor = new OptionEditorPanel(
+                current == null ? List.of() : current.dropdownOptionList()
+        );
+        JLabel variableLabel = new JLabel("Variable option");
+        JLabel optionsLabel = new JLabel("Options");
+
+        JPanel form = new JPanel(new GridBagLayout());
+        form.setBorder(new EmptyBorder(8, 8, 8, 8));
         heading.setEnabled(!"Documents".equals(category.getSelectedItem()));
         dateField.setEnabled(!"Documents".equals(category.getSelectedItem()));
+        dropdownField.setEnabled(!"Documents".equals(category.getSelectedItem()));
+        dateField.addActionListener(event -> {
+            if (dateField.isSelected()) {
+                dropdownField.setSelected(false);
+                variableOption.setSelected(false);
+            }
+            refreshDropdownControls(form, category, dateField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
+        });
+        dropdownField.addActionListener(event -> {
+            if (dropdownField.isSelected() && !"Documents".equals(category.getSelectedItem())) {
+                dateField.setSelected(false);
+            }
+            refreshDropdownControls(form, category, dateField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
+        });
         category.addActionListener(event -> {
             boolean documents = "Documents".equals(category.getSelectedItem());
             heading.setEnabled(!documents);
             dateField.setEnabled(!documents);
+            dropdownField.setEnabled(!documents);
             if (documents) {
                 heading.setSelectedItem("Documents");
                 dateField.setSelected(false);
+                dropdownField.setSelected(false);
+                variableOption.setSelected(false);
             }
+            refreshDropdownControls(form, category, dateField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
         });
 
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setBorder(new EmptyBorder(8, 8, 8, 8));
         GridBagConstraints gbc = formConstraints();
 
         int row = 0;
@@ -797,10 +900,29 @@ public class FieldManagementView extends JFrame {
         form.add(heading, gbc);
 
         gbc.gridx = 0;
-        gbc.gridy = row;
+        gbc.gridy = row++;
         form.add(new JLabel("Date"), gbc);
         gbc.gridx = 1;
         form.add(dateField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = row++;
+        form.add(new JLabel("Dropdown"), gbc);
+        gbc.gridx = 1;
+        form.add(dropdownField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = row++;
+        form.add(variableLabel, gbc);
+        gbc.gridx = 1;
+        form.add(variableOption, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        form.add(optionsLabel, gbc);
+        gbc.gridx = 1;
+        form.add(optionEditor, gbc);
+        refreshDropdownControls(form, category, dateField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
 
         while (true) {
             int result = DialogHelper.formOption(
@@ -821,6 +943,9 @@ public class FieldManagementView extends JFrame {
                     ? current == null ? "Documents" : current.heading()
                     : headingValue == null ? "" : headingValue.toString().trim();
             boolean useDatePicker = !documentField && dateField.isSelected();
+            boolean useDropdown = !documentField && dropdownField.isSelected();
+            List<String> options = useDropdown ? optionEditor.values() : List.of();
+            String optionsText = String.join("\n", options);
             if (labelText.isEmpty()) {
                 DialogHelper.warning(this, "Label Required", "Enter a field label.");
                 continue;
@@ -829,14 +954,62 @@ public class FieldManagementView extends JFrame {
                 DialogHelper.warning(this, "Category Required", "Choose or type a category for this field.");
                 continue;
             }
-            return new FieldFormData(labelText, headingText, documentField, useDatePicker);
+            if (useDropdown && optionsText.isEmpty()) {
+                DialogHelper.warning(this, "Options Required", "Add at least one dropdown option.");
+                continue;
+            }
+            return new FieldFormData(
+                    labelText,
+                    headingText,
+                    documentField,
+                    useDatePicker,
+                    useDropdown,
+                    useDropdown && variableOption.isSelected(),
+                    optionsText
+            );
+        }
+    }
+
+    private void refreshDropdownControls(
+            JPanel form,
+            JComboBox<String> category,
+            JCheckBox dateField,
+            JCheckBox dropdownField,
+            JCheckBox variableOption,
+            OptionEditorPanel optionEditor,
+            JLabel variableLabel,
+            JLabel optionsLabel
+    ) {
+        boolean documents = "Documents".equals(category.getSelectedItem());
+        boolean dropdown = !documents && dropdownField.isSelected();
+        dateField.setEnabled(!documents);
+        dropdownField.setEnabled(!documents);
+        variableOption.setVisible(dropdown);
+        variableOption.setEnabled(dropdown);
+        variableLabel.setVisible(dropdown);
+        optionsLabel.setVisible(dropdown);
+        optionEditor.setVisible(dropdown);
+        optionEditor.setOptionsEnabled(dropdown);
+        if (!dropdown) {
+            variableOption.setSelected(false);
+        }
+
+        form.revalidate();
+        form.repaint();
+        Window window = SwingUtilities.getWindowAncestor(form);
+        if (window != null) {
+            window.pack();
         }
     }
 
     private boolean confirmPassword() {
+        return confirmPassword("Enter admin password to delete this field.");
+    }
+
+    private boolean confirmPassword(String message) {
         JPasswordField password = new JPasswordField(18);
         JPanel panel = new JPanel(new BorderLayout(0, 8));
-        panel.add(new JLabel("Enter admin password to delete this field."), BorderLayout.NORTH);
+        panel.add(new JLabel(message), BorderLayout.NORTH);
         panel.add(password, BorderLayout.CENTER);
 
         int result = DialogHelper.formOption(
@@ -878,10 +1051,123 @@ public class FieldManagementView extends JFrame {
         return message == null || message.isBlank() ? throwable.getMessage() : message;
     }
 
-    private record FieldFormData(String label, String heading, boolean documentField, boolean dateField) {
+    private void refreshOpenEmployeeForms() {
+        for (Window window : Window.getWindows()) {
+            if (window == this || !window.isDisplayable()) {
+                continue;
+            }
+            if (window instanceof EmployeeRegistrationView registrationView) {
+                registrationView.refreshDynamicFields();
+            } else if (window instanceof EmployeeDetailView detailView) {
+                detailView.refreshDynamicFields();
+            }
+        }
+    }
+
+    private record FieldFormData(
+            String label,
+            String heading,
+            boolean documentField,
+            boolean dateField,
+            boolean dropdownField,
+            boolean variableOptionField,
+            String dropdownOptions
+    ) {
     }
 
     private record CategoryRow(String heading, List<EmployeeFieldDefinition> fields, boolean selected) {
+    }
+
+    private static class OptionEditorPanel extends JPanel {
+        private final JPanel rows = new JPanel();
+        private final JButton addOption = new JButton("Add Option");
+        private final List<JTextField> fields = new ArrayList<>();
+
+        OptionEditorPanel(List<String> options) {
+            setLayout(new BorderLayout(0, 8));
+            setOpaque(false);
+            rows.setLayout(new BoxLayout(rows, BoxLayout.Y_AXIS));
+            rows.setOpaque(false);
+            addOption.setFocusPainted(false);
+            addOption.addActionListener(event -> addOptionRow(""));
+
+            if (options == null || options.isEmpty()) {
+                addOptionRow("");
+            } else {
+                for (String option : options) {
+                    addOptionRow(option);
+                }
+            }
+
+            JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+            actions.setOpaque(false);
+            actions.add(addOption);
+            add(rows, BorderLayout.CENTER);
+            add(actions, BorderLayout.SOUTH);
+        }
+
+        void addOptionRow(String value) {
+            JPanel row = new JPanel(new BorderLayout(8, 0));
+            row.setOpaque(false);
+            row.setBorder(new EmptyBorder(0, 0, 6, 0));
+
+            JTextField field = new JTextField(value == null ? "" : value.trim(), 22);
+            JButton remove = new JButton("Remove");
+            remove.setFocusPainted(false);
+            remove.addActionListener(event -> {
+                fields.remove(field);
+                rows.remove(row);
+                if (fields.isEmpty()) {
+                    addOptionRow("");
+                }
+                revalidate();
+                repaint();
+                Window window = SwingUtilities.getWindowAncestor(this);
+                if (window != null) {
+                    window.pack();
+                }
+            });
+
+            fields.add(field);
+            row.add(field, BorderLayout.CENTER);
+            row.add(remove, BorderLayout.EAST);
+            rows.add(row);
+            revalidate();
+            repaint();
+        }
+
+        List<String> values() {
+            List<String> values = new ArrayList<>();
+            for (JTextField field : fields) {
+                String value = field.getText().trim();
+                if (value.isEmpty() || containsIgnoreCase(values, value)) {
+                    continue;
+                }
+                values.add(value);
+            }
+            return values;
+        }
+
+        void setOptionsEnabled(boolean enabled) {
+            addOption.setEnabled(enabled);
+            for (Component row : rows.getComponents()) {
+                row.setEnabled(enabled);
+                if (row instanceof Container container) {
+                    for (Component child : container.getComponents()) {
+                        child.setEnabled(enabled);
+                    }
+                }
+            }
+        }
+
+        private static boolean containsIgnoreCase(List<String> values, String candidate) {
+            for (String value : values) {
+                if (value.equalsIgnoreCase(candidate)) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     private static class HugHeightTabbedPane extends JTabbedPane {

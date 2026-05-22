@@ -42,6 +42,15 @@ public class EmployeeDetailView extends JFrame {
         initializeUI(null, false);
     }
 
+    public void refreshDynamicFields() {
+        if (empCode == null || empCode.isBlank()) {
+            initializeUI(null, false);
+            return;
+        }
+        Employee refreshed = new EmployeeRecordDao().getFullEmployeeByCode(empCode);
+        initializeUI(refreshed, refreshed != null);
+    }
+
     private void initializeUI(Employee emp, boolean isWithData) {
         this.employee = emp;
         getContentPane().removeAll();
@@ -156,6 +165,11 @@ public class EmployeeDetailView extends JFrame {
                 boolean updatedAny = false;
 
                 if (basicPanel != null && panelHasEditableFields(basicPanel)) {
+                    String validationMessage = basicPanel.validationMessage();
+                    if (validationMessage != null) {
+                        DialogHelper.warning(this, "Check Employee Details", validationMessage);
+                        return;
+                    }
                     Employee updatedBasic = basicPanel.getEmployeeFromForm();
                     File selectedImage = basicPanel.getSelectedImage();
                     if (selectedImage != null) {

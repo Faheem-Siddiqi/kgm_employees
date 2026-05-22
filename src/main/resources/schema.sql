@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS employees (
     DEPARTMENT TEXT,
     DESIG_CODE TEXT,
     DESIGNATION TEXT,
+    SECTION TEXT,
     GRADE TEXT,
     JOINING_DATE TEXT,
     CONFIRMING_ON TEXT,
@@ -161,6 +162,10 @@ CREATE TABLE IF NOT EXISTS employee_field_metadata (
     protected_field TINYINT(1) NOT NULL DEFAULT 0,
     detail_field TINYINT(1) NOT NULL DEFAULT 1,
     date_field TINYINT(1) NOT NULL DEFAULT 0,
+    core_field TINYINT(1) NOT NULL DEFAULT 0,
+    dropdown_field TINYINT(1) NOT NULL DEFAULT 0,
+    variable_option_field TINYINT(1) NOT NULL DEFAULT 0,
+    dropdown_options TEXT,
     sort_order INT NOT NULL DEFAULT 0,
     PRIMARY KEY (column_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

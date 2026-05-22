@@ -3,8 +3,10 @@ package com.kgm.ui.panel;
 import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.ui.component.DropdownFieldSupport;
 import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.styling.EmployeeAdditionalDetailsPanelHelper;
+import com.kgm.util.EmployeeBasicFieldUtil;
 
 import javax.swing.*;
 import java.awt.*;
@@ -29,6 +31,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
 
     private final Employee data;
     private final Map<String, JTextField> textFieldMap = new LinkedHashMap<>();
+    private final Map<String, JComboBox<String>> dropdownFieldMap = new LinkedHashMap<>();
     private final Map<String, UniversalDatePicker> dateFieldMap = new LinkedHashMap<>();
     private final Map<String, Boolean> dateDirtyMap = new LinkedHashMap<>();
     private JComponent topAnchor;
@@ -160,12 +163,20 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
         JLabel label = EmployeeAdditionalDetailsPanelHelper.createFieldLabel(definition.label());
         String value = valueFor(definition.columnName());
         JComponent field;
-        if (definition.dateField()) {
+        if (EmployeeBasicFieldUtil.isDateField(definition)) {
             UniversalDatePicker datePicker = EmployeeAdditionalDetailsPanelHelper.createDateField(parseDate(value));
             datePicker.addDateChangeListener(() -> dateDirtyMap.put(definition.columnName(), true));
             dateFieldMap.put(definition.columnName(), datePicker);
             dateDirtyMap.put(definition.columnName(), false);
             field = datePicker;
+        } else if (EmployeeBasicFieldUtil.isDropdownField(definition)) {
+            JComboBox<String> combo = EmployeeAdditionalDetailsPanelHelper.createDropdownField(
+                    EmployeeBasicFieldUtil.dropdownOptions(definition, true),
+                    value == null || value.trim().isEmpty() ? "" : value,
+                    definition.variableOptionField()
+            );
+            dropdownFieldMap.put(definition.columnName(), combo);
+            field = combo;
         } else {
             JTextField textField = EmployeeAdditionalDetailsPanelHelper.createField(displayValue(value));
             textField.setEditable(true);
@@ -186,6 +197,14 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             }
 
             String value = field.getText();
+            if (isEmpty(value)) {
+                return;
+            }
+
+            writeValue(employee, column, value.trim());
+        });
+        dropdownFieldMap.forEach((column, combo) -> {
+            String value = DropdownFieldSupport.value(combo);
             if (isEmpty(value)) {
                 return;
             }
@@ -265,4 +284,5 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
                 || text.equalsIgnoreCase("NULL")
                 || text.equals("-");
     }
+
 }
