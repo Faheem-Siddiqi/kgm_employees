@@ -181,6 +181,26 @@ public final class EmployeeRegistrationViewHelper {
      * This creates modern tabs with underline indicator for selected tab.
      */
     public static void styleTabs(JTabbedPane tabs) {
+        styleTabs(tabs, new Insets(6, TAB_CONTENT_INSET, 12, TAB_CONTENT_INSET), new Insets(8, 0, 0, 0));
+    }
+
+    public static void styleTabs(JTabbedPane tabs, Insets tabAreaSpacing, Insets contentSpacing) {
+        styleTabs(
+                tabs,
+                tabAreaSpacing,
+                contentSpacing,
+                new Insets(12, 14, 11, 14),
+                TAB_DIVIDER_GAP
+        );
+    }
+
+    public static void styleTabs(
+            JTabbedPane tabs,
+            Insets tabAreaSpacing,
+            Insets contentSpacing,
+            Insets tabLabelSpacing,
+            int dividerGap
+    ) {
         tabs.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
         tabs.setBackground(Color.WHITE);
         tabs.setForeground(TEXT_SECONDARY);
@@ -192,10 +212,10 @@ public final class EmployeeRegistrationViewHelper {
         tabs.setUI(new BasicTabbedPaneUI() {
             protected void installDefaults() {
                 super.installDefaults();
-                tabInsets = new Insets(12, 14, 11, 14);
+                tabInsets = tabLabelSpacing;
                 selectedTabPadInsets = new Insets(0, 0, 0, 0); 
-                contentBorderInsets = new Insets(8, 0, 0, 0);
-                tabAreaInsets = new Insets(6, TAB_CONTENT_INSET, 12, TAB_CONTENT_INSET);
+                contentBorderInsets = contentSpacing;
+                tabAreaInsets = tabAreaSpacing;
             }
 
             protected void paintTabBackground(
@@ -230,7 +250,7 @@ public final class EmployeeRegistrationViewHelper {
                 if (rects != null) {
                     for (Rectangle rect : rects) {
                         if (rect != null && rect.height > 0) {
-                            lineY = Math.max(lineY, rect.y + rect.height + TAB_DIVIDER_GAP);
+                            lineY = Math.max(lineY, rect.y + rect.height + dividerGap);
                         }
                     }
                 }

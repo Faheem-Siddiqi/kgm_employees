@@ -42,6 +42,7 @@ public class EmployeeRegistrationDao {
                 ps.setString(index + 1, safe(readField(employee, columns.get(index))));
             }
             ps.executeUpdate();
+            new EmployeeFieldDefinitionDao(conn).applyCustomFieldDefaultsForEmployee(employee.getEMPLOYEE_CODE());
         } catch (SQLException ex) {
             throw new RuntimeException("Employee insert failed: " + ex.getMessage(), ex);
         }

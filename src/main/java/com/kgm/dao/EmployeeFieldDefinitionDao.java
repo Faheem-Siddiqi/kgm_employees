@@ -189,9 +189,7 @@ public class EmployeeFieldDefinitionDao {
         }
         ensureMetadataColumn("date_field", "TINYINT(1) NOT NULL DEFAULT 0");
 
-        for (EmployeeFieldDefinition definition : BUILT_IN_FIELDS) {
-            insertMetadataIgnore(definition);
-        }
+        syncBuiltInMetadata();
     }
 
     public void syncMetadataWithDatabase() throws SQLException {
@@ -280,6 +278,9 @@ public class EmployeeFieldDefinitionDao {
 
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("ALTER TABLE employees ADD COLUMN " + quoteIdentifier(column) + " TEXT");
+            if (!documentField && !effectiveDateField) {
+                fillMissingTextValues(column);
+            }
             EmployeeFieldDefinition definition = new EmployeeFieldDefinition(
                     column,
                     cleanLabel,
@@ -335,6 +336,7 @@ public class EmployeeFieldDefinitionDao {
                     current.sortOrder()
             );
             insertMetadataReplace(renamed);
+            applyValueDefaultsForType(newColumn, renamed.documentField(), effectiveDateField);
             return renamed;
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to rename employee field: " + exception.getMessage(), exception);
@@ -359,6 +361,12 @@ public class EmployeeFieldDefinitionDao {
             ps.executeUpdate();
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to update employee field: " + exception.getMessage(), exception);
+        }
+
+        try {
+            applyValueDefaultsForType(current.columnName(), current.documentField(), effectiveDateField);
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to update employee field defaults: " + exception.getMessage(), exception);
         }
 
         return new EmployeeFieldDefinition(
@@ -460,8 +468,23 @@ public class EmployeeFieldDefinitionDao {
             ps.setBoolean(1, effectiveDateField);
             ps.setString(2, definition.columnName());
             ps.executeUpdate();
+            applyValueDefaultsForType(definition.columnName(), definition.documentField(), effectiveDateField);
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to update date field setting: " + exception.getMessage(), exception);
+        }
+    }
+
+    public void applyCustomFieldDefaultsForEmployee(String employeeCode) {
+        String cleanCode = requireText(employeeCode, "Employee code is required.");
+        try {
+            for (EmployeeFieldDefinition definition : listFields()) {
+                if (!definition.customField() || definition.documentField() || definition.dateField()) {
+                    continue;
+                }
+                fillMissingTextValueForEmployee(definition.columnName(), cleanCode);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to apply employee field defaults: " + exception.getMessage(), exception);
         }
     }
 
@@ -514,6 +537,35 @@ public class EmployeeFieldDefinitionDao {
             }
         }
         return fields;
+    }
+
+    private void syncBuiltInMetadata() throws SQLException {
+        Map<String, EmployeeFieldDefinition> existingFields = metadataByColumn();
+        for (EmployeeFieldDefinition builtIn : BUILT_IN_FIELDS) {
+            EmployeeFieldDefinition existing = existingFields.get(builtIn.columnName().toUpperCase(Locale.ROOT));
+            if (existing == null) {
+                insertMetadataIgnore(builtIn);
+                continue;
+            }
+
+            String label = isBlank(existing.label()) ? builtIn.label() : existing.label();
+            String heading = existing.customField() || isBlank(existing.heading())
+                    ? builtIn.heading()
+                    : existing.heading();
+            boolean dateField = builtIn.documentField() ? false : existing.dateField();
+            EmployeeFieldDefinition corrected = new EmployeeFieldDefinition(
+                    builtIn.columnName(),
+                    label,
+                    heading,
+                    builtIn.documentField(),
+                    false,
+                    true,
+                    builtIn.detailField(),
+                    dateField,
+                    builtIn.sortOrder()
+            );
+            insertMetadataReplace(corrected);
+        }
     }
 
     private Map<String, Integer> employeeColumns() throws SQLException {
@@ -591,6 +643,48 @@ public class EmployeeFieldDefinitionDao {
         }
     }
 
+    private void applyValueDefaultsForType(String columnName, boolean documentField, boolean dateField) throws SQLException {
+        if (documentField) {
+            return;
+        }
+        if (dateField) {
+            clearPlaceholderValues(columnName);
+        } else {
+            fillMissingTextValues(columnName);
+        }
+    }
+
+    private void fillMissingTextValues(String columnName) throws SQLException {
+        String quoted = quoteIdentifier(columnName);
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE employees SET " + quoted + " = 'N/A' WHERE " + missingValueCondition(quoted))) {
+            ps.executeUpdate();
+        }
+    }
+
+    private void fillMissingTextValueForEmployee(String columnName, String employeeCode) throws SQLException {
+        String quoted = quoteIdentifier(columnName);
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE employees SET " + quoted + " = 'N/A' WHERE EMPLOYEE_CODE = ? AND ("
+                        + missingValueCondition(quoted) + ")")) {
+            ps.setString(1, employeeCode);
+            ps.executeUpdate();
+        }
+    }
+
+    private void clearPlaceholderValues(String columnName) throws SQLException {
+        String quoted = quoteIdentifier(columnName);
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE employees SET " + quoted + " = NULL WHERE " + missingValueCondition(quoted))) {
+            ps.executeUpdate();
+        }
+    }
+
+    private static String missingValueCondition(String quotedColumn) {
+        return quotedColumn + " IS NULL OR TRIM(" + quotedColumn + ") = '' OR UPPER(TRIM(" + quotedColumn
+                + ")) IN ('N/A', 'NA', 'NULL') OR TRIM(" + quotedColumn + ") = '-'";
+    }
+
     private int nextSortOrder(String heading) {
         int max = 3000;
         for (EmployeeFieldDefinition definition : listFields()) {
@@ -634,6 +728,10 @@ public class EmployeeFieldDefinitionDao {
             throw new IllegalArgumentException(message);
         }
         return clean;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private static String toColumnName(String label) {

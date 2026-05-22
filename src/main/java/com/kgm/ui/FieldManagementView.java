@@ -66,10 +66,10 @@ public class FieldManagementView extends JFrame {
         add(top, BorderLayout.NORTH);
 
         JPanel centerWrapper = EmployeeRegistrationViewHelper.createCenterWrapper();
-        centerWrapper.add(createTitleRow(), EmployeeRegistrationViewHelper.pageConstraints(0));
+        centerWrapper.add(createTitleRow(), pageConstraints(0, 0));
 
         JTabbedPane tabs = createTabs();
-        centerWrapper.add(createTabsArea(tabs), EmployeeRegistrationViewHelper.pageConstraints(1));
+        centerWrapper.add(createTabsArea(tabs), pageConstraints(1, 8));
 
         JScrollPane pageScroll = EmployeeRegistrationViewHelper.createPageScrollPane(centerWrapper);
         tabs.addChangeListener(event -> SwingUtilities.invokeLater(() -> {
@@ -104,6 +104,9 @@ public class FieldManagementView extends JFrame {
         titleBlock.add(Box.createVerticalStrut(3));
         titleBlock.add(subtitle);
 
+        // Spacing
+        titleBlock.add(Box.createVerticalStrut(16));
+
         JButton dashboard = new JButton("Dashboard");
         EmployeeRegistrationViewHelper.styleBackButton(dashboard);
         dashboard.addActionListener(event -> {
@@ -123,7 +126,13 @@ public class FieldManagementView extends JFrame {
         JTabbedPane tabs = new HugHeightTabbedPane();
         tabs.addTab("Fields", createFieldTab());
         tabs.addTab("Categories", createCategoryTab());
-        EmployeeRegistrationViewHelper.styleTabs(tabs);
+        EmployeeRegistrationViewHelper.styleTabs(
+                tabs,
+                new Insets(0, 28, 2, 28),
+                new Insets(4, 0, 4, 0),
+                new Insets(4, 12, 4, 12),
+                2
+        );
         tabs.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent event) {
                 int tabIndex = tabs.indexAtLocation(event.getX(), event.getY());
@@ -140,14 +149,25 @@ public class FieldManagementView extends JFrame {
     private JComponent createTabsArea(JTabbedPane tabs) {
         JPanel area = new JPanel(new BorderLayout());
         area.setBackground(Color.WHITE);
-        area.setBorder(new EmptyBorder(0, 0, 14, 0));
         area.add(tabs, BorderLayout.CENTER);
         return area;
+    }
+
+    private GridBagConstraints pageConstraints(int y, int bottomGap) {
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = y;
+        gbc.insets = new Insets(0, 0, bottomGap, 0);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.NORTH;
+        gbc.weightx = 1.0;
+        return gbc;
     }
 
     private UniversalTablePanel createFieldTable() {
         UniversalTablePanel tablePanel = new UniversalTablePanel(FIELD_COLUMNS, "No fields match the current search");
         tablePanel.setMinimumViewportRows(12);
+        tablePanel.setEmptyStateEnabled(false);
         tablePanel.setCheckboxColumn(FIELD_DATE, row -> row >= 0
                 && row < displayedFields.size()
                 && displayedFields.get(row).dateField());
@@ -268,7 +288,7 @@ public class FieldManagementView extends JFrame {
     private JPanel createTabPanel() {
         JPanel tab = new JPanel(new BorderLayout(0, 14));
         tab.setBackground(Color.WHITE);
-        tab.setBorder(new EmptyBorder(0, 28, 0, 28));
+        tab.setBorder(new EmptyBorder(0, 28, 8, 28));
         return tab;
     }
 
@@ -276,6 +296,9 @@ public class FieldManagementView extends JFrame {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBackground(Color.WHITE);
+
+        // Spacing
+        panel.setBorder(new EmptyBorder(8, 0, 12, 0));
 
         JLabel titleLabel = new JLabel(title);
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));

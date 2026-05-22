@@ -53,6 +53,7 @@ public class UniversalTablePanel extends JPanel {
     private boolean paginationEnabled = true;
     private int paginationBottomGap = 0;
     private int minimumViewportRows = 0;
+    private boolean emptyStateEnabled = true;
     private int currentPage = 0;
 
     public UniversalTablePanel(String[] columns, String emptyText) {
@@ -358,6 +359,11 @@ public class UniversalTablePanel extends JPanel {
         refresh();
     }
 
+    public void setEmptyStateEnabled(boolean emptyStateEnabled) {
+        this.emptyStateEnabled = emptyStateEnabled;
+        refresh();
+    }
+
     public void addRow(Object[] row) {
         rows.add(row);
         currentPage = lastPage();
@@ -406,7 +412,7 @@ public class UniversalTablePanel extends JPanel {
 
     private void refresh() {
         content.removeAll();
-        if (rows.isEmpty()) {
+        if (rows.isEmpty() && emptyStateEnabled) {
             content.add(TableThemeHelper.emptyState(emptyText), BorderLayout.NORTH);
         } else {
             renderPage();
