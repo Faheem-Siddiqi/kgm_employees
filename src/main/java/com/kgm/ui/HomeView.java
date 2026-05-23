@@ -279,12 +279,19 @@ public class HomeView extends JFrame {
         chooser.setDialogTitle("Save Employee Excel Export");
         chooser.setSelectedFile(new File("employee_export.xlsx"));
         chooser.setFileFilter(new FileNameExtensionFilter("Excel workbook (*.xlsx)", "xlsx"));
+        chooser.addChoosableFileFilter(new FileNameExtensionFilter("Excel 97-2003 workbook (*.xls)", "xls"));
         chooser.setAcceptAllFileFilterUsed(false);
         if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
             return;
         }
 
-        File target = xlsxFile(chooser.getSelectedFile());
+        // Ask user for file format
+        String selectedFormat = askForExcelFormat();
+        if (selectedFormat == null) {
+            return; // User cancelled
+        }
+
+        File target = ensureExcelExtension(chooser.getSelectedFile(), selectedFormat);
         setExcelButtonBusy("Exporting...");
         SwingWorker<ExcelExportService.ExportResult, Void> worker = new SwingWorker<>() {
             protected ExcelExportService.ExportResult doInBackground() throws Exception {
@@ -476,6 +483,42 @@ public class HomeView extends JFrame {
     private File xlsxFile(File file) {
         String path = file.getAbsolutePath();
         return path.toLowerCase().endsWith(".xlsx") ? file : new File(path + ".xlsx");
+    }
+
+    private String askForExcelFormat() {
+        String[] options = {"XLSX (.xlsx)", "XLS (.xls)"};
+        int choice = JOptionPane.showOptionDialog(
+                this,
+                "Choose the Excel file format:",
+                "Excel Format",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]
+        );
+        
+        if (choice == 0) {
+            return "xlsx";
+        } else if (choice == 1) {
+            return "xls";
+        }
+        return null; // User cancelled
+    }
+
+    private File ensureExcelExtension(File file, String format) {
+        String path = file.getAbsolutePath().toLowerCase();
+        String extension = "." + format;
+        
+        // Remove any existing Excel extension if present
+        if (path.endsWith(".xlsx")) {
+            path = path.substring(0, path.length() - 5);
+        } else if (path.endsWith(".xls")) {
+            path = path.substring(0, path.length() - 4);
+        }
+        
+        // Add the correct extension
+        return new File(path + extension);
     }
 
     private String plural(int count) {

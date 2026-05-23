@@ -12,7 +12,7 @@ import java.awt.*;
 import java.util.Locale;
 
 public final class UniversalDatePickerHelper {
-    public static final String DATE_FORMAT = "dd-MM-yyyy HH:mm";
+    public static final String DATE_FORMAT = "dd/MM/yyyy HH:mm:ss";
     public static final int FIELD_HEIGHT = 34;
     public static final int FIELD_WIDTH = 340;
     public static final int POPUP_WIDTH = 330;

@@ -14,6 +14,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.File;
@@ -188,17 +189,29 @@ public final class ExcelExportService {
     );
     private static final Map<String, String> SOURCE_ALIASES = sourceAliases();
 
+    static List<String> fixedHeaders() {
+        return FIXED_HEADERS;
+    }
+
+    static String sourceAliasForHeader(String header) {
+        return SOURCE_ALIASES.get(normalizeColumn(header));
+    }
+
     public ExportResult exportEmployees(File file) throws IOException {
         Path target = file.toPath();
         Path parent = target.toAbsolutePath().getParent();
+        
+        // Determine file format and create temp file with appropriate extension
+        String fileName = file.getName().toLowerCase();
+        String tempExtension = fileName.endsWith(".xls") ? ".xls" : ".xlsx";
         Path temporaryFile = parent == null
-                ? Files.createTempFile("employee_export_", ".xlsx")
-                : Files.createTempFile(parent, "employee_export_", ".xlsx");
+                ? Files.createTempFile("employee_export_", tempExtension)
+                : Files.createTempFile(parent, "employee_export_", tempExtension);
 
         try {
             ExportResult result;
             try (Connection connection = DatabaseConnection.getConnection()) {
-                result = writeWorkbook(connection, temporaryFile.toFile());
+                result = writeWorkbook(connection, temporaryFile.toFile(), tempExtension);
             } catch (SQLException exception) {
                 throw new IOException("Database error while exporting Excel: " + exception.getMessage(), exception);
             }
@@ -218,13 +231,13 @@ public final class ExcelExportService {
         }
     }
 
-    private ExportResult writeWorkbook(Connection connection, File temporaryFile) throws SQLException, IOException {
+    private ExportResult writeWorkbook(Connection connection, File temporaryFile, String fileExtension) throws SQLException, IOException {
         Map<String, String> dbColumns = employeeColumns(connection);
         Set<String> documentColumns = documentColumns(connection);
         List<ExportColumn> columns = exportColumns(dbColumns, documentColumns);
         int[] widths = initialWidths(columns);
 
-        try (Workbook workbook = new XSSFWorkbook();
+        try (Workbook workbook = createWorkbook(fileExtension);
              FileOutputStream output = new FileOutputStream(temporaryFile)) {
             Sheet sheet = workbook.createSheet("Employee Export");
             sheet.createFreezePane(0, 1);
@@ -256,9 +269,6 @@ public final class ExcelExportService {
                 }
             }
 
-            if (!columns.isEmpty()) {
-                sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, Math.max(rowCount, 1), 0, columns.size() - 1));
-            }
             for (int index = 0; index < columns.size(); index++) {
                 sheet.setColumnWidth(index, widths[index]);
             }
@@ -266,6 +276,14 @@ public final class ExcelExportService {
             workbook.write(output);
             output.flush();
             return new ExportResult(rowCount, columns.size(), dynamicColumnCount(columns));
+        }
+    }
+
+    private Workbook createWorkbook(String fileExtension) {
+        if (".xls".equalsIgnoreCase(fileExtension)) {
+            return new HSSFWorkbook();
+        } else {
+            return new XSSFWorkbook();
         }
     }
 

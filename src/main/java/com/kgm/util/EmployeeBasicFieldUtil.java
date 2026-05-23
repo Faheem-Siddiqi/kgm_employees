@@ -93,7 +93,9 @@ public final class EmployeeBasicFieldUtil {
     }
 
     public static boolean isFundamentalsField(EmployeeFieldDefinition definition) {
-        return definition != null && isFundamentalsHeading(definition.heading());
+        return definition != null
+                && !definition.documentField()
+                && (definition.coreField() || isFundamentalsHeading(definition.heading()));
     }
 
     public static boolean isFundamentalsHeading(String heading) {

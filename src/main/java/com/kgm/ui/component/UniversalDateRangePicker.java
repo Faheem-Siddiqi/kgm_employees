@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 public class UniversalDateRangePicker extends JPanel {
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
     private final JLabel displayLabel = UniversalDateRangePickerHelper.createDisplayLabel();
     private final JLabel iconLabel = UniversalDateRangePickerHelper.createIconLabel();

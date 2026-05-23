@@ -22,6 +22,7 @@ import java.util.Set;
 public class EmployeeFieldDefinitionDao {
     private static final String TABLE = "employee_field_metadata";
     public static final String FUNDAMENTALS_HEADING = "Fundamentals";
+    private static final Set<String> RETIRED_FIELD_KEYS = Set.of("RRR");
 
     private static final List<EmployeeFieldDefinition> BUILT_IN_FIELDS = List.of(
             def("ID", "ID", "System", false, false, 1),
@@ -200,6 +201,7 @@ public class EmployeeFieldDefinitionDao {
         ensureMetadataColumn("variable_option_field", "TINYINT(1) NOT NULL DEFAULT 0");
         ensureMetadataColumn("dropdown_options", "TEXT");
 
+        removeRetiredFields();
         syncBuiltInMetadata();
     }
 
@@ -256,6 +258,7 @@ public class EmployeeFieldDefinitionDao {
         for (EmployeeFieldDefinition definition : listFields()) {
             if (!definition.documentField()
                     && definition.detailField()
+                    && !definition.coreField()
                     && !EmployeeBasicFieldUtil.isFundamentalsHeading(definition.heading())) {
                 definitions.add(definition);
             }
@@ -267,7 +270,7 @@ public class EmployeeFieldDefinitionDao {
     public List<EmployeeFieldDefinition> listFundamentalsFields() {
         List<EmployeeFieldDefinition> list = new ArrayList<>();
         for (EmployeeFieldDefinition def : listFields()) {
-            if (isFundamentalsHeading(def.heading())) {
+            if (!def.documentField() && (def.coreField() || isFundamentalsHeading(def.heading()))) {
                 list.add(def);
             }
         }
@@ -291,6 +294,7 @@ public class EmployeeFieldDefinitionDao {
         for (EmployeeFieldDefinition definition : listFields()) {
             if (!definition.documentField()
                     && definition.detailField()
+                    && !definition.coreField()
                     && !EmployeeBasicFieldUtil.isFundamentalsHeading(definition.heading())) {
                 headings.add(definition.heading());
             }
@@ -534,6 +538,49 @@ public class EmployeeFieldDefinitionDao {
         }
     }
 
+    private void removeRetiredFields() throws SQLException {
+        Set<String> columnsToDrop = new LinkedHashSet<>();
+        for (String column : employeeColumns().keySet()) {
+            if (isRetiredFieldKey(column)) {
+                columnsToDrop.add(column);
+            }
+        }
+        for (EmployeeFieldDefinition definition : metadataByColumn().values()) {
+            if (isRetiredFieldKey(definition.columnName()) || isRetiredFieldKey(definition.label())) {
+                columnsToDrop.add(definition.columnName().toUpperCase(Locale.ROOT));
+            }
+        }
+
+        for (String column : columnsToDrop) {
+            if (columnExists(column)) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE employees DROP COLUMN " + quoteIdentifier(column));
+                }
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "DELETE FROM employee_field_metadata WHERE UPPER(column_name) = UPPER(?)")) {
+                ps.setString(1, column);
+                ps.executeUpdate();
+            }
+        }
+
+        try (PreparedStatement ps = conn.prepareStatement(
+                "DELETE FROM employee_field_metadata WHERE UPPER(TRIM(display_label)) = UPPER(?)")) {
+            for (String key : RETIRED_FIELD_KEYS) {
+                ps.setString(1, key);
+                ps.executeUpdate();
+            }
+        }
+    }
+
+    private static boolean isRetiredFieldKey(String value) {
+        if (value == null) {
+            return false;
+        }
+        String key = value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+        return RETIRED_FIELD_KEYS.contains(key);
+    }
+
     private static String fundamentalsHeadingSqlCondition(String columnExpression) {
         String keyExpression = "UPPER(REPLACE(REPLACE(REPLACE(TRIM(" + columnExpression
                 + "), ' ', ''), '-', ''), '_', ''))";
@@ -623,6 +670,31 @@ public class EmployeeFieldDefinitionDao {
                     continue;
                 }
                 fillMissingTextValueForEmployee(definition.columnName(), cleanCode);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to apply employee field defaults: " + exception.getMessage(), exception);
+        }
+    }
+
+    public void applyCustomFieldDefaultsForEmployees(List<String> employeeCodes) {
+        List<String> cleanCodes = new ArrayList<>();
+        for (String employeeCode : employeeCodes == null ? List.<String>of() : employeeCodes) {
+            String cleanCode = employeeCode == null ? "" : employeeCode.trim();
+            if (!cleanCode.isEmpty() && !containsIgnoreCase(cleanCodes, cleanCode)) {
+                cleanCodes.add(cleanCode);
+            }
+        }
+        if (cleanCodes.isEmpty()) {
+            return;
+        }
+
+        try {
+            List<EmployeeFieldDefinition> definitions = listFields();
+            for (EmployeeFieldDefinition definition : definitions) {
+                if (definition.documentField() || definition.dateField()) {
+                    continue;
+                }
+                fillMissingTextValueForEmployees(definition.columnName(), cleanCodes);
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to apply employee field defaults: " + exception.getMessage(), exception);
@@ -1066,6 +1138,21 @@ public class EmployeeFieldDefinitionDao {
         }
     }
 
+    private void fillMissingTextValueForEmployees(String columnName, List<String> employeeCodes) throws SQLException {
+        String quoted = quoteIdentifier(columnName);
+        for (int start = 0; start < employeeCodes.size(); start += 500) {
+            List<String> batch = employeeCodes.subList(start, Math.min(start + 500, employeeCodes.size()));
+            String sql = "UPDATE employees SET " + quoted + " = 'N/A' WHERE EMPLOYEE_CODE IN ("
+                    + placeholders(batch.size()) + ") AND (" + missingValueCondition(quoted) + ")";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                for (int index = 0; index < batch.size(); index++) {
+                    ps.setString(index + 1, batch.get(index));
+                }
+                ps.executeUpdate();
+            }
+        }
+    }
+
     private void clearPlaceholderValues(String columnName) throws SQLException {
         String quoted = quoteIdentifier(columnName);
         try (PreparedStatement ps = conn.prepareStatement(
@@ -1178,6 +1265,10 @@ public class EmployeeFieldDefinitionDao {
 
     private static String quoteIdentifier(String identifier) {
         return "`" + identifier.replace("`", "``") + "`";
+    }
+
+    private static String placeholders(int count) {
+        return String.join(", ", java.util.Collections.nCopies(count, "?"));
     }
 
     private static EmployeeFieldDefinition def(

@@ -61,6 +61,62 @@ public class EmployeeRegistrationDao {
         }
     }
 
+    public int insertEmployees(List<Employee> employees, List<List<String>> extraColumnsByEmployee) {
+        if (employees == null || employees.isEmpty()) {
+            return 0;
+        }
+
+        List<String> columns = insertColumns();
+        if (extraColumnsByEmployee != null) {
+            for (List<String> extraColumns : extraColumnsByEmployee) {
+                if (extraColumns == null) {
+                    continue;
+                }
+                for (String column : extraColumns) {
+                    addColumn(columns, column);
+                }
+            }
+        }
+
+        String sql = "INSERT INTO employees (" + quotedColumns(columns) + ") VALUES (" + placeholders(columns.size()) + ")";
+        boolean originalAutoCommit;
+        try {
+            originalAutoCommit = conn.getAutoCommit();
+        } catch (SQLException exception) {
+            throw new RuntimeException("Employee batch insert failed: " + exception.getMessage(), exception);
+        }
+
+        try {
+            conn.setAutoCommit(false);
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                List<String> employeeCodes = new ArrayList<>();
+                for (int employeeIndex = 0; employeeIndex < employees.size(); employeeIndex++) {
+                    Employee employee = employees.get(employeeIndex);
+                    employeeCodes.add(safe(readField(employee, "EMPLOYEE_CODE")));
+                    for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
+                        ps.setString(columnIndex + 1, safe(readField(employee, columns.get(columnIndex))));
+                    }
+                    ps.addBatch();
+                    if ((employeeIndex + 1) % 500 == 0) {
+                        ps.executeBatch();
+                    }
+                }
+                ps.executeBatch();
+                new EmployeeFieldDefinitionDao(conn).applyCustomFieldDefaultsForEmployees(employeeCodes);
+                conn.commit();
+                return employees.size();
+            }
+        } catch (SQLException exception) {
+            rollbackQuietly();
+            throw new RuntimeException("Employee batch insert failed: " + exception.getMessage(), exception);
+        } finally {
+            try {
+                conn.setAutoCommit(originalAutoCommit);
+            } catch (SQLException ignored) {
+            }
+        }
+    }
+
     private List<String> insertColumns() {
         List<String> columns = new ArrayList<>();
         for (String column : BASE_INSERT_COLUMNS) {
@@ -125,5 +181,12 @@ public class EmployeeRegistrationDao {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private void rollbackQuietly() {
+        try {
+            conn.rollback();
+        } catch (SQLException ignored) {
+        }
     }
 }

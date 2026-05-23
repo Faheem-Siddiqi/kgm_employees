@@ -254,7 +254,7 @@ public class FieldManagementView extends JFrame {
         JPanel tab = createTabPanel();
         tab.add(createSectionHeader(
                 "Categories",
-                "Every category lists the fields it contains. Select a category or use Edit Name to update it everywhere."
+                "Every category lists the fields it contains. Select any category or use Edit Name to update it everywhere."
         ), BorderLayout.NORTH);
         tab.add(createCategoryBody(), BorderLayout.CENTER);
         return tab;
@@ -606,28 +606,12 @@ public class FieldManagementView extends JFrame {
         return true;
     }
 
-    private boolean categoryHasBuiltInFields(CategoryRow category) {
-        if (category == null) {
-            return false;
-        }
-        for (EmployeeFieldDefinition field : category.fields()) {
-            if (!field.customField()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private void renameCategoryAtRow(int row) {
         if (row < 0 || row >= categoryRows.size()) {
             return;
         }
 
         CategoryRow category = categoryRows.get(row);
-        if (categoryHasBuiltInFields(category)
-                && !confirmPassword("Enter admin password to edit this built-in category.")) {
-            return;
-        }
         String renamed = showCategoryDialog(category);
         if (renamed == null) {
             return;

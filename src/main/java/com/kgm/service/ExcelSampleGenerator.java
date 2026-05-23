@@ -18,8 +18,32 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Locale;
 
 public final class ExcelSampleGenerator {
+    private static final int SAMPLE_ROW_COUNT = 5;
+    private static final String[] SAMPLE_EMPLOYEE_CODES = {"EMP-1001", "EMP-1002", "EMP-1003", "EMP-1004", "EMP-1005"};
+    private static final String[] SAMPLE_NAMES = {"Ali Khan", "Sana Malik", "Bilal Ahmed", "Ayesha Noor", "Usman Raza"};
+    private static final String[] SAMPLE_FATHER_NAMES = {"Ahmed Khan", "Tariq Malik", "Naveed Ahmed", "Imran Noor", "Raza Ali"};
+    private static final String[] SAMPLE_CNICS = {
+            "3520212345671", "4210112345672", "6110112345673", "3740112345674", "1730112345675"
+    };
+    private static final String[] SAMPLE_PHONES = {
+            "0307-5011252", "0334-5040248", "0312-3456789", "0321-7654321", "0345-1234567"
+    };
+    private static final String[] SAMPLE_JOINING_DATES = {
+            "8/23/2010 00:00:00", "2/19/2011 00:00:00", "7/30/2021 00:00:00",
+            "12/30/2021 00:00:00", "11/1/2023 00:00:00"
+    };
+    private static final String[] SAMPLE_RESIGN_DATES = {
+            "1/1/2024 00:00:00", "2/15/2024 00:00:00", "3/31/2024 00:00:00",
+            "4/30/2024 00:00:00", "5/31/2024 00:00:00"
+    };
+    private static final String[] SAMPLE_DOBS = {
+            "3/8/1984 00:00:00", "5/14/1990 00:00:00", "9/20/1988 00:00:00",
+            "1/6/1992 00:00:00", "10/11/1986 00:00:00"
+    };
+
     private ExcelSampleGenerator() {
     }
 
@@ -60,11 +84,17 @@ public final class ExcelSampleGenerator {
         unlockColumns(sheet, textStyle, columns.size());
 
         Row header = sheet.createRow(0);
-        Row sample = sheet.createRow(1);
         for (int index = 0; index < columns.size(); index++) {
             ExcelImportService.TemplateColumn column = columns.get(index);
             textCell(header, index, column.header(), headerStyle);
-            textCell(sample, index, column.sampleValue(), textStyle);
+        }
+
+        for (int sampleIndex = 0; sampleIndex < SAMPLE_ROW_COUNT; sampleIndex++) {
+            Row sample = sheet.createRow(sampleIndex + 1);
+            for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
+                ExcelImportService.TemplateColumn column = columns.get(columnIndex);
+                textCell(sample, columnIndex, sampleValue(column, sampleIndex), textStyle);
+            }
         }
 
         for (int index = 0; index < columns.size(); index++) {
@@ -79,7 +109,7 @@ public final class ExcelSampleGenerator {
             CellStyle textStyle
     ) {
         Sheet sheet = workbook.createSheet("Valid Values");
-        String[] headers = {"Field", "DB Column", "Required", "Type", "Valid / Sample Value"};
+        String[] headers = {"Field", "DB Column", "Category", "Required", "Type", "Valid / Sample Value", "Rule / Comment"};
         unlockColumns(sheet, textStyle, headers.length);
 
         Row header = sheet.createRow(0);
@@ -91,21 +121,27 @@ public final class ExcelSampleGenerator {
         for (ExcelImportService.TemplateColumn column : columns) {
             Row row = sheet.createRow(rowIndex++);
             textCell(row, 0, column.header(), textStyle);
-            textCell(row, 1, column.dbColumn(), textStyle);
-            textCell(row, 2, column.required() ? "Yes" : "No", textStyle);
-            textCell(row, 3, column.dateField() ? "Date" : column.dropdownOptions().isBlank() ? "Text" : "Dropdown", textStyle);
-            textCell(row, 4, validValue(column), textStyle);
+            textCell(row, 1, column.dbColumn().isBlank() ? "-" : column.dbColumn(), textStyle);
+            textCell(row, 2, column.category().isBlank() ? "Details" : column.category(), textStyle);
+            textCell(row, 3, column.required() ? "Yes" : "No", textStyle);
+            textCell(row, 4, column.importable()
+                    ? column.dateField() ? "Date" : column.dropdownOptions().isBlank() ? "Text" : "Dropdown"
+                    : "Ignored", textStyle);
+            textCell(row, 5, validValue(column), textStyle);
+            textCell(row, 6, ruleComment(column), textStyle);
         }
 
         rowIndex++;
         textCell(sheet.createRow(rowIndex++), 0, "Rules", headerStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Only .xlsx or .xls files can be imported.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "CNIC must contain exactly 13 digits. Hyphens are allowed but ignored.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "Phone must use format 0307-5011252, including the hyphen.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Date of Joining must be before Date of Resignation.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Date format: " + ExcelImportService.DATE_FORMAT_HINT + " (example: 2024-01-31).", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "Date format: " + ExcelImportService.DATE_FORMAT_HINT + " (example: 8/23/2010 00:00:00).", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Document fields are not part of Excel import.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "The sample is rebuilt from current Field Management settings each time it is downloaded.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Fields in the Fundamentals category are required; other non-document fields are optional.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "The first five rows are examples. Replace them with employee records before import.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Do not add, remove, or rename headers. Unknown headers are rejected during import.", textStyle);
 
         rowIndex++;
@@ -125,7 +161,55 @@ public final class ExcelSampleGenerator {
         }
     }
 
+    private static String sampleValue(ExcelImportService.TemplateColumn column, int sampleIndex) {
+        String dbColumn = column.dbColumn();
+        if (!column.importable()) {
+            return "";
+        }
+        return switch (dbColumn.toUpperCase(Locale.ROOT)) {
+            case "EMPLOYEE_CODE" -> SAMPLE_EMPLOYEE_CODES[sampleIndex];
+            case "EMP_NAME" -> SAMPLE_NAMES[sampleIndex];
+            case "FATHER_NAME" -> SAMPLE_FATHER_NAMES[sampleIndex];
+            case "NID" -> SAMPLE_CNICS[sampleIndex];
+            case "EMP_CONTNO", "EMERGENCY_NO" -> SAMPLE_PHONES[sampleIndex];
+            case "PERSONAL_EMAIL" -> "employee" + (sampleIndex + 1) + "@example.com";
+            case "DEPARTMENT" -> sampleFrom(new String[]{"HR", "Finance", "Production", "Admin", "IT"}, sampleIndex);
+            case "DESIGNATION" -> sampleFrom(new String[]{"Officer", "Assistant Manager", "Supervisor", "Clerk", "Manager"}, sampleIndex);
+            case "SECTION" -> sampleFrom(new String[]{"Admin", "Payroll", "Spinning", "Records", "Support"}, sampleIndex);
+            case "GRADE" -> sampleFrom(new String[]{"G-5", "M-14", "S-2", "G-7", "M-10"}, sampleIndex);
+            case "SHIFT" -> sampleFrom(new String[]{"Morning", "G", "Evening", "Night", "General"}, sampleIndex);
+            case "DOB" -> SAMPLE_DOBS[sampleIndex];
+            case "JOINING_DATE" -> SAMPLE_JOINING_DATES[sampleIndex];
+            case "RESIGN_DATE" -> SAMPLE_RESIGN_DATES[sampleIndex];
+            case "GENDER" -> sampleFrom(new String[]{"Male", "Female", "Male", "Female", "Male"}, sampleIndex);
+            case "RESIGN_REASON" -> sampleFrom(new String[]{"Retirement", "Layoff", "Other", "Retirement", "Other"}, sampleIndex);
+            case "PERMANENT_ADR", "CURRENT_ADR" -> "House " + (sampleIndex + 1) + ", Lahore";
+            default -> fallbackSampleValue(column, sampleIndex);
+        };
+    }
+
+    private static String fallbackSampleValue(ExcelImportService.TemplateColumn column, int sampleIndex) {
+        if (!column.dropdownOptions().isBlank()) {
+            String[] options = column.dropdownOptions().split("\\s*,\\s*");
+            return options[Math.min(sampleIndex, options.length - 1)];
+        }
+        if (column.dateField()) {
+            return SAMPLE_JOINING_DATES[sampleIndex];
+        }
+        if (!"N/A".equalsIgnoreCase(column.sampleValue())) {
+            return column.sampleValue();
+        }
+        return "Sample " + (sampleIndex + 1);
+    }
+
+    private static String sampleFrom(String[] values, int sampleIndex) {
+        return values[Math.min(sampleIndex, values.length - 1)];
+    }
+
     private static String validValue(ExcelImportService.TemplateColumn column) {
+        if (!column.importable()) {
+            return "";
+        }
         if ("GENDER".equalsIgnoreCase(column.dbColumn())) {
             return column.dropdownOptions().isBlank() ? "Male, Female, Other" : column.dropdownOptions();
         }
@@ -136,9 +220,41 @@ public final class ExcelSampleGenerator {
             return column.dropdownOptions();
         }
         if (column.dateField()) {
-            return ExcelImportService.DATE_FORMAT_HINT + " e.g. " + column.sampleValue();
+            return ExcelImportService.DATE_FORMAT_HINT
+                    + " e.g. 8/23/2010 00:00:00, 2/19/2011 00:00:00";
         }
         return column.sampleValue();
+    }
+
+    private static String ruleComment(ExcelImportService.TemplateColumn column) {
+        if (!column.importable()) {
+            return "Included so import sample has the same headers/count as export. Import ignores this column.";
+        }
+        String dbColumn = column.dbColumn();
+        if ("NID".equalsIgnoreCase(dbColumn)) {
+            return "CNIC must contain exactly 13 digits. Hyphens are allowed but ignored.";
+        }
+        if ("EMP_CONTNO".equalsIgnoreCase(dbColumn) || "EMERGENCY_NO".equalsIgnoreCase(dbColumn)) {
+            return "Use phone format 0307-5011252, including the hyphen.";
+        }
+        if ("JOINING_DATE".equalsIgnoreCase(dbColumn)) {
+            return "Use " + ExcelImportService.DATE_FORMAT_HINT
+                    + ". Date of Joining must be before Date of Resignation.";
+        }
+        if ("RESIGN_DATE".equalsIgnoreCase(dbColumn)) {
+            return "Use " + ExcelImportService.DATE_FORMAT_HINT
+                    + ". Date of Resignation must be after Date of Joining.";
+        }
+        if (column.dateField()) {
+            return "Use date format " + ExcelImportService.DATE_FORMAT_HINT + ".";
+        }
+        if (column.required()) {
+            return "Required for standard import.";
+        }
+        if (!column.dropdownOptions().isBlank()) {
+            return "Use one of the listed values unless this field allows a custom value.";
+        }
+        return "";
     }
 
     private static CellStyle headerStyle(Workbook workbook) {

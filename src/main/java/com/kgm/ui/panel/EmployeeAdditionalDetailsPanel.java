@@ -20,13 +20,17 @@ import java.util.List;
 import java.util.Map;
 
 public class EmployeeAdditionalDetailsPanel extends JPanel {
-    private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+    private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
     private static final String[] READ_DATE_FORMATS = {
-            "yyyy-MM-dd",
-            "dd-MM-yyyy HH:mm",
+            "dd/MM/yyyy HH:mm:ss",
+            "dd/MM/yyyy H:mm:ss",
+            "dd-MM-yyyy HH:mm:ss",
+            "dd-MM-yyyy H:mm:ss",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd H:mm:ss",
+            "dd/MM/yyyy",
             "dd-MM-yyyy",
-            "yyyy/MM/dd",
-            "dd/MM/yyyy"
+            "yyyy-MM-dd"
     };
 
     private final Employee data;
