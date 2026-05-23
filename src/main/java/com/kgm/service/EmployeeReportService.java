@@ -4,6 +4,7 @@ import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.util.CnicFormatter;
 import com.kgm.util.EmployeeDocumentUtil;
 
 import javax.imageio.ImageIO;
@@ -382,7 +383,7 @@ public class EmployeeReportService {
         writer.drawRows(new String[][]{
                 {"Employee Name", display(employee.getEMP_NAME())},
                 {"Employee Code", display(employee.getEMPLOYEE_CODE())},
-                {"CNIC / NID", display(employee.getNID())},
+                {"CNIC / NID", display(CnicFormatter.format(employee.getNID()))},
                 {"Father Name", display(employee.getFATHER_NAME())},
                 {"Mother Name", display(employee.getMOTHER_NAME())},
                 {"Gender", display(employee.getGENDER())},

@@ -23,6 +23,17 @@ public class EmployeeFieldDefinitionDao {
     private static final String TABLE = "employee_field_metadata";
     public static final String FUNDAMENTALS_HEADING = "Fundamentals";
     private static final Set<String> RETIRED_FIELD_KEYS = Set.of("RRR");
+    private static final Set<String> DEFAULT_REQUIRED_DOCUMENT_COLUMNS = Set.of(
+            "CNIC_FRONT",
+            "CNIC_BACK",
+            "FINAL_SETTLEMENT",
+            "APPOINTMENT_LETTER_FRONT",
+            "APPOINTMENT_LETTER_BACK",
+            "APPLICATION_FRONT",
+            "APPLICATION_BACK",
+            "CLEARANCE_CERTIFICATE",
+            "EMP_IMG"
+    );
 
     private static final List<EmployeeFieldDefinition> BUILT_IN_FIELDS = List.of(
             def("ID", "ID", "System", false, false, 1),
@@ -189,6 +200,7 @@ public class EmployeeFieldDefinitionDao {
                         core_field TINYINT(1) NOT NULL DEFAULT 0,
                         dropdown_field TINYINT(1) NOT NULL DEFAULT 0,
                         variable_option_field TINYINT(1) NOT NULL DEFAULT 0,
+                        required_field TINYINT(1) NOT NULL DEFAULT 0,
                         dropdown_options TEXT,
                         sort_order INT NOT NULL DEFAULT 0,
                         PRIMARY KEY (column_name)
@@ -200,9 +212,16 @@ public class EmployeeFieldDefinitionDao {
         ensureMetadataColumn("dropdown_field", "TINYINT(1) NOT NULL DEFAULT 0");
         ensureMetadataColumn("variable_option_field", "TINYINT(1) NOT NULL DEFAULT 0");
         ensureMetadataColumn("dropdown_options", "TEXT");
+        boolean requiredFieldColumnAdded = ensureMetadataColumnAdded(
+                "required_field",
+                "TINYINT(1) NOT NULL DEFAULT 0"
+        );
 
         removeRetiredFields();
         syncBuiltInMetadata();
+        if (requiredFieldColumnAdded) {
+            seedDefaultRequiredFields();
+        }
     }
 
     public void syncMetadataWithDatabase() throws SQLException {
@@ -227,7 +246,8 @@ public class EmployeeFieldDefinitionDao {
                     false,
                     false,
                     false,
-                    ""
+                    "",
+                    false
             );
             insertMetadataIgnore(inferred);
         }
@@ -349,7 +369,8 @@ public class EmployeeFieldDefinitionDao {
                     fundamentalsField,
                     effectiveDropdownField,
                     effectiveVariableOptionField,
-                    cleanDropdownOptions
+                    cleanDropdownOptions,
+                    fundamentalsField
             );
             insertMetadataReplace(definition);
             return definition;
@@ -398,7 +419,8 @@ public class EmployeeFieldDefinitionDao {
                     fundamentalsField || current.coreField(),
                     current.dropdownField(),
                     current.variableOptionField(),
-                    current.dropdownOptions()
+                    current.dropdownOptions(),
+                    current.requiredField()
             );
             insertMetadataReplace(renamed);
             applyValueDefaultsForType(newColumn, renamed.documentField(), effectiveDateField, renamed.dropdownField());
@@ -499,7 +521,42 @@ public class EmployeeFieldDefinitionDao {
                 effectiveCoreField,
                 effectiveDropdownField,
                 effectiveVariableOptionField,
-                cleanDropdownOptions
+                cleanDropdownOptions,
+                current.requiredField()
+        );
+    }
+
+    public EmployeeFieldDefinition updateRequiredField(String columnName, boolean required) {
+        EmployeeFieldDefinition current = requireExistingField(columnName);
+        if ("ID".equalsIgnoreCase(current.columnName())) {
+            throw new IllegalArgumentException("ID cannot be marked as a required employee field.");
+        }
+        try (PreparedStatement ps = conn.prepareStatement("""
+                UPDATE employee_field_metadata
+                SET required_field = ?
+                WHERE column_name = ?
+                """)) {
+            ps.setBoolean(1, required);
+            ps.setString(2, current.columnName());
+            ps.executeUpdate();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to update required field setting: " + exception.getMessage(), exception);
+        }
+        return new EmployeeFieldDefinition(
+                current.columnName(),
+                current.label(),
+                current.heading(),
+                current.documentField(),
+                current.customField(),
+                current.protectedField(),
+                current.detailField(),
+                current.dateField(),
+                current.sortOrder(),
+                current.coreField(),
+                current.dropdownField(),
+                current.variableOptionField(),
+                current.dropdownOptions(),
+                required
         );
     }
 
@@ -729,7 +786,7 @@ public class EmployeeFieldDefinitionDao {
         String sql = """
                 SELECT column_name, display_label, heading, document_field, custom_field,
                        protected_field, detail_field, date_field, sort_order,
-                       core_field, dropdown_field, variable_option_field, dropdown_options
+                       core_field, dropdown_field, variable_option_field, dropdown_options, required_field
                 FROM employee_field_metadata
                 ORDER BY document_field, heading, sort_order, display_label
                 """;
@@ -749,7 +806,8 @@ public class EmployeeFieldDefinitionDao {
                         rs.getBoolean("core_field"),
                         rs.getBoolean("dropdown_field"),
                         rs.getBoolean("variable_option_field"),
-                        rs.getString("dropdown_options")
+                        rs.getString("dropdown_options"),
+                        rs.getBoolean("required_field")
                 );
                 fields.put(definition.columnName().toUpperCase(Locale.ROOT), definition);
             }
@@ -787,6 +845,20 @@ public class EmployeeFieldDefinitionDao {
         promoteFundamentalsFields();
     }
 
+    private void seedDefaultRequiredFields() throws SQLException {
+        List<String> requiredColumns = new ArrayList<>();
+        requiredColumns.addAll(EmployeeBasicFieldUtil.BASIC_COLUMNS);
+        requiredColumns.addAll(DEFAULT_REQUIRED_DOCUMENT_COLUMNS);
+        String sql = "UPDATE employee_field_metadata SET required_field = 1 WHERE UPPER(column_name) IN ("
+                + placeholders(requiredColumns.size()) + ")";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (int index = 0; index < requiredColumns.size(); index++) {
+                ps.setString(index + 1, requiredColumns.get(index));
+            }
+            ps.executeUpdate();
+        }
+    }
+
     private EmployeeFieldDefinition customDetailDefinition(
             EmployeeFieldDefinition builtIn,
             EmployeeFieldDefinition existing
@@ -815,7 +887,8 @@ public class EmployeeFieldDefinitionDao {
                 fundamentalsField,
                 dropdownField,
                 variableOptionField,
-                dropdownOptions
+                dropdownOptions,
+                existing != null && existing.requiredField()
         );
     }
 
@@ -856,6 +929,9 @@ public class EmployeeFieldDefinitionDao {
                         ? defaultOptions
                         : normalizeOptions(existing.dropdownOptions())
                 : "";
+        boolean requiredField = existing == null
+                ? defaultRequiredField(builtIn)
+                : existing.requiredField();
 
         return new EmployeeFieldDefinition(
                 builtIn.columnName(),
@@ -870,7 +946,8 @@ public class EmployeeFieldDefinitionDao {
                 core,
                 dropdownField,
                 variableOptionField,
-                dropdownOptions
+                dropdownOptions,
+                requiredField
         );
     }
 
@@ -913,6 +990,15 @@ public class EmployeeFieldDefinitionDao {
             return builtIn.label();
         }
         return current;
+    }
+
+    private boolean defaultRequiredField(EmployeeFieldDefinition builtIn) {
+        String column = builtIn.columnName().toUpperCase(Locale.ROOT);
+        if (builtIn.documentField()) {
+            return DEFAULT_REQUIRED_DOCUMENT_COLUMNS.contains(column);
+        }
+        return EmployeeBasicFieldUtil.BASIC_COLUMNS.contains(column)
+                || isFundamentalsHeading(builtIn.heading());
     }
 
     private String builtInHeading(EmployeeFieldDefinition existing, EmployeeFieldDefinition builtIn) {
@@ -1052,8 +1138,8 @@ public class EmployeeFieldDefinitionDao {
                 INSERT IGNORE INTO employee_field_metadata
                     (column_name, display_label, heading, document_field, custom_field,
                      protected_field, detail_field, date_field, sort_order,
-                     core_field, dropdown_field, variable_option_field, dropdown_options)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     core_field, dropdown_field, variable_option_field, dropdown_options, required_field)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         writeMetadata(definition, sql);
     }
@@ -1063,8 +1149,8 @@ public class EmployeeFieldDefinitionDao {
                 REPLACE INTO employee_field_metadata
                     (column_name, display_label, heading, document_field, custom_field,
                      protected_field, detail_field, date_field, sort_order,
-                     core_field, dropdown_field, variable_option_field, dropdown_options)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     core_field, dropdown_field, variable_option_field, dropdown_options, required_field)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         writeMetadata(definition, sql);
     }
@@ -1084,20 +1170,26 @@ public class EmployeeFieldDefinitionDao {
             ps.setBoolean(11, definition.dropdownField());
             ps.setBoolean(12, definition.variableOptionField());
             ps.setString(13, normalizeOptions(definition.dropdownOptions()));
+            ps.setBoolean(14, definition.requiredField());
             ps.executeUpdate();
         }
     }
 
     private void ensureMetadataColumn(String columnName, String ddl) throws SQLException {
+        ensureMetadataColumnAdded(columnName, ddl);
+    }
+
+    private boolean ensureMetadataColumnAdded(String columnName, String ddl) throws SQLException {
         DatabaseMetaData metaData = conn.getMetaData();
         try (ResultSet rs = metaData.getColumns(conn.getCatalog(), null, TABLE, columnName)) {
             if (rs.next()) {
-                return;
+                return false;
             }
         }
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("ALTER TABLE " + TABLE + " ADD COLUMN " + quoteIdentifier(columnName) + " " + ddl);
         }
+        return true;
     }
 
     private void applyValueDefaultsForType(String columnName, boolean documentField, boolean dateField) throws SQLException {
@@ -1292,7 +1384,9 @@ public class EmployeeFieldDefinitionDao {
                 false,
                 false,
                 false,
-                ""
+                "",
+                EmployeeBasicFieldUtil.BASIC_COLUMNS.contains(column)
+                        || DEFAULT_REQUIRED_DOCUMENT_COLUMNS.contains(column)
         );
     }
 }

@@ -5,6 +5,7 @@ import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.dao.EmployeeRegistrationDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.util.CnicFormatter;
 import com.kgm.util.EmployeeBasicFieldUtil;
 
 import org.apache.poi.ss.usermodel.Cell;
@@ -345,7 +346,7 @@ public class ExcelImportService {
             case "EMPLOYEE_CODE" -> "EMP-1001";
             case "EMP_NAME" -> "Ali Khan";
             case "FATHER_NAME" -> "Ahmed Khan";
-            case "NID" -> "3520212345671";
+            case "NID" -> CnicFormatter.FORMAT_EXAMPLE;
             case "EMP_CONTNO" -> PHONE_FORMAT_EXAMPLE;
             case "PERSONAL_EMAIL" -> "ali.khan@example.com";
             case "DEPARTMENT" -> "HR";
@@ -594,8 +595,8 @@ public class ExcelImportService {
         }
 
         String cnic = rowData.values().get("NID");
-        if (isBlankValue(cnic) || cnic.replaceAll("\\D", "").length() != 13) {
-            throw new RowImportException("CNIC must contain exactly 13 digits.");
+        if (isBlankValue(cnic) || !CnicFormatter.isValid(cnic)) {
+            throw new RowImportException("CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".");
         }
 
         validatePhone(rowData, catalog, "EMP_CONTNO");
@@ -808,10 +809,10 @@ public class ExcelImportService {
                 return numericIdentifier(value.getNumberValue());
             }
             if (value.getCellType() == CellType.STRING) {
-                return digitsOnly(value.getStringValue());
+                return value.getStringValue().trim();
             }
         }
-        return digitsOnly(cellText(cell, formatter, evaluator));
+        return cellText(cell, formatter, evaluator);
     }
 
     private String numericIdentifier(double value) {

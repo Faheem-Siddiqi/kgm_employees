@@ -36,21 +36,33 @@ public class FieldManagementView extends JFrame {
     private static final int CATEGORY_COUNT = 3;
     private static final int CATEGORY_ACTION = 4;
 
+    private static final int REQUIRED_LABEL = 0;
+    private static final int REQUIRED_COLUMN = 1;
+    private static final int REQUIRED_HEADING = 2;
+    private static final int REQUIRED_CATEGORY = 3;
+    private static final int REQUIRED_STATUS = 4;
+    private static final int REQUIRED_ACTION = 5;
+
     private static final String[] FIELD_COLUMNS = {
             "DB Column", "Label", "Heading", "Category", "Date", "Dropdown", "Locked", "Origin", "Action"
     };
     private static final String[] CATEGORY_COLUMNS = {
             "Select", "Category", "Fields", "Count", "Action"
     };
+    private static final String[] REQUIRED_COLUMNS = {
+            "Field", "DB Column", "Heading", "Category", "Required", "Action"
+    };
 
     private final EmployeeFieldDefinitionDao dao = new EmployeeFieldDefinitionDao();
     private final Map<String, EmployeeFieldDefinition> definitionsByColumn = new LinkedHashMap<>();
     private final List<EmployeeFieldDefinition> allFields = new ArrayList<>();
     private final List<EmployeeFieldDefinition> displayedFields = new ArrayList<>();
+    private final List<EmployeeFieldDefinition> requiredRows = new ArrayList<>();
     private final List<CategoryRow> categoryRows = new ArrayList<>();
 
     private UniversalTablePanel fieldTable;
     private UniversalTablePanel categoryTable;
+    private UniversalTablePanel requiredTable;
     private JTextField searchField;
     private JComboBox<String> originFilter;
     private String selectedCategoryHeading;
@@ -124,16 +136,18 @@ public class FieldManagementView extends JFrame {
     private JTabbedPane createTabs() {
         fieldTable = createFieldTable();
         categoryTable = createCategoryTable();
+        requiredTable = createRequiredTable();
 
         JTabbedPane tabs = new HugHeightTabbedPane();
         tabs.addTab("Fields", createFieldTab());
         tabs.addTab("Categories", createCategoryTab());
+        tabs.addTab("Required Fields", createRequiredTab());
         EmployeeRegistrationViewHelper.styleTabs(
                 tabs,
                 new Insets(0, 28, 2, 28),
                 new Insets(4, 0, 4, 0),
                 new Insets(4, 12, 4, 12),
-                2
+                3
         );
         tabs.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent event) {
@@ -200,6 +214,19 @@ public class FieldManagementView extends JFrame {
         tablePanel.setPreferredColumnWidthLimit(CATEGORY_SELECT, 86);
         tablePanel.setPreferredColumnWidthLimit(CATEGORY_FIELDS, 620);
         tablePanel.setPreferredColumnWidthLimit(CATEGORY_COUNT, 86);
+        return tablePanel;
+    }
+
+    private UniversalTablePanel createRequiredTable() {
+        UniversalTablePanel tablePanel = new UniversalTablePanel(REQUIRED_COLUMNS, "No fields available");
+        tablePanel.setMinimumViewportRows(12);
+        tablePanel.setActionColumn(REQUIRED_ACTION, "Edit", this::editRequiredAtRow);
+        tablePanel.setColumnAlignment(REQUIRED_CATEGORY, SwingConstants.CENTER);
+        tablePanel.setColumnAlignment(REQUIRED_STATUS, SwingConstants.CENTER);
+        tablePanel.setPreferredColumnWidthLimit(REQUIRED_LABEL, 240);
+        tablePanel.setPreferredColumnWidthLimit(REQUIRED_COLUMN, 190);
+        tablePanel.setPreferredColumnWidthLimit(REQUIRED_HEADING, 230);
+        tablePanel.setPreferredColumnWidthLimit(REQUIRED_STATUS, 96);
         return tablePanel;
     }
 
@@ -291,6 +318,44 @@ public class FieldManagementView extends JFrame {
         actions.setBackground(Color.WHITE);
         actions.add(rename);
         actions.add(delete);
+        actions.add(refresh);
+        row.add(actions, BorderLayout.EAST);
+        return row;
+    }
+
+    private JPanel createRequiredTab() {
+        JPanel tab = createTabPanel();
+        tab.add(createSectionHeader(
+                "Required Fields",
+                "Use Edit to set any employee field or document as required. The Home dashboard compliance chart uses these settings."
+        ), BorderLayout.NORTH);
+        tab.add(createRequiredBody(), BorderLayout.CENTER);
+        return tab;
+    }
+
+    private JPanel createRequiredBody() {
+        JPanel body = new JPanel();
+        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+        body.setBackground(Color.WHITE);
+        JComponent actions = createRequiredActionsRow();
+        actions.setAlignmentX(Component.LEFT_ALIGNMENT);
+        requiredTable.setAlignmentX(Component.LEFT_ALIGNMENT);
+        body.add(actions);
+        body.add(Box.createVerticalStrut(12));
+        body.add(requiredTable);
+        return body;
+    }
+
+    private JPanel createRequiredActionsRow() {
+        JPanel row = new JPanel(new BorderLayout());
+        row.setBackground(Color.WHITE);
+
+        JButton refresh = new JButton("Refresh");
+        EmployeeRegistrationViewHelper.styleSecondaryButton(refresh);
+        refresh.addActionListener(event -> loadData());
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        actions.setBackground(Color.WHITE);
         actions.add(refresh);
         row.add(actions, BorderLayout.EAST);
         return row;
@@ -410,6 +475,7 @@ public class FieldManagementView extends JFrame {
             }
             applyFieldSearch();
             refreshCategoryTable();
+            refreshRequiredTable();
         } catch (RuntimeException exception) {
             exception.printStackTrace();
             DialogHelper.error(this, "Field Management Load Failed", rootMessage(exception));
@@ -488,6 +554,96 @@ public class FieldManagementView extends JFrame {
             ));
         }
         categoryTable.setRows(toCategoryRows(categoryRows));
+    }
+
+    private void refreshRequiredTable() {
+        if (requiredTable == null) {
+            return;
+        }
+        requiredTable.setRows(toRequiredRows(allFields));
+    }
+
+    private List<Object[]> toRequiredRows(List<EmployeeFieldDefinition> definitions) {
+        List<Object[]> rows = new ArrayList<>();
+        requiredRows.clear();
+        for (EmployeeFieldDefinition definition : definitions) {
+            if ("ID".equalsIgnoreCase(definition.columnName())) {
+                continue;
+            }
+            requiredRows.add(definition);
+            rows.add(new Object[]{
+                    definition.label(),
+                    definition.columnName(),
+                    definition.heading(),
+                    definition.documentField() ? "Documents" : "Fields",
+                    definition.requiredField() ? "True" : "False",
+                    "Edit"
+            });
+        }
+        return rows;
+    }
+
+    private void editRequiredAtRow(int row) {
+        if (row < 0 || row >= requiredRows.size()) {
+            return;
+        }
+        EmployeeFieldDefinition selected = requiredRows.get(row);
+        if ("ID".equalsIgnoreCase(selected.columnName())) {
+            DialogHelper.warning(this, "System Field", "ID cannot be marked as required.");
+            return;
+        }
+        if (!confirmPassword("Enter admin password to edit required status.")) {
+            return;
+        }
+        Boolean required = showRequiredStatusDialog(selected);
+        if (required == null || required == selected.requiredField()) {
+            return;
+        }
+        try {
+            dao.updateRequiredField(selected.columnName(), required);
+            loadData();
+            refreshOpenEmployeeForms();
+            DialogHelper.success(this, "Required status updated.\nField: "
+                    + selected.label()
+                    + "\nRequired: "
+                    + (required ? "True" : "False"));
+        } catch (RuntimeException exception) {
+            DialogHelper.error(this, "Required Field Update Failed", rootMessage(exception));
+        }
+    }
+
+    private Boolean showRequiredStatusDialog(EmployeeFieldDefinition definition) {
+        JComboBox<String> status = new JComboBox<>(new String[]{"True", "False"});
+        status.setSelectedItem(definition.requiredField() ? "True" : "False");
+        status.setPreferredSize(new Dimension(180, 34));
+
+        JPanel form = new JPanel(new GridBagLayout());
+        form.setBorder(new EmptyBorder(8, 8, 8, 8));
+        GridBagConstraints gbc = formConstraints();
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        form.add(new JLabel("Field"), gbc);
+        gbc.gridx = 1;
+        form.add(new JLabel(definition.label() + " (" + definition.columnName() + ")"), gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        form.add(new JLabel("Required"), gbc);
+        gbc.gridx = 1;
+        form.add(status, gbc);
+
+        int result = DialogHelper.formOption(
+                this,
+                "Edit Required Status",
+                form,
+                "Save",
+                "Cancel"
+        );
+        if (result != 0) {
+            return null;
+        }
+        return "True".equals(status.getSelectedItem());
     }
 
     private List<Object[]> toCategoryRows(List<CategoryRow> categories) {

@@ -1,5 +1,7 @@
 package com.kgm.service;
 
+import com.kgm.util.CnicFormatter;
+
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.FillPatternType;
@@ -26,7 +28,7 @@ public final class ExcelSampleGenerator {
     private static final String[] SAMPLE_NAMES = {"Ali Khan", "Sana Malik", "Bilal Ahmed", "Ayesha Noor", "Usman Raza"};
     private static final String[] SAMPLE_FATHER_NAMES = {"Ahmed Khan", "Tariq Malik", "Naveed Ahmed", "Imran Noor", "Raza Ali"};
     private static final String[] SAMPLE_CNICS = {
-            "3520212345671", "4210112345672", "6110112345673", "3740112345674", "1730112345675"
+            "35202-1234567-1", "42101-1234567-2", "61101-1234567-3", "37401-1234567-4", "17301-1234567-5"
     };
     private static final String[] SAMPLE_PHONES = {
             "0307-5011252", "0334-5040248", "0312-3456789", "0321-7654321", "0345-1234567"
@@ -134,13 +136,13 @@ public final class ExcelSampleGenerator {
         rowIndex++;
         textCell(sheet.createRow(rowIndex++), 0, "Rules", headerStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Only .xlsx or .xls files can be imported.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "CNIC must contain exactly 13 digits. Hyphens are allowed but ignored.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ", including both hyphens.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Phone must use format 0307-5011252, including the hyphen.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Date of Joining must be before Date of Resignation.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Date format: " + ExcelImportService.DATE_FORMAT_HINT + " (example: 8/23/2010 00:00:00).", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Document fields are not part of Excel import.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "The sample is rebuilt from current Field Management settings each time it is downloaded.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Fields in the Fundamentals category are required; other non-document fields are optional.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "Required fields come from Field Management > Required Fields.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "The first five rows are examples. Replace them with employee records before import.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Do not add, remove, or rename headers. Unknown headers are rejected during import.", textStyle);
 
@@ -232,7 +234,7 @@ public final class ExcelSampleGenerator {
         }
         String dbColumn = column.dbColumn();
         if ("NID".equalsIgnoreCase(dbColumn)) {
-            return "CNIC must contain exactly 13 digits. Hyphens are allowed but ignored.";
+            return "Use CNIC format " + CnicFormatter.FORMAT_EXAMPLE + ", including both hyphens.";
         }
         if ("EMP_CONTNO".equalsIgnoreCase(dbColumn) || "EMERGENCY_NO".equalsIgnoreCase(dbColumn)) {
             return "Use phone format 0307-5011252, including the hyphen.";

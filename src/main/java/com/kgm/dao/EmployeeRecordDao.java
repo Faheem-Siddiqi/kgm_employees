@@ -2,11 +2,15 @@ package com.kgm.dao;
 
 import com.kgm.config.DatabaseConnection;
 import com.kgm.model.Employee;
+import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.EmployeeDocumentUtil;
 import java.sql.*;
 import java.util.HashSet;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -110,6 +114,325 @@ public class EmployeeRecordDao {
         }
 
         return 0;
+    }
+
+    public DashboardStats dashboardStats() {
+        int total = countEmployees();
+        Map<String, List<CountStat>> sectionsByDepartment = countByParentChild("DEPARTMENT", "SECTION");
+        Map<String, List<CountStat>> departmentsByGrade = countByParentChild("GRADE", "DEPARTMENT");
+        List<CountStat> departments = countByColumn("DEPARTMENT");
+        List<ContributionStat> grades = contributions(countByColumn("GRADE"), departmentsByGrade);
+        List<CountStat> designations = countByColumn("DESIGNATION");
+        List<CountStat> exitTrends = exitTrends();
+        List<MissingRequirementStat> missingDocuments = missingRequirementStats(requiredDefinitions(true), total);
+        List<MissingRequirementStat> missingFields = missingRequirementStats(requiredDefinitions(false), total);
+        int employeesMissingDocuments = employeesMissingAny(missingDocuments, total);
+        int employeesMissingFields = employeesMissingAny(missingFields, total);
+        List<MissingRequirementStat> allMissingRequirements = new ArrayList<>(missingDocuments);
+        allMissingRequirements.addAll(missingFields);
+        int employeesMissingAnyData = employeesMissingAny(allMissingRequirements, total);
+
+        return new DashboardStats(
+                total,
+                departments,
+                sectionsByDepartment,
+                grades,
+                designations,
+                exitTrends,
+                missingDocumentsFromRequirements(missingDocuments),
+                employeesMissingDocuments,
+                missingDocuments,
+                missingFields,
+                employeesMissingFields,
+                totalMissing(missingDocuments),
+                totalMissing(missingFields),
+                employeesMissingAnyData
+        );
+    }
+
+    private List<CountStat> countByColumn(String column) {
+        List<CountStat> stats = new ArrayList<>();
+        String sql = "SELECT " + normalizedValueSql(column) + " AS label, COUNT(*) AS total "
+                + "FROM employees GROUP BY label ORDER BY total DESC, label ASC";
+        try (Statement statement = con.createStatement();
+             ResultSet rs = statement.executeQuery(sql)) {
+            while (rs.next()) {
+                stats.add(new CountStat(rs.getString("label"), rs.getInt("total")));
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+        return stats;
+    }
+
+    private Map<String, List<CountStat>> countByParentChild(String parentColumn, String childColumn) {
+        Map<String, List<CountStat>> grouped = new LinkedHashMap<>();
+        String sql = "SELECT " + normalizedValueSql(parentColumn) + " AS parent_label, "
+                + normalizedValueSql(childColumn) + " AS child_label, COUNT(*) AS total "
+                + "FROM employees GROUP BY parent_label, child_label "
+                + "ORDER BY parent_label ASC, total DESC, child_label ASC";
+        try (Statement statement = con.createStatement();
+             ResultSet rs = statement.executeQuery(sql)) {
+            while (rs.next()) {
+                String parent = rs.getString("parent_label");
+                grouped.computeIfAbsent(parent, ignored -> new ArrayList<>())
+                        .add(new CountStat(rs.getString("child_label"), rs.getInt("total")));
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+        return grouped;
+    }
+
+    private List<ContributionStat> contributions(
+            List<CountStat> totals,
+            Map<String, List<CountStat>> contributionMap
+    ) {
+        List<ContributionStat> contributions = new ArrayList<>();
+        for (CountStat total : totals) {
+            contributions.add(new ContributionStat(
+                    total.label(),
+                    total.count(),
+                    contributionMap.getOrDefault(total.label(), List.of())
+            ));
+        }
+        contributions.sort(Comparator
+                .comparingInt(ContributionStat::count)
+                .reversed()
+                .thenComparing(ContributionStat::label, String.CASE_INSENSITIVE_ORDER));
+        return contributions;
+    }
+
+    private List<CountStat> exitTrends() {
+        Map<String, Integer> totals = new LinkedHashMap<>();
+        totals.put("Layoffs", 0);
+        totals.put("Resignations", 0);
+        totals.put("Other exits", 0);
+        for (CountStat reason : countByColumn("RESIGN_REASON")) {
+            String bucket = exitBucket(reason.label());
+            totals.put(bucket, totals.getOrDefault(bucket, 0) + reason.count());
+        }
+
+        List<CountStat> stats = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : totals.entrySet()) {
+            stats.add(new CountStat(entry.getKey(), entry.getValue()));
+        }
+        return stats;
+    }
+
+    private String exitBucket(String reason) {
+        String text = reason == null ? "" : reason.toLowerCase();
+        if (text.contains("lay")) {
+            return "Layoffs";
+        }
+        if (text.contains("resign")
+                || text.contains("retire")
+                || text.contains("left")
+                || text.contains("quit")) {
+            return "Resignations";
+        }
+        return "Other exits";
+    }
+
+    private List<MissingRequirementStat> missingRequirementStats(
+            List<EmployeeFieldDefinition> definitions,
+            int totalEmployees
+    ) {
+        List<MissingRequirementStat> stats = new ArrayList<>();
+        for (EmployeeFieldDefinition definition : definitions) {
+            int missing = columnExists(definition.columnName())
+                    ? missingCount(definition.columnName())
+                    : totalEmployees;
+            stats.add(new MissingRequirementStat(
+                    definition.label(),
+                    definition.columnName(),
+                    missing,
+                    definition.documentField()
+            ));
+        }
+        stats.sort(Comparator
+                .comparingInt(MissingRequirementStat::missingCount)
+                .reversed()
+                .thenComparing(MissingRequirementStat::label, String.CASE_INSENSITIVE_ORDER));
+        return stats;
+    }
+
+    private List<EmployeeFieldDefinition> requiredDefinitions(boolean documentField) {
+        List<EmployeeFieldDefinition> required = new ArrayList<>();
+        try {
+            for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao(con).listFields()) {
+                if ("ID".equalsIgnoreCase(definition.columnName())) {
+                    continue;
+                }
+                if (definition.documentField() == documentField && definition.requiredField()) {
+                    required.add(definition);
+                }
+            }
+        } catch (RuntimeException exception) {
+            exception.printStackTrace();
+        }
+        required.sort(Comparator
+                .comparing(EmployeeFieldDefinition::heading, String.CASE_INSENSITIVE_ORDER)
+                .thenComparingInt(EmployeeFieldDefinition::sortOrder)
+                .thenComparing(EmployeeFieldDefinition::label, String.CASE_INSENSITIVE_ORDER));
+        return required;
+    }
+
+    private List<MissingDocumentStat> missingDocumentsFromRequirements(List<MissingRequirementStat> requirements) {
+        List<MissingDocumentStat> documents = new ArrayList<>();
+        for (MissingRequirementStat requirement : requirements) {
+            documents.add(new MissingDocumentStat(
+                    requirement.label(),
+                    requirement.column(),
+                    requirement.missingCount()
+            ));
+        }
+        return documents;
+    }
+
+    private int employeesMissingAny(List<MissingRequirementStat> requirements, int totalEmployees) {
+        List<String> conditions = new ArrayList<>();
+        for (MissingRequirementStat requirement : requirements) {
+            if (columnExists(requirement.column())) {
+                conditions.add(missingValueCondition(quoteIdentifier(requirement.column())));
+            }
+        }
+        if (requirements.isEmpty()) {
+            return 0;
+        }
+        if (conditions.isEmpty()) {
+            return totalEmployees;
+        }
+
+        String sql = "SELECT COUNT(*) FROM employees WHERE " + String.join(" OR ", conditions);
+        try (Statement statement = con.createStatement();
+             ResultSet rs = statement.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+        return 0;
+    }
+
+    private int totalMissing(List<MissingRequirementStat> stats) {
+        int total = 0;
+        for (MissingRequirementStat stat : stats) {
+            total += stat.missingCount();
+        }
+        return total;
+    }
+
+    private int missingCount(String column) {
+        String quoted = quoteIdentifier(column);
+        String sql = "SELECT SUM(CASE WHEN " + missingValueCondition(quoted)
+                + " THEN 1 ELSE 0 END) FROM employees";
+        try (Statement statement = con.createStatement();
+             ResultSet rs = statement.executeQuery(sql)) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+        return 0;
+    }
+
+    private String normalizedValueSql(String column) {
+        String quoted = quoteIdentifier(column);
+        return "CASE WHEN " + missingValueCondition(quoted)
+                + " THEN 'Unassigned' ELSE TRIM(" + quoted + ") END";
+    }
+
+    private String missingValueCondition(String quotedColumn) {
+        return quotedColumn + " IS NULL OR TRIM(" + quotedColumn + ") = '' OR UPPER(TRIM(" + quotedColumn
+                + ")) IN ('N/A', 'NA', 'NULL') OR TRIM(" + quotedColumn + ") = '-'";
+    }
+
+    private boolean columnExists(String columnName) {
+        try (ResultSet rs = con.getMetaData().getColumns(con.getCatalog(), null, "employees", columnName)) {
+            if (rs.next()) {
+                return true;
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+        return false;
+    }
+
+    public List<MissingEmployeeRow> missingRequiredDataRows() {
+        List<MissingEmployeeRow> rows = new ArrayList<>();
+        List<EmployeeFieldDefinition> required = new ArrayList<>();
+        required.addAll(requiredDefinitions(false));
+        required.addAll(requiredDefinitions(true));
+        if (required.isEmpty()) {
+            return rows;
+        }
+
+        try (Statement statement = con.createStatement();
+             ResultSet rs = statement.executeQuery("SELECT * FROM employees ORDER BY ID DESC")) {
+            ResultSetMetaData metaData = rs.getMetaData();
+            Map<String, Integer> resultColumns = resultColumns(metaData);
+            while (rs.next()) {
+                List<String> missing = new ArrayList<>();
+                for (EmployeeFieldDefinition definition : required) {
+                    Integer index = resultColumns.get(definition.columnName().toUpperCase(Locale.ROOT));
+                    String value = index == null ? null : rs.getString(index);
+                    if (isMissingValue(value)) {
+                        missing.add(definition.label());
+                    }
+                }
+                if (missing.isEmpty()) {
+                    continue;
+                }
+                rows.add(new MissingEmployeeRow(
+                        safe(valueFor(rs, resultColumns, "EMPLOYEE_CODE")),
+                        safe(valueFor(rs, resultColumns, "EMP_NAME")),
+                        String.join(", ", missing),
+                        safe(valueFor(rs, resultColumns, "DESIGNATION")),
+                        safe(valueFor(rs, resultColumns, "GRADE")),
+                        safe(valueFor(rs, resultColumns, "DEPARTMENT")),
+                        safe(valueFor(rs, resultColumns, "SECTION")),
+                        safe(valueFor(rs, resultColumns, "JOINING_DATE")),
+                        safe(valueFor(rs, resultColumns, "RESIGN_DATE"))
+                ));
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+        return rows;
+    }
+
+    private boolean isMissingValue(String value) {
+        if (value == null) {
+            return true;
+        }
+        String text = value.trim();
+        return text.isEmpty()
+                || text.equalsIgnoreCase("N/A")
+                || text.equalsIgnoreCase("NA")
+                || text.equalsIgnoreCase("NULL")
+                || text.equals("-");
+    }
+
+    private Map<String, Integer> resultColumns(ResultSetMetaData metaData) throws SQLException {
+        Map<String, Integer> columns = new LinkedHashMap<>();
+        for (int index = 1; index <= metaData.getColumnCount(); index++) {
+            String label = metaData.getColumnLabel(index);
+            if (label == null || label.isBlank()) {
+                label = metaData.getColumnName(index);
+            }
+            if (label != null && !label.isBlank()) {
+                columns.put(label.toUpperCase(Locale.ROOT), index);
+            }
+        }
+        return columns;
+    }
+
+    private String valueFor(ResultSet rs, Map<String, Integer> resultColumns, String column) throws SQLException {
+        Integer index = resultColumns.get(column.toUpperCase(Locale.ROOT));
+        return index == null ? "" : rs.getString(index);
     }
 
     // ==============================
@@ -434,6 +757,49 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
                 && !text.equalsIgnoreCase("NA")
                 && !text.equalsIgnoreCase("NULL")
                 && !text.equals("-");
+    }
+
+    public record CountStat(String label, int count) {
+    }
+
+    public record ContributionStat(String label, int count, List<CountStat> contributions) {
+    }
+
+    public record MissingDocumentStat(String label, String column, int missingCount) {
+    }
+
+    public record MissingRequirementStat(String label, String column, int missingCount, boolean documentField) {
+    }
+
+    public record MissingEmployeeRow(
+            String employeeCode,
+            String name,
+            String missingItems,
+            String designation,
+            String grade,
+            String department,
+            String section,
+            String joiningDate,
+            String resignationDate
+    ) {
+    }
+
+    public record DashboardStats(
+            int totalEmployees,
+            List<CountStat> employeesByDepartment,
+            Map<String, List<CountStat>> sectionsByDepartment,
+            List<ContributionStat> employeesByGrade,
+            List<CountStat> employeesByDesignation,
+            List<CountStat> exitTrends,
+            List<MissingDocumentStat> missingDocuments,
+            int employeesMissingRequiredDocuments,
+            List<MissingRequirementStat> missingRequiredDocuments,
+            List<MissingRequirementStat> missingRequiredFields,
+            int employeesMissingRequiredFields,
+            int totalMissingRequiredDocuments,
+            int totalMissingRequiredFields,
+            int employeesMissingAnyRequiredData
+    ) {
     }
 }
 

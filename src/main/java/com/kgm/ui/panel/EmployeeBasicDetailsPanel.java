@@ -6,6 +6,7 @@ import com.kgm.ui.component.DropdownFieldSupport;
 import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeBasicDetailsPanelHelper;
+import com.kgm.util.CnicFormatter;
 import com.kgm.util.EmployeeBasicFieldUtil;
 
 import javax.imageio.ImageIO;
@@ -172,6 +173,9 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             input = EmployeeBasicDetailsPanelHelper.createTextAreaScrollPane(area);
         } else {
             input = new JTextField();
+            if ("NID".equalsIgnoreCase(column)) {
+                CnicFormatter.installFormatter((JTextField) input);
+            }
         }
 
         if ("EMPLOYEE_CODE".equalsIgnoreCase(column)) {
@@ -330,7 +334,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
                 continue;
             }
             if ("NID".equalsIgnoreCase(column)) {
-                value = value.replaceAll("\\D", "");
+                value = CnicFormatter.format(value);
             }
             EmployeeBasicFieldUtil.writeValue(updated, column, value);
         }
@@ -338,9 +342,9 @@ public class EmployeeBasicDetailsPanel extends JPanel {
     }
 
     public String validationMessage() {
-        String cnic = valueFor("NID").replaceAll("\\D", "");
-        if (!cnic.isEmpty() && cnic.length() != 13) {
-            return "CNIC must contain exactly 13 digits.";
+        String cnic = valueFor("NID");
+        if (!cnic.isBlank() && !CnicFormatter.isValid(cnic)) {
+            return "CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".";
         }
 
         Date joining = dateFor("JOINING_DATE");

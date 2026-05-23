@@ -3,6 +3,7 @@ package com.kgm.ui.panel;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.model.Employee;
 import com.kgm.ui.EmployeeDetailView;
+import com.kgm.util.CnicFormatter;
 
 import javax.swing.*;
 import java.awt.*;
@@ -11,14 +12,16 @@ import java.util.List;
 
 public class EmployeeTablePanel extends JPanel {
     private static final int EMPLOYEE_CODE_COLUMN = 0;
-    private static final int ACTION_COLUMN = 7;
+    private static final int ACTION_COLUMN = 9;
 
     private static final String[] COLUMNS = {
             "Employee ID",
             "Name",
             "Designation",
             "Grade",
-            "Department",
+            "Department-Section",
+            "Date of Joining",
+            "Date of Resignation",
             "Phone",
             "CNIC",
             "Action"
@@ -41,11 +44,15 @@ public class EmployeeTablePanel extends JPanel {
         tablePanel.setColumnAlignment(2, SwingConstants.LEFT);
         tablePanel.setColumnAlignment(3, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(4, SwingConstants.LEFT);
-        tablePanel.setColumnAlignment(5, SwingConstants.LEFT);
-        tablePanel.setColumnAlignment(6, SwingConstants.LEFT);
+        tablePanel.setColumnAlignment(5, SwingConstants.CENTER);
+        tablePanel.setColumnAlignment(6, SwingConstants.CENTER);
+        tablePanel.setColumnAlignment(7, SwingConstants.LEFT);
+        tablePanel.setColumnAlignment(8, SwingConstants.LEFT);
         tablePanel.setPreferredColumnWidthLimit(4, 200);
         tablePanel.setPreferredColumnWidthLimit(5, 140);
-        tablePanel.setPreferredColumnWidthLimit(6, 150);
+        tablePanel.setPreferredColumnWidthLimit(6, 140);
+        tablePanel.setPreferredColumnWidthLimit(7, 140);
+        tablePanel.setPreferredColumnWidthLimit(8, 150);
         // Pagination button gap for this table specifically.
         tablePanel.setPaginationBottomGap(5);
 
@@ -110,8 +117,10 @@ public class EmployeeTablePanel extends JPanel {
                     employee.getDESIGNATION(),
                     employee.getGRADE() != null ? employee.getGRADE() : "",
                     formatDepartment(employee),
+                    employee.getJOINING_DATE() != null ? employee.getJOINING_DATE() : "",
+                    employee.getRESIGN_DATE() != null ? employee.getRESIGN_DATE() : "",
                     employee.getEMP_CONTNO(),
-                    employee.getNID(),
+                    CnicFormatter.format(employee.getNID()),
                     "View"
             });
         }

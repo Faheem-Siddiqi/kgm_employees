@@ -89,7 +89,7 @@ public final class EmployeeBasicFieldUtil {
     }
 
     public static boolean isRequired(EmployeeFieldDefinition definition) {
-        return isFundamentalsField(definition);
+        return definition != null && definition.requiredField();
     }
 
     public static boolean isFundamentalsField(EmployeeFieldDefinition definition) {
@@ -221,7 +221,8 @@ public final class EmployeeBasicFieldUtil {
                 true,
                 isComboField(column),
                 isComboField(column),
-                String.join("\n", comboOptions(column, false))
+                String.join("\n", comboOptions(column, false)),
+                true
         );
     }
 

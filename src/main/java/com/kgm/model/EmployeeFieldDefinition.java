@@ -17,7 +17,8 @@ public record EmployeeFieldDefinition(
         boolean coreField,
         boolean dropdownField,
         boolean variableOptionField,
-        String dropdownOptions
+        String dropdownOptions,
+        boolean requiredField
 ) {
     public String usageLabel() {
         if (documentField) {

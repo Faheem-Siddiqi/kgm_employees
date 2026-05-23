@@ -8,6 +8,7 @@ import com.kgm.ui.panel.EmployeeTablePanel;
 import com.kgm.ui.panel.ExcelImportButton;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
+import com.kgm.ui.panel.HomeStatsPanel;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.HomeViewHelper;
 
@@ -24,6 +25,7 @@ public class HomeView extends JFrame {
     private final ExcelImportService excelImportService = new ExcelImportService();
     private final ExcelExportService excelExportService = new ExcelExportService();
     private EmployeeTablePanel tablePanel;
+    private HomeStatsPanel statsPanel;
     private ExcelImportButton excelBtn;
 
     public HomeView() {
@@ -31,6 +33,7 @@ public class HomeView extends JFrame {
 
         EmployeeRecordDao repo = new EmployeeRecordDao();
         tablePanel = new EmployeeTablePanel(repo);
+        statsPanel = new HomeStatsPanel(repo);
 
         JPanel top = HomeViewHelper.createTopPanel();
         top.add(new HeaderPanel("Home Dashboard"), BorderLayout.NORTH);
@@ -83,7 +86,7 @@ public class HomeView extends JFrame {
 
         clearBtn.addActionListener(e -> {
             searchField.setText("");
-            tablePanel.reload();
+            reloadHomeData();
             HomeViewHelper.setTextButtonEnabled(clearBtn, false);
         });
 
@@ -105,7 +108,7 @@ public class HomeView extends JFrame {
 
         JButton refreshBtn = new JButton("Refresh");
         HomeViewHelper.styleRefreshButton(refreshBtn);
-        refreshBtn.addActionListener(e -> tablePanel.reload());
+        refreshBtn.addActionListener(e -> reloadHomeData());
 
         JButton settingsBtn = new JButton("Settings");
         HomeViewHelper.styleAddButton(settingsBtn);
@@ -122,6 +125,7 @@ public class HomeView extends JFrame {
 
         JPanel body = HomeViewHelper.createBodyPanel();
         body.add(tablePanel, BorderLayout.NORTH);
+        body.add(statsPanel, BorderLayout.CENTER);
 
         JPanel mainContent = HomeViewHelper.createMainContentPanel();
         mainContent.add(northContainer, BorderLayout.NORTH);
@@ -225,8 +229,8 @@ public class HomeView extends JFrame {
                 try {
                     ExcelImportService.ImportResult result = get();
                     showImportResult(result);
-                    if (result.importedCount() > 0 && tablePanel != null) {
-                        tablePanel.reload();
+                    if (result.importedCount() > 0) {
+                        reloadHomeData();
                     }
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
@@ -247,6 +251,15 @@ public class HomeView extends JFrame {
             }
         };
         worker.execute();
+    }
+
+    private void reloadHomeData() {
+        if (tablePanel != null) {
+            tablePanel.reload();
+        }
+        if (statsPanel != null) {
+            statsPanel.reload();
+        }
     }
 
     private void downloadSampleExcel() {
@@ -430,8 +443,8 @@ public class HomeView extends JFrame {
             return rowPrefix + "Add required fields: "
                     + reason.substring("Missing required fields:".length()).trim();
         }
-        if (reason.equals("CNIC must contain exactly 13 digits.")) {
-            return rowPrefix + "CNIC must be exactly 13 digits.";
+        if (reason.startsWith("CNIC must use format")) {
+            return rowPrefix + reason;
         }
         if (reason.equals("Date of Resignation must be after Date of Joining.")) {
             return rowPrefix + "Date of Joining must be before Date of Resignation.";
@@ -551,4 +564,3 @@ public class HomeView extends JFrame {
         excelBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 }
-
