@@ -46,7 +46,7 @@ The project follows a layered desktop-application architecture:
 
 | File | Functionality |
 | --- | --- |
-| **DatabaseInitializer.java** | Creates the configured MySQL database, ensures the `employees` table exists, adds required document columns for existing installs, migrates obvious legacy document paths, and ensures the employee-code search index. |
+| **DatabaseInitializer.java** | Creates the configured MySQL database, ensures the `employees` table exists, adds required document columns for existing installs, migrates obvious legacy document paths, and ensures employee-code/search/reporting indexes. |
 
 #### `src/main/resources`
 
@@ -186,6 +186,7 @@ The project follows a layered desktop-application architecture:
 | **SessionManager.java** | Stores and clears the current `UserSession`, checks expiry, and exposes remaining session time. |
 | **SessionWatcher.java** | Monitors active session expiry and closes/redirects windows when the session is no longer valid. |
 | **EmployeeBasicFieldUtil.java** | Single source of truth for Core employee field order, required-field rules, date/dropdown defaults, and labels used by Add Employee, Basic Detail, and Excel import/sample generation. |
+| **EmployeeAdditionalFieldDefaults.java** | Seeds the 43 ERP/detail custom fields with database columns, Field Management categories, date/dropdown behavior, and Excel sample values. |
 | **EmployeeDocumentUtil.java** | Shared document metadata, validation, path handling, filename matching, and bulk-upload matching for the 22 required document fields. |
 | **FileUtil.java** | Reserved file utility boundary for shared file handling logic. |
 | **FilterUtil.java** | Reserved filtering utility boundary for reusable search/filter behavior. |
@@ -253,6 +254,10 @@ The primary table is defined in `src/main/resources/schema.sql` and initialized 
 | **employees** | Stores employee identity, employment, organization, payroll, banking, contact, reporting, compliance, benefits, vaccination, document paths, and profile image path. |
 | **employee_field_metadata** | Stores editable field labels, category headings, Core/detail/document flags, custom/built-in origin, date/dropdown flags, variable-option flags, dropdown options, and sort order for dynamic UI/report/Excel behavior. |
 
+The app keeps `employees` as the canonical employee row for Excel import/export, reports, and updates, but it no longer treats every screen as a `SELECT *` workflow. `EmployeeRecordDao` exposes header, Basic tab, Others tab, and Documents tab projections so each screen fetches only the columns it needs. Physical mini tables are kept for data that truly has a separate lifecycle, such as `employee_field_metadata`; this avoids unnecessary joins and complex migrations while still improving runtime performance.
+
+Startup also ensures indexes for employee-code lookup and dashboard/reporting group fields (`DEPARTMENT`, `SECTION`, `GRADE`, `DESIGNATION`, and `RESIGN_REASON`) so home statistics and navigation filters stay responsive as the employee table grows.
+
 Key schema areas:
 
 - Basic built-in employee fields: Employee ID, Name, Father Name, CNIC, Phone, Email, Department, Designation, Section, Grade, Shift, Date of Birth, Gender, Resign Reason, Date of Joining, Date of Resignation, and Permanent Address.
@@ -280,13 +285,25 @@ Field origin is categorized like this:
 - **Custom**: every non-document field that is not Core, including older payroll/HR/banking columns and user-created fields.
 - **System internal**: `ID` stays protected and is not part of forms or Excel import.
 
+Seeded custom detail fields are also created/kept during startup so Field Management, Employee Detail, Excel import, and Excel export share the same database columns and categories:
+
+- **Organization / Structure**: `DEPT_CODE`.
+- **Payroll / Allowances**: `PAY_SHEET`, `H_RENT`, `H_MAINTENANCE`, `EXTRA_DUTY_ALLOWANCE_DATE`.
+- **Personal / HR Details**: `CITY_VILLAGE`, `DISTRICT`, `REFERENCE`, `RELATIVE_DETAIL`, `REFEMP_NAME`, `REFEMP_DESIG`, `REFEMP_DEPT`, `CNIC_EXP_DATE`, `CNIC_FAMILY_NO`, `CNIC_ISSUANCE_DATE`.
+- **Employment Details**: `REST_DAY`, `STAFF`, `PRE_WORKEXP`, `CARDNO`, `CHEST_CARD_STATUS`, `REHIRING_STATUS`, `TAILOR_CATEGORY`, `VAC_ID`.
+- **Benefits / Housing**: `COLONY_RESIDENT`, `COMPANY_CAR`, `PERSONAL_HOUSE_RENT`, `COLONY_HOUSE_NUMBER`.
+- **Compliance / Status**: `SS`, `DED_UNION`.
+- **Reporting**: `REPORT_TO_EMP_ID`, `REPORT_TO_UNT`.
+- **IT Access**: `USER_ID`, `IT_EQUIPMENT`, `IT_EMAIL`, `IT_INTERNET`, `INTERNET_JUSTIFY`, `IT_SERVICE_ALERT`.
+- **Alternate Saturday**: `ALT_SAT_TEAM`, `ALT_SAT_START_DATE`, `ALT_SAT_END_DATE`, `ALT_SAT_NEXT_YEAR`, `ALT_SAT_SHUFFLE`, `ALT_SAT_UNLOCK_NEXT_YEAR`.
+
 Dropdown behavior is metadata-driven through `dropdown_field`, `variable_option_field`, and `dropdown_options`. `Gender` and `Resign Reason` are seeded as dropdowns. Any future non-document field can be marked as a dropdown in Field Management, where each option can be edited or removed. Fixed dropdowns only allow listed options, while variable dropdowns allow typing with prefix suggestion from existing options. Existing old values that are no longer in the option list still display for saved records, but they are not added back to the saved option list.
 
 ### Excel Import
 
-The Home dashboard Excel action supports importing `.xlsx` / `.xls` files and downloading a generated `.xlsx` sample. The sample is rebuilt from current Field Management metadata every time it is downloaded, includes all non-document fields, excludes document/image columns, includes a Valid Values sheet with dynamic dropdown options, and states the date format `yyyy-MM-dd`.
+The Home dashboard Excel action supports importing `.xlsx` / `.xls` files and downloading a generated `.xlsx` sample. The sample is rebuilt from current Field Management metadata every time it is downloaded, includes all non-document fields, excludes document/image columns, includes a Valid Values sheet with dynamic dropdown options, and states the date format `M/d/yyyy HH:mm:ss`.
 
-Standard import requires every field currently in the `Fundamentals` category. Other non-document fields are optional. CNIC must contain exactly 13 digits, and Date of Joining must be before Date of Resignation. Unknown, renamed, document, or extra headers are rejected so users must download the current sample and keep the first row unchanged.
+Standard import requires every field currently in the `Fundamentals` category. Other non-document fields are optional and may appear in any order. CNIC must contain exactly 13 digits, and Date of Joining must be before Date of Resignation. Unknown, renamed, document, or unsupported extra headers are rejected so users should download the current sample when field settings change.
 
 ### Required Document Fields
 
@@ -333,7 +350,8 @@ The application uses `EmployeeDocumentUtil` as the single source of truth for do
 - After a bulk upload attempt, the user receives a summary showing how many documents are ready to save and which files were discarded with the reason.
 - Employee detail downloads first ask what to include: PDF profile, all saved documents, `All Documents (PDF)`, or specific saved document names when `All saved documents` is turned off. Saved records with missing source files are still named in the picker so the user can see their status.
 - `All Documents (PDF)` merges only available saved document images, excludes the employee profile photo, starts each document on a new page, preserves image size, splits tall images across pages when needed, and does not add a header or footer.
-- Employee detail navigation paints an immediate loading shell before database queries run. The employee record and field metadata load on a background worker, while Dashboard, Download Profile, and Update actions stay fixed outside the tab scroll area.
+- Employee detail navigation paints an immediate loading shell before database queries run. The header loads first, then the Basic, Others, and Documents tabs lazy-load their own field projections only when opened. Dashboard, Download Profile, and Update actions stay fixed outside the tab scroll area.
+- Long employee-detail operations use the shared `LoadingOverlay`, which blocks the active window with progress text while DB/file work runs in a background worker. This keeps screen switching immediate and still makes saving, tab loading, and package generation visibly intentional.
 - File uploads, multi-file document uploads, Excel save/import actions, and employee report package downloads use the shared `FileUploadCard` / `NativeFileDialog` path so the app avoids old Swing file chooser surfaces.
 
 ---

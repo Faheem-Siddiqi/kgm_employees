@@ -6,6 +6,7 @@ import com.kgm.dao.EmployeeRegistrationDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.CnicFormatter;
+import com.kgm.util.EmployeeAdditionalFieldDefaults;
 import com.kgm.util.EmployeeBasicFieldUtil;
 
 import org.apache.poi.ss.usermodel.Cell;
@@ -342,6 +343,10 @@ public class ExcelImportService {
     }
 
     private static String sampleValue(String column, boolean dateField, List<String> dropdownOptions) {
+        String seededSample = EmployeeAdditionalFieldDefaults.sampleValue(column);
+        if (seededSample != null) {
+            return seededSample;
+        }
         if (!dropdownOptions.isEmpty() && !EmployeeBasicFieldUtil.isBasicField(column)) {
             return dropdownOptions.get(0);
         }
@@ -411,7 +416,6 @@ public class ExcelImportService {
             standardRequiredColumns.addAll(FALLBACK_REQUIRED_STANDARD_COLUMNS);
         }
         List<TemplateColumn> templateColumns = templateColumns(new ArrayList<>(byColumn.values()));
-        List<String> standardHeaderColumns = standardHeaderColumns(templateColumns);
         for (TemplateColumn templateColumn : templateColumns) {
             if (!templateColumn.importable()) {
                 ignoredHeaderAliases.add(normalizeHeader(templateColumn.header()));
@@ -432,17 +436,8 @@ public class ExcelImportService {
                 byAlias,
                 documentAliases,
                 ignoredHeaderAliases,
-                standardRequiredColumns,
-                standardHeaderColumns
+                standardRequiredColumns
         );
-    }
-
-    private List<String> standardHeaderColumns(List<TemplateColumn> templateColumns) {
-        List<String> columns = new ArrayList<>();
-        for (TemplateColumn templateColumn : templateColumns) {
-            columns.add(normalizeHeader(templateColumn.header()));
-        }
-        return columns;
     }
 
     private Map<String, HeaderBinding> readHeaders(
@@ -455,9 +450,8 @@ public class ExcelImportService {
         Row headerRow = sheet.getRow(0);
         Map<String, HeaderBinding> headers = new LinkedHashMap<>();
         List<String> unknownHeaders = new ArrayList<>();
-        List<String> actualHeaderColumns = new ArrayList<>();
         if (headerRow == null) {
-            validateHeaders(headers, unknownHeaders, actualHeaderColumns, importType, catalog);
+            validateHeaders(headers, unknownHeaders, importType, catalog);
             return headers;
         }
 
@@ -470,29 +464,25 @@ public class ExcelImportService {
 
             String normalized = normalizeHeader(headerText);
             if (catalog.ignoredHeaderAliases().contains(normalized)) {
-                actualHeaderColumns.add(normalized);
                 continue;
             }
 
             if (catalog.documentAliases().contains(normalized)) {
                 unknownHeaders.add(headerText);
-                actualHeaderColumns.add(normalized);
                 continue;
             }
 
             EmployeeFieldDefinition definition = catalog.byAlias().get(normalized);
             if (definition == null) {
                 unknownHeaders.add(headerText);
-                actualHeaderColumns.add(normalized);
                 continue;
             }
 
             String column = definition.columnName().toUpperCase(Locale.ROOT);
-            actualHeaderColumns.add(normalized);
             headers.putIfAbsent(column, new HeaderBinding(definition, cellIndex));
         }
 
-        validateHeaders(headers, unknownHeaders, actualHeaderColumns, importType, catalog);
+        validateHeaders(headers, unknownHeaders, importType, catalog);
         return headers;
     }
 
@@ -540,17 +530,9 @@ public class ExcelImportService {
     private void validateHeaders(
             Map<String, HeaderBinding> headers,
             List<String> unknownHeaders,
-            List<String> actualHeaderColumns,
             ImportType importType,
             FieldCatalog catalog
     ) {
-        if (importType == ImportType.STANDARD
-                && !sameColumns(actualHeaderColumns, catalog.standardHeaderColumns())) {
-            throw new HeaderImportException(
-                    "Row 1 must match the latest sample headers and order."
-            );
-        }
-
         Set<String> required = importType == ImportType.LEGACY
                 ? REQUIRED_LEGACY_COLUMNS
                 : catalog.standardRequiredColumns();
@@ -568,18 +550,6 @@ public class ExcelImportService {
                     "Row 1 has missing or unsupported headers."
             );
         }
-    }
-
-    private boolean sameColumns(List<String> actualColumns, List<String> expectedColumns) {
-        if (actualColumns.size() != expectedColumns.size()) {
-            return false;
-        }
-        for (int index = 0; index < expectedColumns.size(); index++) {
-            if (!expectedColumns.get(index).equalsIgnoreCase(actualColumns.get(index))) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private void validateEmployeeRow(
@@ -963,8 +933,7 @@ public class ExcelImportService {
             Map<String, EmployeeFieldDefinition> byAlias,
             Set<String> documentAliases,
             Set<String> ignoredHeaderAliases,
-            Set<String> standardRequiredColumns,
-            List<String> standardHeaderColumns
+            Set<String> standardRequiredColumns
     ) {
     }
 

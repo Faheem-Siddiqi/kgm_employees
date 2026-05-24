@@ -5,6 +5,7 @@ import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.FileUploadCard;
+import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.panel.EmployeeBasicDetailsPanel;
 import com.kgm.ui.panel.EmployeeDocumentViewPanel;
@@ -28,10 +29,27 @@ import java.util.List;
 import java.util.Map;
 
 public class EmployeeDetailView extends JFrame {
+    private static final int BASIC_TAB_INDEX = 0;
+    private static final int OTHER_TAB_INDEX = 1;
+    private static final int DOCUMENT_TAB_INDEX = 2;
 
     private String empCode;
     private JButton updateBtn;
     private Employee employee;
+    private List<EmployeeFieldDefinition> basicDefinitions = List.of();
+    private List<EmployeeFieldDefinition> detailDefinitions = List.of();
+    private JTabbedPane tabs;
+    private JScrollPane pageScroll;
+    private JPanel centerWrapper;
+    private EmployeeBasicDetailsPanel basicPanel;
+    private EmployeeAdditionalDetailsPanel otherPanel;
+    private EmployeeDocumentViewPanel documentPanel;
+    private boolean basicTabLoaded;
+    private boolean basicTabLoading;
+    private boolean otherTabLoaded;
+    private boolean otherTabLoading;
+    private boolean documentTabLoaded;
+    private boolean documentTabLoading;
 
     public EmployeeDetailView(String empCode) {
         this.empCode = (empCode != null) ? empCode.trim() : null;
@@ -64,6 +82,14 @@ public class EmployeeDetailView extends JFrame {
     private void initializeUI(DetailLoadResult detailData, boolean isWithData) {
         Employee emp = detailData == null ? null : detailData.employee();
         this.employee = emp;
+        this.basicDefinitions = detailData == null || detailData.basicDefinitions() == null
+                ? EmployeeBasicFieldUtil.loadBasicDefinitions()
+                : detailData.basicDefinitions();
+        this.detailDefinitions = detailData == null || detailData.detailDefinitions() == null
+                ? List.of()
+                : detailData.detailDefinitions();
+        resetLazyTabs();
+
         getContentPane().removeAll();
         EmployeeDetailViewHelper.applyFrame(this);
 
@@ -83,31 +109,22 @@ public class EmployeeDetailView extends JFrame {
         ), BorderLayout.CENTER);
         add(topContainer, BorderLayout.NORTH);
 
-        JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
-        List<EmployeeFieldDefinition> basicDefinitions = detailData == null || detailData.basicDefinitions() == null
-                ? EmployeeBasicFieldUtil.loadBasicDefinitions()
-                : detailData.basicDefinitions();
-        List<EmployeeFieldDefinition> detailDefinitions = detailData == null || detailData.detailDefinitions() == null
-                ? List.of()
-                : detailData.detailDefinitions();
-
-        JTabbedPane tabs = new HugHeightTabbedPane();
-
-        EmployeeDocumentViewPanel documentPanel = isWithData && emp != null
-                ? new EmployeeDocumentViewPanel(emp)
-                : new EmployeeDocumentViewPanel();
+        centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
+        tabs = new HugHeightTabbedPane();
 
         if (isWithData) {
-            tabs.addTab("Basic", new EmployeeBasicDetailsPanel(emp, basicDefinitions));
-            tabs.addTab("Others", new EmployeeAdditionalDetailsPanel(emp, detailDefinitions));
+            tabs.addTab("Basic", createTabLoadingPanel("Basic details", "Fetching only the Basic fields for this employee."));
+            tabs.addTab("Others", createTabLoadingPanel("Other details", "This tab loads when you open it."));
+            tabs.addTab("Documents", createTabLoadingPanel("Documents", "Document paths load only when needed."));
         } else {
-            tabs.addTab("Core", new EmployeeBasicDetailsPanel(null, basicDefinitions));
-            tabs.addTab("Details", new EmployeeAdditionalDetailsPanel(null, detailDefinitions));
+            basicPanel = new EmployeeBasicDetailsPanel(null, basicDefinitions);
+            otherPanel = new EmployeeAdditionalDetailsPanel(null, detailDefinitions);
+            documentPanel = new EmployeeDocumentViewPanel();
+            tabs.addTab("Core", basicPanel);
+            tabs.addTab("Details", otherPanel);
+            tabs.addTab("Documents", documentPanel);
         }
 
-        tabs.addTab("Documents", documentPanel);
-
-        // Apply custom tab styling
         EmployeeDetailViewHelper.styleTabs(tabs);
         tabs.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent event) {
@@ -123,16 +140,21 @@ public class EmployeeDetailView extends JFrame {
         JPanel footerActions = EmployeeDetailViewHelper.createActionRow();
         updateBtn = new JButton("Update");
         EmployeeDetailViewHelper.styleUpdateButton(updateBtn);
+        updateBtn.setEnabled(false);
         footerActions.add(updateBtn);
 
         JPanel tabContent = EmployeeDetailViewHelper.createTabContent(tabs, null);
         centerWrapper.add(tabContent, EmployeeDetailViewHelper.pageConstraints(0));
 
-        JScrollPane pageScroll = EmployeeDetailViewHelper.createPageScrollPane(centerWrapper);
+        pageScroll = EmployeeDetailViewHelper.createPageScrollPane(centerWrapper);
         tabs.addChangeListener(event -> SwingUtilities.invokeLater(() -> {
             centerWrapper.revalidate();
             centerWrapper.repaint();
             pageScroll.getVerticalScrollBar().setValue(0);
+            if (isWithData) {
+                loadSelectedTab();
+            }
+            refreshUpdateButtonState();
         }));
         EmployeeDetailViewHelper.installPageWheelForwarding(pageScroll, centerWrapper);
         add(pageScroll, BorderLayout.CENTER);
@@ -143,95 +165,413 @@ public class EmployeeDetailView extends JFrame {
         southContainer.add(new FooterPanel(), BorderLayout.SOUTH);
         add(southContainer, BorderLayout.SOUTH);
 
-        Runnable refreshButtonState = () -> {
-            boolean canUpdate = isWithData && documentPanel.hasPendingDocumentUpdates();
-
-            for (int i = 0; i < tabs.getTabCount(); i++) {
-                Component comp = tabs.getComponentAt(i);
-
-                if (comp instanceof EmployeeBasicDetailsPanel bp && panelHasEditableFields(bp)) {
-                    canUpdate = true;
-                    break;
-                }
-
-                if (comp instanceof EmployeeAdditionalDetailsPanel op && panelHasEditableFields(op)) {
-                    canUpdate = true;
-                    break;
-                }
-            }
-
-            updateBtn.setEnabled(isWithData && canUpdate);
-        };
-
-        documentPanel.setPendingChangesListener(refreshButtonState);
-        tabs.addChangeListener(e -> refreshButtonState.run());
-        refreshButtonState.run();
-
-        updateBtn.addActionListener(e -> {
-            try {
-                EmployeeBasicDetailsPanel basicPanel = null;
-                EmployeeAdditionalDetailsPanel otherPanel = null;
-
-                for (int i = 0; i < tabs.getTabCount(); i++) {
-                    Component comp = tabs.getComponentAt(i);
-
-                    if (comp instanceof EmployeeBasicDetailsPanel bp) {
-                        basicPanel = bp;
-                    }
-
-                    if (comp instanceof EmployeeAdditionalDetailsPanel op) {
-                        otherPanel = op;
-                    }
-                }
-
-                EmployeeRecordDao dao = new EmployeeRecordDao();
-                boolean updatedAny = false;
-
-                if (basicPanel != null && panelHasEditableFields(basicPanel)) {
-                    String validationMessage = basicPanel.validationMessage();
-                    if (validationMessage != null) {
-                        DialogHelper.warning(this, "Check Employee Details", validationMessage);
-                        return;
-                    }
-                    Employee updatedBasic = basicPanel.getEmployeeFromForm();
-                    File selectedImage = basicPanel.getSelectedImage();
-                    if (selectedImage != null) {
-                        updatedBasic.setEMP_IMG(copyProfileImage(selectedImage, empCode));
-                    }
-                    updatedBasic.setEMPLOYEE_CODE(empCode);
-                    dao.updateEmployeeDynamic(updatedBasic);
-                    updatedAny = true;
-                }
-
-                if (otherPanel != null && panelHasEditableFields(otherPanel)) {
-                    Employee updatedOther = otherPanel.getUpdatedOtherDetails();
-                    updatedOther.setEMPLOYEE_CODE(empCode);
-                    dao.updateEmployeeDynamic(updatedOther);
-                    updatedAny = true;
-                }
-
-                if (documentPanel.hasPendingDocumentUpdates()) {
-                    Employee documentUpdates = documentPanel.getDocumentUpdates(empCode);
-                    documentUpdates.setEMPLOYEE_CODE(empCode);
-                    dao.updateEmployeeDynamic(documentUpdates);
-                    updatedAny = true;
-                }
-
-                if (!updatedAny) {
-                    DialogHelper.warning(this, "No Editable Fields", "No editable fields found.");
-                    return;
-                }
-
-                DialogHelper.success(this, "Updated successfully.");
-
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                DialogHelper.error(this, "Update Failed", "Update failed.");
-            }
-        });
+        if (isWithData) {
+            updateBtn.addActionListener(event -> handleUpdate());
+        }
+        refreshUpdateButtonState();
         revalidate();
         repaint();
         setVisible(true);
+
+        if (isWithData) {
+            SwingUtilities.invokeLater(this::loadSelectedTab);
+        }
+    }
+
+    private void resetLazyTabs() {
+        basicPanel = null;
+        otherPanel = null;
+        documentPanel = null;
+        basicTabLoaded = false;
+        basicTabLoading = false;
+        otherTabLoaded = false;
+        otherTabLoading = false;
+        documentTabLoaded = false;
+        documentTabLoading = false;
+    }
+
+    private JPanel createTabLoadingPanel(String title, String message) {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(42, 24, 52, 24));
+
+        JPanel box = new JPanel();
+        box.setOpaque(false);
+        box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 16));
+        titleLabel.setForeground(new Color(17, 24, 39));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel messageLabel = new JLabel(message);
+        messageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        messageLabel.setForeground(new Color(100, 116, 139));
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JProgressBar progress = new JProgressBar();
+        progress.setIndeterminate(true);
+        progress.setPreferredSize(new Dimension(260, 8));
+        progress.setMaximumSize(new Dimension(260, 8));
+        progress.setBorderPainted(false);
+        progress.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        box.add(titleLabel);
+        box.add(Box.createVerticalStrut(5));
+        box.add(messageLabel);
+        box.add(Box.createVerticalStrut(16));
+        box.add(progress);
+        box.add(Box.createVerticalStrut(28));
+        box.add(createSkeletonPanel());
+        panel.add(box);
+        return panel;
+    }
+
+    private JPanel createTabErrorPanel(String title, String message, Runnable retryAction) {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(46, 24, 56, 24));
+
+        JPanel box = new JPanel();
+        box.setOpaque(false);
+        box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 16));
+        titleLabel.setForeground(new Color(185, 28, 28));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel messageLabel = new JLabel(message);
+        messageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        messageLabel.setForeground(new Color(100, 116, 139));
+        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton retry = createDialogButton("Retry", true);
+        retry.setAlignmentX(Component.CENTER_ALIGNMENT);
+        retry.addActionListener(event -> retryAction.run());
+
+        box.add(titleLabel);
+        box.add(Box.createVerticalStrut(6));
+        box.add(messageLabel);
+        box.add(Box.createVerticalStrut(18));
+        box.add(retry);
+        panel.add(box);
+        return panel;
+    }
+
+    private void loadSelectedTab() {
+        if (tabs == null || empCode == null || empCode.isBlank()) {
+            return;
+        }
+
+        int selectedIndex = tabs.getSelectedIndex();
+        if (selectedIndex == BASIC_TAB_INDEX) {
+            loadBasicTab();
+        } else if (selectedIndex == OTHER_TAB_INDEX) {
+            loadOtherTab();
+        } else if (selectedIndex == DOCUMENT_TAB_INDEX) {
+            loadDocumentTab();
+        }
+    }
+
+    private void loadBasicTab() {
+        if (basicTabLoaded || basicTabLoading || tabs == null) {
+            return;
+        }
+        basicTabLoading = true;
+        tabs.setComponentAt(BASIC_TAB_INDEX, createTabLoadingPanel("Basic details", "Fetching Basic fields from the database."));
+        LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Loading Basic Details", "Fetching only Basic tab fields...");
+
+        SwingWorker<Employee, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Employee doInBackground() {
+                return new EmployeeRecordDao().getEmployeeSectionByCode(
+                        empCode,
+                        columnsForDefinitions(basicDefinitions, true)
+                );
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                basicTabLoading = false;
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    Employee loaded = get();
+                    if (loaded == null) {
+                        throw new IllegalStateException("Employee record was not found.");
+                    }
+                    employee = loaded;
+                    basicPanel = new EmployeeBasicDetailsPanel(loaded, basicDefinitions);
+                    tabs.setComponentAt(BASIC_TAB_INDEX, basicPanel);
+                    basicTabLoaded = true;
+                    refreshAfterTabChange();
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                    tabs.setComponentAt(BASIC_TAB_INDEX, createTabErrorPanel(
+                            "Basic details could not load",
+                            "Check the database connection and try again.",
+                            EmployeeDetailView.this::loadBasicTab
+                    ));
+                    refreshAfterTabChange();
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void loadOtherTab() {
+        if (otherTabLoaded || otherTabLoading || tabs == null) {
+            return;
+        }
+        otherTabLoading = true;
+        tabs.setComponentAt(OTHER_TAB_INDEX, createTabLoadingPanel("Other details", "Fetching only additional fields."));
+        LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Loading Other Details", "Fetching selected tab fields...");
+
+        SwingWorker<Employee, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Employee doInBackground() {
+                return new EmployeeRecordDao().getEmployeeSectionByCode(
+                        empCode,
+                        columnsForDefinitions(detailDefinitions, false)
+                );
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                otherTabLoading = false;
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    Employee loaded = get();
+                    if (loaded == null) {
+                        throw new IllegalStateException("Employee record was not found.");
+                    }
+                    otherPanel = new EmployeeAdditionalDetailsPanel(loaded, detailDefinitions);
+                    tabs.setComponentAt(OTHER_TAB_INDEX, otherPanel);
+                    otherTabLoaded = true;
+                    refreshAfterTabChange();
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                    tabs.setComponentAt(OTHER_TAB_INDEX, createTabErrorPanel(
+                            "Other details could not load",
+                            "Check the database connection and try again.",
+                            EmployeeDetailView.this::loadOtherTab
+                    ));
+                    refreshAfterTabChange();
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void loadDocumentTab() {
+        if (documentTabLoaded || documentTabLoading || tabs == null) {
+            return;
+        }
+        documentTabLoading = true;
+        tabs.setComponentAt(DOCUMENT_TAB_INDEX, createTabLoadingPanel("Documents", "Fetching saved document paths."));
+        LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Loading Documents", "Fetching document references...");
+
+        SwingWorker<Employee, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Employee doInBackground() {
+                return new EmployeeRecordDao().getEmployeeDocumentsByCode(empCode);
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                documentTabLoading = false;
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    Employee loaded = get();
+                    if (loaded == null) {
+                        throw new IllegalStateException("Employee record was not found.");
+                    }
+                    documentPanel = new EmployeeDocumentViewPanel(loaded);
+                    documentPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
+                    tabs.setComponentAt(DOCUMENT_TAB_INDEX, documentPanel);
+                    documentTabLoaded = true;
+                    refreshAfterTabChange();
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                    tabs.setComponentAt(DOCUMENT_TAB_INDEX, createTabErrorPanel(
+                            "Documents could not load",
+                            "Check the database connection and try again.",
+                            EmployeeDetailView.this::loadDocumentTab
+                    ));
+                    refreshAfterTabChange();
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private List<String> columnsForDefinitions(List<EmployeeFieldDefinition> definitions, boolean includeProfileImage) {
+        List<String> columns = new ArrayList<>();
+        columns.add("ID");
+        columns.add("EMPLOYEE_CODE");
+        columns.add("EMP_NAME");
+        if (includeProfileImage) {
+            columns.add("EMP_IMG");
+        }
+        if (definitions != null) {
+            for (EmployeeFieldDefinition definition : definitions) {
+                if (definition != null && definition.columnName() != null && !definition.columnName().isBlank()) {
+                    columns.add(definition.columnName());
+                }
+            }
+        }
+        return columns;
+    }
+
+    private void refreshAfterTabChange() {
+        if (centerWrapper != null) {
+            centerWrapper.revalidate();
+            centerWrapper.repaint();
+        }
+        if (tabs != null) {
+            tabs.revalidate();
+            tabs.repaint();
+        }
+        refreshUpdateButtonState();
+    }
+
+    private void refreshUpdateButtonState() {
+        if (updateBtn == null) {
+            return;
+        }
+        boolean hasEmployee = empCode != null && !empCode.isBlank();
+        boolean canUpdate = false;
+
+        if (basicPanel != null && panelHasEditableFields(basicPanel)) {
+            canUpdate = true;
+        }
+        if (!canUpdate && otherPanel != null && panelHasEditableFields(otherPanel)) {
+            canUpdate = true;
+        }
+        if (!canUpdate && documentPanel != null && documentPanel.hasPendingDocumentUpdates()) {
+            canUpdate = true;
+        }
+
+        updateBtn.setEnabled(hasEmployee && canUpdate);
+    }
+
+    private void handleUpdate() {
+        if (empCode == null || empCode.isBlank()) {
+            DialogHelper.warning(this, "Missing Employee Code", "Employee code is required to update details.");
+            return;
+        }
+
+        Employee basicUpdate = null;
+        File selectedImage = null;
+        if (basicPanel != null && panelHasEditableFields(basicPanel)) {
+            String validationMessage = basicPanel.validationMessage();
+            if (validationMessage != null) {
+                DialogHelper.warning(this, "Check Employee Details", validationMessage);
+                return;
+            }
+            basicUpdate = basicPanel.getEmployeeFromForm();
+            basicUpdate.setEMPLOYEE_CODE(empCode);
+            selectedImage = basicPanel.getSelectedImage();
+        }
+
+        Employee otherUpdate = null;
+        if (otherPanel != null && panelHasEditableFields(otherPanel)) {
+            otherUpdate = otherPanel.getUpdatedOtherDetails();
+            otherUpdate.setEMPLOYEE_CODE(empCode);
+        }
+
+        boolean hasDocumentUpdates = documentPanel != null && documentPanel.hasPendingDocumentUpdates();
+        if (basicUpdate == null && otherUpdate == null && !hasDocumentUpdates) {
+            DialogHelper.warning(this, "No Editable Fields", "Open a tab with editable fields or upload a document first.");
+            return;
+        }
+
+        final Employee finalBasicUpdate = basicUpdate;
+        final File finalSelectedImage = selectedImage;
+        final Employee finalOtherUpdate = otherUpdate;
+        final EmployeeDocumentViewPanel finalDocumentPanel = documentPanel;
+        LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Saving Employee", "Preparing changes...");
+
+        SwingWorker<Boolean, String> worker = new SwingWorker<>() {
+            @Override
+            protected Boolean doInBackground() throws Exception {
+                EmployeeRecordDao dao = new EmployeeRecordDao();
+                boolean documentsSaved = false;
+
+                if (finalBasicUpdate != null) {
+                    publish("Saving Basic details...");
+                    if (finalSelectedImage != null) {
+                        finalBasicUpdate.setEMP_IMG(copyProfileImage(finalSelectedImage, empCode));
+                    }
+                    dao.updateEmployeeDynamic(finalBasicUpdate);
+                }
+
+                if (finalOtherUpdate != null) {
+                    publish("Saving Other details...");
+                    dao.updateEmployeeDynamic(finalOtherUpdate);
+                }
+
+                if (hasDocumentUpdates && finalDocumentPanel != null) {
+                    publish("Copying document files...");
+                    Employee documentUpdates = finalDocumentPanel.getDocumentUpdates(empCode);
+                    documentUpdates.setEMPLOYEE_CODE(empCode);
+                    dao.updateEmployeeDynamic(documentUpdates);
+                    documentsSaved = true;
+                }
+
+                return documentsSaved;
+            }
+
+            @Override
+            protected void process(List<String> chunks) {
+                if (!chunks.isEmpty()) {
+                    loader.setMessage(chunks.get(chunks.size() - 1));
+                }
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    boolean documentsSaved = get();
+                    DialogHelper.success(EmployeeDetailView.this, "Updated successfully.");
+                    if (documentsSaved) {
+                        invalidateDocumentTab();
+                    }
+                    refreshUpdateButtonState();
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                    DialogHelper.error(EmployeeDetailView.this, "Update Failed", "Update failed.");
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void invalidateDocumentTab() {
+        documentPanel = null;
+        documentTabLoaded = false;
+        documentTabLoading = false;
+        if (tabs == null || tabs.getTabCount() <= DOCUMENT_TAB_INDEX) {
+            return;
+        }
+        tabs.setComponentAt(DOCUMENT_TAB_INDEX, createTabLoadingPanel("Documents", "Refreshing saved document paths."));
+        refreshAfterTabChange();
+        if (tabs.getSelectedIndex() == DOCUMENT_TAB_INDEX) {
+            SwingUtilities.invokeLater(this::loadDocumentTab);
+        }
     }
 
     private void showLoadingShell() {
@@ -321,7 +661,7 @@ public class EmployeeDetailView extends JFrame {
                 if (empCode == null || empCode.isBlank()) {
                     return new DetailLoadResult(null, List.of(), List.of());
                 }
-                Employee loadedEmployee = new EmployeeRecordDao().getFullEmployeeByCode(empCode);
+                Employee loadedEmployee = new EmployeeRecordDao().getEmployeeHeaderByCode(empCode);
                 if (loadedEmployee == null) {
                     return new DetailLoadResult(null, List.of(), List.of());
                 }
@@ -389,22 +729,54 @@ public class EmployeeDetailView extends JFrame {
             return;
         }
 
-        EmployeeReportService reportService = new EmployeeReportService();
-        Employee currentEmployee;
-        try {
-            currentEmployee = new EmployeeRecordDao().getFullEmployeeByCode(empCode);
-        } catch (Exception exception) {
-            exception.printStackTrace();
-            DialogHelper.error(this, "Download Profile Failed", "Employee details could not be loaded.");
-            return;
-        }
-        if (currentEmployee == null) {
-            DialogHelper.warning(this, "Employee Not Found", "This employee record could not be found.");
-            return;
-        }
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Preparing Download",
+                "Loading employee profile and saved documents..."
+        );
+
+        SwingWorker<ReportPreparation, Void> worker = new SwingWorker<>() {
+            @Override
+            protected ReportPreparation doInBackground() {
+                EmployeeReportService reportService = new EmployeeReportService();
+                Employee currentEmployee = new EmployeeRecordDao().getFullEmployeeByCode(empCode);
+                if (currentEmployee == null) {
+                    return null;
+                }
+                return new ReportPreparation(
+                        currentEmployee,
+                        reportService.availableDocuments(currentEmployee),
+                        reportService.suggestedPackageFolderName(currentEmployee)
+                );
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    ReportPreparation preparation = get();
+                    if (preparation == null || preparation.employee() == null) {
+                        DialogHelper.warning(EmployeeDetailView.this, "Employee Not Found", "This employee record could not be found.");
+                        return;
+                    }
+                    continueDownloadEmployeeReport(preparation);
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                    DialogHelper.error(EmployeeDetailView.this, "Download Profile Failed", "Employee details could not be loaded.");
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void continueDownloadEmployeeReport(ReportPreparation preparation) {
+        Employee currentEmployee = preparation.employee();
         this.employee = currentEmployee;
 
-        List<EmployeeReportService.AvailableDocument> availableDocuments = reportService.availableDocuments(currentEmployee);
+        List<EmployeeReportService.AvailableDocument> availableDocuments = preparation.availableDocuments();
         EmployeeReportService.PackageOptions options = showDownloadOptionsDialog(availableDocuments);
         if (options == null) {
             return;
@@ -413,41 +785,78 @@ public class EmployeeDetailView extends JFrame {
         File selectedFolder = FileUploadCard.chooseDirectory(
                 this,
                 "Save Employee Report Package",
-                reportService.suggestedPackageFolderName(currentEmployee)
+                preparation.suggestedFolderName()
         );
         if (selectedFolder == null) {
             return;
         }
 
-        try {
-            EmployeeReportService.PackageResult result = reportService
-                    .generateEmployeePackageAt(empCode, selectedFolder, options);
-            String pdfStatus = result.pdfFile() == null ? "Not included" : "Saved";
-            String mergedPdfStatus = result.mergedDocumentsPdfFile() == null
-                    ? "Not included"
-                    : "Saved (" + result.mergedDocumentCount() + " documents)";
-            String message = "Folder: " + result.folder().getAbsolutePath()
-                    + "\nPDF profile: " + pdfStatus
-                    + "\nAll documents PDF: " + mergedPdfStatus
-                    + "\nDocuments copied: " + result.copiedDocumentCount()
-                    + " / " + result.totalDocumentCount();
-            int choice = DialogHelper.successOption(
-                    this,
-                    "Download Folder Ready",
-                    message,
-                    "Open Folder",
-                    "OK"
-            );
-            if (choice == 0) {
-                openReportFolder(result.folder());
+        generateEmployeeReportPackage(selectedFolder, options);
+    }
+
+    private void generateEmployeeReportPackage(
+            File selectedFolder,
+            EmployeeReportService.PackageOptions options
+    ) {
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Building Package",
+                "Creating profile PDF and copying selected files..."
+        );
+
+        SwingWorker<EmployeeReportService.PackageResult, String> worker = new SwingWorker<>() {
+            @Override
+            protected EmployeeReportService.PackageResult doInBackground() throws Exception {
+                publish("Loading latest saved values...");
+                EmployeeReportService reportService = new EmployeeReportService();
+                publish("Writing package files...");
+                return reportService.generateEmployeePackageAt(empCode, selectedFolder, options);
             }
-        } catch (Exception exception) {
-            exception.printStackTrace();
-            String message = exception.getMessage() == null || exception.getMessage().isBlank()
-                    ? "Employee report package could not be generated."
-                    : exception.getMessage();
-            DialogHelper.error(this, "Download Report Failed", message);
-        }
+
+            @Override
+            protected void process(List<String> chunks) {
+                if (!chunks.isEmpty()) {
+                    loader.setMessage(chunks.get(chunks.size() - 1));
+                }
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    EmployeeReportService.PackageResult result = get();
+                    String pdfStatus = result.pdfFile() == null ? "Not included" : "Saved";
+                    String mergedPdfStatus = result.mergedDocumentsPdfFile() == null
+                            ? "Not included"
+                            : "Saved (" + result.mergedDocumentCount() + " documents)";
+                    String message = "Folder: " + result.folder().getAbsolutePath()
+                            + "\nPDF profile: " + pdfStatus
+                            + "\nAll documents PDF: " + mergedPdfStatus
+                            + "\nDocuments copied: " + result.copiedDocumentCount()
+                            + " / " + result.totalDocumentCount();
+                    int choice = DialogHelper.successOption(
+                            EmployeeDetailView.this,
+                            "Download Folder Ready",
+                            message,
+                            "Open Folder",
+                            "OK"
+                    );
+                    if (choice == 0) {
+                        openReportFolder(result.folder());
+                    }
+                } catch (Exception exception) {
+                    exception.printStackTrace();
+                    String message = exception.getMessage() == null || exception.getMessage().isBlank()
+                            ? "Employee report package could not be generated."
+                            : exception.getMessage();
+                    DialogHelper.error(EmployeeDetailView.this, "Download Report Failed", message);
+                }
+            }
+        };
+        worker.execute();
     }
 
     private void openReportFolder(File folder) {
@@ -1087,6 +1496,13 @@ public class EmployeeDetailView extends JFrame {
             Employee employee,
             List<EmployeeFieldDefinition> basicDefinitions,
             List<EmployeeFieldDefinition> detailDefinitions
+    ) {
+    }
+
+    private record ReportPreparation(
+            Employee employee,
+            List<EmployeeReportService.AvailableDocument> availableDocuments,
+            String suggestedFolderName
     ) {
     }
 

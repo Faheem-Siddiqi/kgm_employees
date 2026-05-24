@@ -2,6 +2,7 @@ package com.kgm.dao;
 
 import com.kgm.config.DatabaseConnection;
 import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.util.EmployeeAdditionalFieldDefaults;
 import com.kgm.util.EmployeeBasicFieldUtil;
 
 import java.sql.Connection;
@@ -841,32 +842,53 @@ public class EmployeeFieldDefinitionDao {
 
     private void syncBuiltInMetadata() throws SQLException {
         Map<String, EmployeeFieldDefinition> existingFields = metadataByColumn();
-        for (EmployeeFieldDefinition builtIn : BUILT_IN_FIELDS) {
-            String column = builtIn.columnName().toUpperCase(Locale.ROOT);
-            boolean core = isCoreColumn(column);
-            boolean document = builtIn.documentField();
-            boolean internal = isInternalColumn(column);
-            if (!core && !document && !internal) {
-                EmployeeFieldDefinition existing = existingFields.get(column);
-                EmployeeFieldDefinition knownCustom = customDetailDefinition(builtIn, existing);
-                if (existing == null) {
-                    insertMetadataIgnore(knownCustom);
-                } else {
-                    insertMetadataReplace(knownCustom);
-                }
-                continue;
-            }
-
-            EmployeeFieldDefinition existing = existingFields.get(column);
-            if (existing == null) {
-                insertMetadataIgnore(systemDefinition(builtIn, null, core, document, internal));
-                continue;
-            }
-
-            insertMetadataReplace(systemDefinition(builtIn, existing, core, document, internal));
+        for (EmployeeFieldDefinition builtIn : seededFieldDefinitions()) {
+            syncSeededField(existingFields, builtIn);
         }
         demoteNonCoreDetailMetadata();
         promoteFundamentalsFields();
+    }
+
+    private List<EmployeeFieldDefinition> seededFieldDefinitions() {
+        List<EmployeeFieldDefinition> definitions = new ArrayList<>(BUILT_IN_FIELDS);
+        definitions.addAll(EmployeeAdditionalFieldDefaults.definitions());
+        return definitions;
+    }
+
+    private void syncSeededField(
+            Map<String, EmployeeFieldDefinition> existingFields,
+            EmployeeFieldDefinition builtIn
+    ) throws SQLException {
+        String column = builtIn.columnName().toUpperCase(Locale.ROOT);
+        boolean core = isCoreColumn(column);
+        boolean document = builtIn.documentField();
+        boolean internal = isInternalColumn(column);
+        if (!core && !document && !internal) {
+            EmployeeFieldDefinition existing = existingFields.get(column);
+            EmployeeFieldDefinition knownCustom = customDetailDefinition(builtIn, existing);
+            if (existing == null) {
+                insertMetadataIgnore(knownCustom);
+            } else {
+                insertMetadataReplace(knownCustom);
+            }
+            if (EmployeeAdditionalFieldDefaults.isSeededColumn(column)) {
+                applyValueDefaultsForType(
+                        knownCustom.columnName(),
+                        knownCustom.documentField(),
+                        knownCustom.dateField(),
+                        knownCustom.dropdownField()
+                );
+            }
+            return;
+        }
+
+        EmployeeFieldDefinition existing = existingFields.get(column);
+        if (existing == null) {
+            insertMetadataIgnore(systemDefinition(builtIn, null, core, document, internal));
+            return;
+        }
+
+        insertMetadataReplace(systemDefinition(builtIn, existing, core, document, internal));
     }
 
     private void seedDefaultRequiredFields() throws SQLException {
@@ -899,19 +921,31 @@ public class EmployeeFieldDefinitionDao {
             EmployeeFieldDefinition builtIn,
             EmployeeFieldDefinition existing
     ) {
-        String label = existing == null || isBlank(existing.label()) ? builtIn.label() : existing.label();
-        String heading = existing == null || isBlank(existing.heading()) ? builtIn.heading() : existing.heading();
+        String column = builtIn.columnName().toUpperCase(Locale.ROOT);
+        boolean seededAdditional = EmployeeAdditionalFieldDefaults.isSeededColumn(column);
+        String label = seededAdditional || existing == null || isBlank(existing.label())
+                ? builtIn.label()
+                : existing.label();
+        String heading = seededAdditional || existing == null || isBlank(existing.heading())
+                ? builtIn.heading()
+                : existing.heading();
         if (isFundamentalsHeading(heading)) {
             heading = EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING;
         }
         boolean fundamentalsField = isFundamentalsHeading(heading);
-        boolean dateField = existing != null && existing.dateField();
-        boolean dropdownField = existing != null && existing.dropdownField();
-        boolean variableOptionField = dropdownField && existing != null && existing.variableOptionField();
-        boolean textAreaField = existing != null
-                ? existing.textAreaField()
-                : defaultTextAreaField(builtIn.columnName());
-        String dropdownOptions = dropdownField ? normalizeOptions(existing.dropdownOptions()) : "";
+        boolean dateField = builtIn.dateField() || (existing != null && existing.dateField());
+        boolean dropdownField = !dateField && (builtIn.dropdownField() || (existing != null && existing.dropdownField()));
+        boolean variableOptionField = dropdownField
+                && (builtIn.variableOptionField() || (existing != null && existing.variableOptionField()));
+        boolean textAreaField = !dateField && !dropdownField && (
+                builtIn.textAreaField()
+                        || (existing != null ? existing.textAreaField() : defaultTextAreaField(builtIn.columnName()))
+        );
+        String dropdownOptions = dropdownField
+                ? !isBlank(builtIn.dropdownOptions())
+                        ? normalizeOptions(builtIn.dropdownOptions())
+                        : existing == null ? "" : normalizeOptions(existing.dropdownOptions())
+                : "";
 
         return new EmployeeFieldDefinition(
                 builtIn.columnName(),

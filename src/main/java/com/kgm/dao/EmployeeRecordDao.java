@@ -3,12 +3,14 @@ package com.kgm.dao;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
 import java.sql.*;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -496,6 +498,53 @@ public class EmployeeRecordDao {
     }
 
     // ==============================
+    // 🔹 PROJECTED EMPLOYEE LOADS (TAB-SPECIFIC FIELDS)
+    // ==============================
+    public Employee getEmployeeHeaderByCode(String empCode) {
+        return getEmployeeSectionByCode(empCode, List.of("ID", "EMPLOYEE_CODE", "EMP_NAME"));
+    }
+
+    public Employee getEmployeeSectionByCode(String empCode, List<String> requestedColumns) {
+        if (empCode == null || empCode.isBlank()) {
+            return null;
+        }
+
+        try {
+            List<String> columns = normalizedProjectionColumns(requestedColumns);
+            if (columns.isEmpty()) {
+                columns = List.of("EMPLOYEE_CODE");
+            }
+
+            String sql = "SELECT " + quotedColumnList(columns)
+                    + " FROM employees WHERE EMPLOYEE_CODE = ? LIMIT 1";
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setString(1, empCode.trim());
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return mapProjectedEmployee(rs);
+                    }
+                }
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public Employee getEmployeeDocumentsByCode(String empCode) {
+        List<String> columns = new ArrayList<>();
+        columns.add("ID");
+        columns.add("EMPLOYEE_CODE");
+        columns.add("EMP_NAME");
+        columns.add("EMP_IMG");
+        for (EmployeeDocumentUtil.DocumentType documentType : EmployeeDocumentUtil.documentTypes()) {
+            columns.add(documentType.employeeFieldName());
+        }
+        return getEmployeeSectionByCode(empCode, columns);
+    }
+
+    // ==============================
     // 🔹 FULL EMPLOYEE BY CODE (ALL FIELDS)
     // ==============================
     public Employee getFullEmployeeByCode(String empCode) {
@@ -715,6 +764,72 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
     }
 }
 
+    private List<String> normalizedProjectionColumns(List<String> requestedColumns) throws SQLException {
+        Set<String> existingColumns = employeeColumns();
+        Set<String> normalizedColumns = new LinkedHashSet<>();
+        normalizedColumns.add("EMPLOYEE_CODE");
+        normalizedColumns.add("EMP_NAME");
+
+        if (requestedColumns != null) {
+            for (String requestedColumn : requestedColumns) {
+                String normalizedColumn = normalizedColumnName(requestedColumn);
+                if (!normalizedColumn.isBlank() && existingColumns.contains(normalizedColumn)) {
+                    normalizedColumns.add(normalizedColumn);
+                }
+            }
+        }
+
+        normalizedColumns.removeIf(column -> !existingColumns.contains(column));
+        return new ArrayList<>(normalizedColumns);
+    }
+
+    private Set<String> employeeColumns() throws SQLException {
+        Set<String> columns = new HashSet<>();
+        DatabaseMetaData metaData = con.getMetaData();
+        try (ResultSet rs = metaData.getColumns(con.getCatalog(), null, "employees", null)) {
+            while (rs.next()) {
+                columns.add(rs.getString("COLUMN_NAME").toUpperCase(Locale.ROOT));
+            }
+        }
+        return columns;
+    }
+
+    private String normalizedColumnName(String columnName) {
+        if (columnName == null) {
+            return "";
+        }
+        String normalized = columnName.trim().toUpperCase(Locale.ROOT);
+        return normalized.matches("[A-Z0-9_]+") ? normalized : "";
+    }
+
+    private String quotedColumnList(List<String> columns) {
+        List<String> quoted = new ArrayList<>();
+        for (String column : columns) {
+            quoted.add(quoteIdentifier(column));
+        }
+        return String.join(", ", quoted);
+    }
+
+    private Employee mapProjectedEmployee(ResultSet rs) throws SQLException {
+        Employee employee = new Employee();
+        ResultSetMetaData metaData = rs.getMetaData();
+        for (int index = 1; index <= metaData.getColumnCount(); index++) {
+            String column = metaData.getColumnLabel(index);
+            if (column == null || column.isBlank()) {
+                column = metaData.getColumnName(index);
+            }
+            if (column == null || column.isBlank()) {
+                continue;
+            }
+            if ("ID".equalsIgnoreCase(column)) {
+                employee.setID(rs.getInt(index));
+                continue;
+            }
+            EmployeeBasicFieldUtil.writeValue(employee, column, safe(rs.getString(index)));
+        }
+        return employee;
+    }
+
     private String quoteIdentifier(String identifier) {
         return "`" + identifier.replace("`", "``") + "`";
     }
@@ -807,4 +922,3 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
     ) {
     }
 }
-

@@ -3,6 +3,7 @@ package com.kgm.database;
 import com.kgm.config.DatabaseConfig;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.dao.EmployeeFieldDefinitionDao;
+import com.kgm.util.EmployeeAdditionalFieldDefaults;
 import com.kgm.util.EmployeeDocumentUtil;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -37,6 +38,7 @@ public class DatabaseInitializer {
                 DEPARTMENT TEXT,
                 DESIG_CODE TEXT,
                 DESIGNATION TEXT,
+                DEPT_CODE TEXT,
                 SECTION TEXT,
                 GRADE TEXT,
                 JOINING_DATE TEXT,
@@ -45,6 +47,14 @@ public class DatabaseInitializer {
                 SHIFT TEXT,
                 PROB_PERIOD TEXT,
                 EXP_IN_KTML TEXT,
+                REST_DAY TEXT,
+                STAFF TEXT,
+                PRE_WORKEXP TEXT,
+                CARDNO TEXT,
+                CHEST_CARD_STATUS TEXT,
+                REHIRING_STATUS TEXT,
+                TAILOR_CATEGORY TEXT,
+                VAC_ID TEXT,
                 APPLICATION_DATE TEXT,
                 RESIGN_REASON TEXT,
                 RESIGN_DATE TEXT,
@@ -58,6 +68,7 @@ public class DatabaseInitializer {
 
                 -- PAYROLL
                 GROSS_SALARY TEXT,
+                PAY_SHEET TEXT,
                 PAY_CATEGORY TEXT,
                 BASIC TEXT,
                 COLA1 TEXT,
@@ -70,6 +81,8 @@ public class DatabaseInitializer {
                 COLA9 TEXT,
                 COLA10 TEXT,
                 COLA11 TEXT,
+                H_RENT TEXT,
+                H_MAINTENANCE TEXT,
                 PB_SPECIAL1_2 TEXT,
                 PB_SPECIAL3 TEXT,
                 PB_SPECIAL4 TEXT,
@@ -85,6 +98,7 @@ public class DatabaseInitializer {
                 PAY_GROUP_DESC TEXT,
                 PAY_AT_JOINING TEXT,
                 EXTRA_DUTY TEXT,
+                EXTRA_DUTY_ALLOWANCE_DATE TEXT,
                 PAYROLL_FLAG TEXT,
 
                 -- BANKING
@@ -105,6 +119,16 @@ public class DatabaseInitializer {
                 EMP_CONTNO TEXT,
                 CURRENT_ADR TEXT,
                 PERMANENT_ADR TEXT,
+                CITY_VILLAGE TEXT,
+                DISTRICT TEXT,
+                REFERENCE TEXT,
+                RELATIVE_DETAIL TEXT,
+                REFEMP_NAME TEXT,
+                REFEMP_DESIG TEXT,
+                REFEMP_DEPT TEXT,
+                CNIC_EXP_DATE TEXT,
+                CNIC_FAMILY_NO TEXT,
+                CNIC_ISSUANCE_DATE TEXT,
                 PERSONAL_EMAIL TEXT,
                 OFFICIAL_EMAIL TEXT,
                 EMERGENCY_NO TEXT,
@@ -115,6 +139,8 @@ public class DatabaseInitializer {
                 REP_EMP_DESIG_CODE TEXT,
                 REP_EMP_DEPT_CODE TEXT,
                 REP_EMP_TYPE TEXT,
+                REPORT_TO_EMP_ID TEXT,
+                REPORT_TO_UNT TEXT,
 
                 -- COMPLIANCE
                 FLAG TEXT,
@@ -125,8 +151,14 @@ public class DatabaseInitializer {
                 NIC_VERIFY_DATE TEXT,
                 ATT_CATEG TEXT,
                 DIS_CERTIFICATE TEXT,
+                SS TEXT,
+                DED_UNION TEXT,
 
                 -- BENEFITS
+                COLONY_RESIDENT TEXT,
+                COMPANY_CAR TEXT,
+                PERSONAL_HOUSE_RENT TEXT,
+                COLONY_HOUSE_NUMBER TEXT,
                 WELLNESS_CLUB TEXT,
                 WELLNESS_CARD_ISSUE TEXT,
                 WELLNESS_CARD_NO TEXT,
@@ -137,6 +169,20 @@ public class DatabaseInitializer {
                 SECOND_DOSE TEXT,
                 FIRST_VACC_DATE TEXT,
                 SECOND_VACC_DATE TEXT,
+
+                -- IT / ALTERNATE SATURDAY
+                USER_ID TEXT,
+                IT_EQUIPMENT TEXT,
+                IT_EMAIL TEXT,
+                IT_INTERNET TEXT,
+                INTERNET_JUSTIFY TEXT,
+                IT_SERVICE_ALERT TEXT,
+                ALT_SAT_TEAM TEXT,
+                ALT_SAT_START_DATE TEXT,
+                ALT_SAT_END_DATE TEXT,
+                ALT_SAT_NEXT_YEAR TEXT,
+                ALT_SAT_SHUFFLE TEXT,
+                ALT_SAT_UNLOCK_NEXT_YEAR TEXT,
 
                 -- DOCUMENTS
                 CNIC_FRONT TEXT,
@@ -306,6 +352,7 @@ public class DatabaseInitializer {
             fieldDefinitionDao.ensureMetadata();
             fieldDefinitionDao.syncMetadataWithDatabase();
             ensureSearchIndexes(conn);
+            ensureReportingIndexes(conn);
 
             System.out.println(exists ? "=> MySQL schema already exists." : "=> MySQL schema created.");
 
@@ -348,6 +395,9 @@ public class DatabaseInitializer {
 
     private static void ensureCoreColumns(Connection conn) throws SQLException {
         for (String column : STANDARD_EMPLOYEE_TEXT_COLUMNS) {
+            ensureColumn(conn, column);
+        }
+        for (String column : EmployeeAdditionalFieldDefaults.columnNames()) {
             ensureColumn(conn, column);
         }
     }
@@ -426,6 +476,24 @@ public class DatabaseInitializer {
 
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("CREATE INDEX idx_employee_code ON employees (EMPLOYEE_CODE)");
+        }
+    }
+
+    private static void ensureReportingIndexes(Connection conn) throws SQLException {
+        ensureTextPrefixIndex(conn, "idx_employees_department", "DEPARTMENT");
+        ensureTextPrefixIndex(conn, "idx_employees_section", "SECTION");
+        ensureTextPrefixIndex(conn, "idx_employees_grade", "GRADE");
+        ensureTextPrefixIndex(conn, "idx_employees_designation", "DESIGNATION");
+        ensureTextPrefixIndex(conn, "idx_employees_resign_reason", "RESIGN_REASON");
+    }
+
+    private static void ensureTextPrefixIndex(Connection conn, String indexName, String columnName) throws SQLException {
+        if (indexExists(conn, indexName) || !columnExists(conn, columnName)) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE INDEX " + quoteIdentifier(indexName)
+                    + " ON employees (" + quoteIdentifier(columnName) + "(120))");
         }
     }
 
