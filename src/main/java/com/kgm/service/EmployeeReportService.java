@@ -52,8 +52,6 @@ public class EmployeeReportService {
     private static final String SUCCESS = "0F8B4C";
     private static final String WARNING = "B42318";
 
-    private final EmployeeRecordDao employeeRecordDao = new EmployeeRecordDao();
-
     public PackageResult generateEmployeePackage(String employeeCode, File selectedDirectory) throws Exception {
         return generateEmployeePackage(employeeCode, selectedDirectory, PackageOptions.all());
     }
@@ -88,7 +86,10 @@ public class EmployeeReportService {
         }
         PackageOptions effectiveOptions = options == null ? PackageOptions.all() : options;
 
-        Employee employee = employeeRecordDao.getFullEmployeeByCode(employeeCode.trim());
+        Employee employee;
+        try (EmployeeRecordDao employeeRecordDao = new EmployeeRecordDao()) {
+            employee = employeeRecordDao.getFullEmployeeByCode(employeeCode.trim());
+        }
         if (employee == null) {
             throw new IllegalArgumentException("Employee record was not found for code: " + employeeCode);
         }

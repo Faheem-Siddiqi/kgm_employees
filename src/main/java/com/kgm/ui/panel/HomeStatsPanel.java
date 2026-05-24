@@ -13,8 +13,10 @@ import java.util.function.Consumer;
 public class HomeStatsPanel extends JPanel {
     private final HomeStatsKPIPanel kpiPanel;
     private final HomeStatsChartsPanel chartsPanel;
+    private EmployeeRecordDao repo;
 
     public HomeStatsPanel(EmployeeRecordDao repo) {
+        this.repo = repo;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setOpaque(false);
         setBackground(Color.WHITE);
@@ -35,8 +37,20 @@ public class HomeStatsPanel extends JPanel {
         chartsPanel.setShowInTableHandler(handler);
     }
 
+    public void setRepository(EmployeeRecordDao repo) {
+        this.repo = repo;
+        kpiPanel.setRepository(repo);
+        chartsPanel.setRepository(repo);
+    }
+
+    public void setStats(EmployeeRecordDao.DashboardStats stats) {
+        kpiPanel.setStats(stats);
+        chartsPanel.setStats(stats);
+    }
+
     public void reload() {
-        kpiPanel.reload();
-        chartsPanel.reload();
+        if (repo != null) {
+            setStats(repo.dashboardStats());
+        }
     }
 }

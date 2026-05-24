@@ -125,8 +125,8 @@ public class FieldManagementView extends JFrame {
         JButton dashboard = new JButton("Dashboard");
         EmployeeRegistrationViewHelper.styleBackButton(dashboard);
         dashboard.addActionListener(event -> {
-            dispose();
             new HomeView();
+            dispose();
         });
 
         row.add(titleBlock, BorderLayout.WEST);

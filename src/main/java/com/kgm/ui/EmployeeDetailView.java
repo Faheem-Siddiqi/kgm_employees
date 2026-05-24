@@ -102,8 +102,8 @@ public class EmployeeDetailView extends JFrame {
                 nameValue,
                 codeValue,
                 () -> {
-                    this.dispose();
                     new HomeView();
+                    this.dispose();
                 },
                 onDownloadReport
         ), BorderLayout.CENTER);
@@ -209,20 +209,9 @@ public class EmployeeDetailView extends JFrame {
         messageLabel.setForeground(new Color(100, 116, 139));
         messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JProgressBar progress = new JProgressBar();
-        progress.setIndeterminate(true);
-        progress.setPreferredSize(new Dimension(260, 8));
-        progress.setMaximumSize(new Dimension(260, 8));
-        progress.setBorderPainted(false);
-        progress.setAlignmentX(Component.CENTER_ALIGNMENT);
-
         box.add(titleLabel);
         box.add(Box.createVerticalStrut(5));
         box.add(messageLabel);
-        box.add(Box.createVerticalStrut(16));
-        box.add(progress);
-        box.add(Box.createVerticalStrut(28));
-        box.add(createSkeletonPanel());
         panel.add(box);
         return panel;
     }
@@ -285,10 +274,12 @@ public class EmployeeDetailView extends JFrame {
         SwingWorker<Employee, Void> worker = new SwingWorker<>() {
             @Override
             protected Employee doInBackground() {
-                return new EmployeeRecordDao().getEmployeeSectionByCode(
-                        empCode,
-                        columnsForDefinitions(basicDefinitions, true)
-                );
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    return dao.getEmployeeSectionByCode(
+                            empCode,
+                            columnsForDefinitions(basicDefinitions, true)
+                    );
+                }
             }
 
             @Override
@@ -333,10 +324,12 @@ public class EmployeeDetailView extends JFrame {
         SwingWorker<Employee, Void> worker = new SwingWorker<>() {
             @Override
             protected Employee doInBackground() {
-                return new EmployeeRecordDao().getEmployeeSectionByCode(
-                        empCode,
-                        columnsForDefinitions(detailDefinitions, false)
-                );
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    return dao.getEmployeeSectionByCode(
+                            empCode,
+                            columnsForDefinitions(detailDefinitions, false)
+                    );
+                }
             }
 
             @Override
@@ -380,7 +373,9 @@ public class EmployeeDetailView extends JFrame {
         SwingWorker<Employee, Void> worker = new SwingWorker<>() {
             @Override
             protected Employee doInBackground() {
-                return new EmployeeRecordDao().getEmployeeDocumentsByCode(empCode);
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    return dao.getEmployeeDocumentsByCode(empCode);
+                }
             }
 
             @Override
@@ -504,28 +499,28 @@ public class EmployeeDetailView extends JFrame {
         SwingWorker<Boolean, String> worker = new SwingWorker<>() {
             @Override
             protected Boolean doInBackground() throws Exception {
-                EmployeeRecordDao dao = new EmployeeRecordDao();
                 boolean documentsSaved = false;
-
-                if (finalBasicUpdate != null) {
-                    publish("Saving Basic details...");
-                    if (finalSelectedImage != null) {
-                        finalBasicUpdate.setEMP_IMG(copyProfileImage(finalSelectedImage, empCode));
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    if (finalBasicUpdate != null) {
+                        publish("Saving Basic details...");
+                        if (finalSelectedImage != null) {
+                            finalBasicUpdate.setEMP_IMG(copyProfileImage(finalSelectedImage, empCode));
+                        }
+                        dao.updateEmployeeDynamic(finalBasicUpdate);
                     }
-                    dao.updateEmployeeDynamic(finalBasicUpdate);
-                }
 
-                if (finalOtherUpdate != null) {
-                    publish("Saving Other details...");
-                    dao.updateEmployeeDynamic(finalOtherUpdate);
-                }
+                    if (finalOtherUpdate != null) {
+                        publish("Saving Other details...");
+                        dao.updateEmployeeDynamic(finalOtherUpdate);
+                    }
 
-                if (hasDocumentUpdates && finalDocumentPanel != null) {
-                    publish("Copying document files...");
-                    Employee documentUpdates = finalDocumentPanel.getDocumentUpdates(empCode);
-                    documentUpdates.setEMPLOYEE_CODE(empCode);
-                    dao.updateEmployeeDynamic(documentUpdates);
-                    documentsSaved = true;
+                    if (hasDocumentUpdates && finalDocumentPanel != null) {
+                        publish("Copying document files...");
+                        Employee documentUpdates = finalDocumentPanel.getDocumentUpdates(empCode);
+                        documentUpdates.setEMPLOYEE_CODE(empCode);
+                        dao.updateEmployeeDynamic(documentUpdates);
+                        documentsSaved = true;
+                    }
                 }
 
                 return documentsSaved;
@@ -584,8 +579,8 @@ public class EmployeeDetailView extends JFrame {
                 "Loading employee details",
                 empCode == null ? "" : empCode,
                 () -> {
-                    dispose();
                     new HomeView();
+                    dispose();
                 },
                 null
         ), BorderLayout.CENTER);
@@ -593,30 +588,11 @@ public class EmployeeDetailView extends JFrame {
 
         JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
 
-        JPanel loadingPanel = new JPanel(new GridBagLayout());
-        loadingPanel.setBackground(Color.WHITE);
-        loadingPanel.setBorder(BorderFactory.createEmptyBorder(40, 28, 56, 28));
+        JPanel blankPanel = new JPanel(new BorderLayout());
+        blankPanel.setBackground(Color.WHITE);
+        blankPanel.setBorder(BorderFactory.createEmptyBorder(40, 28, 56, 28));
 
-        JPanel box = new JPanel();
-        box.setBackground(Color.WHITE);
-        box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
-        JLabel label = new JLabel("Loading employee details...");
-        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 16));
-        label.setForeground(new Color(35, 43, 54));
-        label.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JProgressBar progress = new JProgressBar();
-        progress.setIndeterminate(true);
-        progress.setPreferredSize(new Dimension(260, 8));
-        progress.setMaximumSize(new Dimension(260, 8));
-        progress.setAlignmentX(Component.CENTER_ALIGNMENT);
-        box.add(label);
-        box.add(Box.createVerticalStrut(16));
-        box.add(progress);
-        box.add(Box.createVerticalStrut(28));
-        box.add(createSkeletonPanel());
-        loadingPanel.add(box);
-
-        centerWrapper.add(loadingPanel, EmployeeDetailViewHelper.pageConstraints(0));
+        centerWrapper.add(blankPanel, EmployeeDetailViewHelper.pageConstraints(0));
         add(EmployeeDetailViewHelper.createPageScrollPane(centerWrapper), BorderLayout.CENTER);
 
         JPanel footerActions = EmployeeDetailViewHelper.createActionRow();
@@ -634,34 +610,22 @@ public class EmployeeDetailView extends JFrame {
         repaint();
     }
 
-    private JPanel createSkeletonPanel() {
-        JPanel skeleton = new JPanel();
-        skeleton.setOpaque(false);
-        skeleton.setLayout(new BoxLayout(skeleton, BoxLayout.Y_AXIS));
-        skeleton.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        int[] widths = {520, 460, 560, 420};
-        for (int width : widths) {
-            JPanel row = new JPanel();
-            row.setBackground(new Color(245, 247, 250));
-            row.setBorder(BorderFactory.createLineBorder(new Color(232, 238, 245)));
-            row.setPreferredSize(new Dimension(width, 26));
-            row.setMaximumSize(new Dimension(width, 26));
-            row.setAlignmentX(Component.CENTER_ALIGNMENT);
-            skeleton.add(row);
-            skeleton.add(Box.createVerticalStrut(10));
-        }
-        return skeleton;
-    }
-
     private void loadEmployeeAsync() {
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Loading Employee",
+                "Preparing employee detail screen..."
+        );
         SwingWorker<DetailLoadResult, Void> worker = new SwingWorker<>() {
             @Override
             protected DetailLoadResult doInBackground() {
                 if (empCode == null || empCode.isBlank()) {
                     return new DetailLoadResult(null, List.of(), List.of());
                 }
-                Employee loadedEmployee = new EmployeeRecordDao().getEmployeeHeaderByCode(empCode);
+                Employee loadedEmployee;
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    loadedEmployee = dao.getEmployeeHeaderByCode(empCode);
+                }
                 if (loadedEmployee == null) {
                     return new DetailLoadResult(null, List.of(), List.of());
                 }
@@ -674,6 +638,7 @@ public class EmployeeDetailView extends JFrame {
 
             @Override
             protected void done() {
+                loader.close();
                 if (!isDisplayable()) {
                     return;
                 }
@@ -684,8 +649,8 @@ public class EmployeeDetailView extends JFrame {
                                 EmployeeDetailView.this,
                                 "Employee Not Found",
                                 "This employee record could not be found.");
-                        dispose();
                         new HomeView();
+                        dispose();
                         return;
                     }
                     initializeUI(detailData, true);
@@ -695,8 +660,8 @@ public class EmployeeDetailView extends JFrame {
                             EmployeeDetailView.this,
                             "Load Failed",
                             "Employee details could not be loaded.");
-                    dispose();
                     new HomeView();
+                    dispose();
                 }
             }
         };
@@ -739,7 +704,10 @@ public class EmployeeDetailView extends JFrame {
             @Override
             protected ReportPreparation doInBackground() {
                 EmployeeReportService reportService = new EmployeeReportService();
-                Employee currentEmployee = new EmployeeRecordDao().getFullEmployeeByCode(empCode);
+                Employee currentEmployee;
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    currentEmployee = dao.getFullEmployeeByCode(empCode);
+                }
                 if (currentEmployee == null) {
                     return null;
                 }

@@ -3,6 +3,7 @@ package com.kgm.ui;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.dao.EmployeeRegistrationDao;
 import com.kgm.model.Employee;
+import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.EmployeeDocumentUploadPanel;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.EmployeeRegistrationFormPanel;
@@ -14,6 +15,8 @@ import com.kgm.util.EmployeeDocumentUtil;
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
 public class EmployeeRegistrationView extends JFrame {
     private EmployeeRegistrationFormPanel formPanel;
@@ -22,8 +25,8 @@ public class EmployeeRegistrationView extends JFrame {
         EmployeeRegistrationViewHelper.applyFrame(this);
 
         Runnable onBack = () -> {
-            this.dispose();
             new HomeView();
+            this.dispose();
         };
 
         JPanel topContainer = EmployeeRegistrationViewHelper.createTopContainer();
@@ -75,78 +78,91 @@ public class EmployeeRegistrationView extends JFrame {
         backButton.addActionListener(e -> tabs.setSelectedIndex(0));
 
         submitButton.addActionListener(e -> {
-            try {
-                String validationMessage = formPanel.validationMessage();
-                if (validationMessage != null) {
-                    DialogHelper.warning(this, "Check Employee Details", validationMessage);
-                    return;
-                }
-
-                Employee emp = formPanel.getEmployeeFromForm();
-                String empCode = emp.getEMPLOYEE_CODE();
-                String basePath = System.getProperty("user.dir") + "/employees/";
-                File empDir = new File(basePath + empCode);
-                File docDir = new File(empDir, "documents");
-                if (!docDir.exists()) {
-                    docDir.mkdirs();
-                }
-
-                File img = formPanel.getSelectedImage();
-                if (img != null) {
-                    File dest = new File(empDir, "EMP_IMG.jpg");
-                    try (java.io.InputStream in = new java.io.FileInputStream(img);
-                            java.io.OutputStream out = new java.io.FileOutputStream(dest)) {
-                        byte[] buffer = new byte[1024];
-                        int len;
-                        while ((len = in.read(buffer)) > 0) {
-                            out.write(buffer, 0, len);
-                        }
-                        emp.setEMP_IMG("employees/" + empCode + "/EMP_IMG.jpg");
-                    }
-                }
-
-                EmployeeDocumentUploadPanel docPanel = documentPanel;
-                String[] docs = docPanel.getAllDocumentPaths();
-                if (docs != null) {
-                    for (int i = 0; i < docs.length; i++) {
-                        if (docs[i] != null) {
-                            File src = new File(docs[i]);
-                            String storageName = EmployeeDocumentUtil.documentType(i).storageName();
-                            File dest = new File(docDir, storageName);
-                            try (java.io.InputStream in = new java.io.FileInputStream(src);
-                                    java.io.OutputStream out = new java.io.FileOutputStream(dest)) {
-                                byte[] buffer = new byte[1024];
-                                int len;
-                                while ((len = in.read(buffer)) > 0) {
-                                    out.write(buffer, 0, len);
-                                }
-                            }
-
-                            String dbPath = "employees/" + empCode + "/documents/" + storageName;
-                            EmployeeDocumentUtil.setDocumentPath(emp, i, dbPath);
-                        }
-                    }
-                }
-
-                EmployeeRegistrationDao dao = new EmployeeRegistrationDao(DatabaseConnection.getConnection());
-                dao.insertEmployee(emp);
-                DialogHelper.success(this, "Employee saved successfully.");
-                formPanel.clearForm();
-                documentPanel.clearDocuments();
-                tabs.setSelectedIndex(0);
-                SwingUtilities.invokeLater(() -> {
-                    centerWrapper.revalidate();
-                    centerWrapper.repaint();
-                    pageScroll.getVerticalScrollBar().setValue(0);
-                });
-            } catch (Exception ex) {
-                DialogHelper.error(
-                        this,
-                        "Error",
-                        "Failed to save employee:\n" + ex.getMessage());
+            String validationMessage = formPanel.validationMessage();
+            if (validationMessage != null) {
+                DialogHelper.warning(this, "Check Employee Details", validationMessage);
+                return;
             }
+
+            Employee emp = formPanel.getEmployeeFromForm();
+            String empCode = emp.getEMPLOYEE_CODE();
+            File selectedImage = formPanel.getSelectedImage();
+            String[] selectedDocuments = documentPanel.getAllDocumentPaths();
+            LoadingOverlay.Handle loader = LoadingOverlay.show(
+                    this,
+                    "Saving Employee",
+                    "Copying files and saving employee record..."
+            );
+
+            SwingWorker<Void, Void> worker = new SwingWorker<>() {
+                @Override
+                protected Void doInBackground() throws Exception {
+                    saveEmployeeRecord(emp, empCode, selectedImage, selectedDocuments);
+                    return null;
+                }
+
+                @Override
+                protected void done() {
+                    loader.close();
+                    try {
+                        get();
+                        DialogHelper.success(EmployeeRegistrationView.this, "Employee saved successfully.");
+                        formPanel.clearForm();
+                        documentPanel.clearDocuments();
+                        tabs.setSelectedIndex(0);
+                        SwingUtilities.invokeLater(() -> {
+                            centerWrapper.revalidate();
+                            centerWrapper.repaint();
+                            pageScroll.getVerticalScrollBar().setValue(0);
+                        });
+                    } catch (Exception ex) {
+                        DialogHelper.error(
+                                EmployeeRegistrationView.this,
+                                "Error",
+                                "Failed to save employee:\n" + ex.getMessage());
+                    }
+                }
+            };
+            worker.execute();
         });
         setVisible(true);
+    }
+
+    private void saveEmployeeRecord(
+            Employee emp,
+            String empCode,
+            File selectedImage,
+            String[] selectedDocuments
+    ) throws Exception {
+        File empDir = new File(System.getProperty("user.dir"), "employees/" + empCode);
+        File docDir = new File(empDir, "documents");
+        if (!docDir.exists() && !docDir.mkdirs()) {
+            throw new IllegalStateException("Could not create employee document folder.");
+        }
+
+        if (selectedImage != null) {
+            File dest = new File(empDir, "EMP_IMG.jpg");
+            Files.copy(selectedImage.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            emp.setEMP_IMG("employees/" + empCode + "/EMP_IMG.jpg");
+        }
+
+        if (selectedDocuments != null) {
+            for (int i = 0; i < selectedDocuments.length; i++) {
+                if (selectedDocuments[i] == null) {
+                    continue;
+                }
+
+                File src = new File(selectedDocuments[i]);
+                String storageName = EmployeeDocumentUtil.documentType(i).storageName();
+                File dest = new File(docDir, storageName);
+                Files.copy(src.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                String dbPath = "employees/" + empCode + "/documents/" + storageName;
+                EmployeeDocumentUtil.setDocumentPath(emp, i, dbPath);
+            }
+        }
+
+        EmployeeRegistrationDao dao = new EmployeeRegistrationDao(DatabaseConnection.getConnection());
+        dao.insertEmployee(emp);
     }
 
     public void refreshDynamicFields() {

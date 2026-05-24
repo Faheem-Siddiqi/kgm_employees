@@ -30,7 +30,6 @@ public class MissingDataView extends JFrame {
             "Action"
     };
 
-    private final EmployeeRecordDao repo = new EmployeeRecordDao();
     private final UniversalTablePanel tablePanel = new UniversalTablePanel(
             COLUMNS,
             "No missing required employee data"
@@ -80,8 +79,8 @@ public class MissingDataView extends JFrame {
         JButton dashboard = new JButton("Dashboard");
         EmployeeRegistrationViewHelper.styleBackButton(dashboard);
         dashboard.addActionListener(event -> {
-            dispose();
             new HomeView();
+            dispose();
         });
 
         row.add(titleBlock, BorderLayout.WEST);
@@ -115,7 +114,9 @@ public class MissingDataView extends JFrame {
 
     private void reload() {
         rows.clear();
-        rows.addAll(repo.missingRequiredDataRows());
+        try (EmployeeRecordDao repo = new EmployeeRecordDao()) {
+            rows.addAll(repo.missingRequiredDataRows());
+        }
         tablePanel.setRows(toRows(rows));
     }
 

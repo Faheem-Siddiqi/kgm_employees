@@ -16,7 +16,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-public class EmployeeRecordDao {
+public class EmployeeRecordDao implements AutoCloseable {
+    private static final int QUERY_TIMEOUT_SECONDS = 15;
+    private static final int FETCH_SIZE = 500;
+
     private final Connection con;
 
     public EmployeeRecordDao() {
@@ -24,6 +27,17 @@ public class EmployeeRecordDao {
             this.con = DatabaseConnection.getConnection();
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to connect to MySQL database.", exception);
+        }
+    }
+
+    @Override
+    public void close() {
+        try {
+            if (con != null && !con.isClosed()) {
+                con.close();
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
         }
     }
 
@@ -35,6 +49,11 @@ public class EmployeeRecordDao {
             return "N/A";
         }
         return value;
+    }
+
+    private void applyReadQuerySettings(Statement statement) throws SQLException {
+        statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+        statement.setFetchSize(FETCH_SIZE);
     }
 
     // ==============================
@@ -69,11 +88,12 @@ public class EmployeeRecordDao {
                 """;
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
+            applyReadQuerySettings(ps);
             ps.setInt(1, Math.max(1, limit));
             ps.setInt(2, Math.max(0, offset));
 
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
                 Employee e = new Employee();
                 e.setID(rs.getInt("ID"));
                 e.setEMPLOYEE_CODE(safe(rs.getString("EMPLOYEE_CODE")));
@@ -91,11 +111,68 @@ public class EmployeeRecordDao {
                 e.setJOINING_DATE(safe(rs.getString("JOINING_DATE")));
                 e.setRESIGN_DATE(safe(rs.getString("RESIGN_DATE")));
                 list.add(e);
+                }
             }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
         return list;
+    }
+
+    public List<Employee> getEmployeeSummaries() {
+        List<Employee> list = new ArrayList<>();
+        String sql = """
+                    SELECT
+                        ID,
+                        EMPLOYEE_CODE,
+                        EMP_NAME,
+                        FATHER_NAME,
+                        NID,
+                        EMP_CONTNO,
+                        PERSONAL_EMAIL,
+                        DEPARTMENT,
+                        DESIGNATION,
+                        SECTION,
+                        GRADE,
+                        GENDER,
+                        RESIGN_REASON,
+                        JOINING_DATE,
+                        RESIGN_DATE
+                    FROM employees
+                    ORDER BY ID DESC
+                """;
+
+        try (PreparedStatement statement = con.prepareStatement(sql)) {
+            applyReadQuerySettings(statement);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    list.add(summaryEmployee(rs));
+                }
+            }
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to load employee summaries.", ex);
+        }
+        return list;
+    }
+
+    private Employee summaryEmployee(ResultSet rs) throws SQLException {
+        Employee e = new Employee();
+        e.setID(rs.getInt("ID"));
+        e.setEMPLOYEE_CODE(safe(rs.getString("EMPLOYEE_CODE")));
+        e.setEMP_NAME(safe(rs.getString("EMP_NAME")));
+        e.setFATHER_NAME(safe(rs.getString("FATHER_NAME")));
+        e.setNID(safe(rs.getString("NID")));
+        e.setEMP_CONTNO(safe(rs.getString("EMP_CONTNO")));
+        e.setPERSONAL_EMAIL(safe(rs.getString("PERSONAL_EMAIL")));
+        e.setDEPARTMENT(safe(rs.getString("DEPARTMENT")));
+        e.setDESIGNATION(safe(rs.getString("DESIGNATION")));
+        e.setSECTION(safe(rs.getString("SECTION")));
+        e.setGRADE(safe(rs.getString("GRADE")));
+        e.setGENDER(safe(rs.getString("GENDER")));
+        e.setRESIGN_REASON(safe(rs.getString("RESIGN_REASON")));
+        e.setJOINING_DATE(safe(rs.getString("JOINING_DATE")));
+        e.setRESIGN_DATE(safe(rs.getString("RESIGN_DATE")));
+        return e;
     }
 
     // ==============================
@@ -104,11 +181,12 @@ public class EmployeeRecordDao {
     public int countEmployees() {
         String sql = "SELECT COUNT(*) FROM employees";
 
-        try (Statement st = con.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-
-            if (rs.next()) {
-                return rs.getInt(1);
+        try (Statement st = con.createStatement()) {
+            applyReadQuerySettings(st);
+            try (ResultSet rs = st.executeQuery(sql)) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
             }
 
         } catch (Exception ex) {
@@ -127,13 +205,17 @@ public class EmployeeRecordDao {
         List<ContributionStat> grades = contributions(countByColumn("GRADE"), departmentsByGrade);
         List<CountStat> designations = countByColumn("DESIGNATION");
         List<CountStat> exitTrends = exitTrends();
-        List<MissingRequirementStat> missingDocuments = missingRequirementStats(requiredDefinitions(true), total);
-        List<MissingRequirementStat> missingFields = missingRequirementStats(requiredDefinitions(false), total);
-        int employeesMissingDocuments = employeesMissingAny(missingDocuments, total);
-        int employeesMissingFields = employeesMissingAny(missingFields, total);
-        List<MissingRequirementStat> allMissingRequirements = new ArrayList<>(missingDocuments);
-        allMissingRequirements.addAll(missingFields);
-        int employeesMissingAnyData = employeesMissingAny(allMissingRequirements, total);
+        List<EmployeeFieldDefinition> requiredDefinitions = requiredDefinitions();
+        List<EmployeeFieldDefinition> requiredDocuments = new ArrayList<>();
+        List<EmployeeFieldDefinition> requiredFields = new ArrayList<>();
+        for (EmployeeFieldDefinition definition : requiredDefinitions) {
+            if (definition.documentField()) {
+                requiredDocuments.add(definition);
+            } else {
+                requiredFields.add(definition);
+            }
+        }
+        DashboardMissingStats missingStats = missingDashboardStats(requiredDocuments, requiredFields, total);
 
         return new DashboardStats(
                 total,
@@ -143,14 +225,14 @@ public class EmployeeRecordDao {
                 designations,
                 departmentsByDesignation,
                 exitTrends,
-                missingDocumentsFromRequirements(missingDocuments),
-                employeesMissingDocuments,
-                missingDocuments,
-                missingFields,
-                employeesMissingFields,
-                totalMissing(missingDocuments),
-                totalMissing(missingFields),
-                employeesMissingAnyData
+                missingDocumentsFromRequirements(missingStats.documents()),
+                missingStats.employeesMissingDocuments(),
+                missingStats.documents(),
+                missingStats.fields(),
+                missingStats.employeesMissingFields(),
+                totalMissing(missingStats.documents()),
+                totalMissing(missingStats.fields()),
+                missingStats.employeesMissingAnyData()
         );
     }
 
@@ -158,10 +240,12 @@ public class EmployeeRecordDao {
         List<CountStat> stats = new ArrayList<>();
         String sql = "SELECT " + normalizedValueSql(column) + " AS label, COUNT(*) AS total "
                 + "FROM employees GROUP BY label ORDER BY total DESC, label ASC";
-        try (Statement statement = con.createStatement();
-             ResultSet rs = statement.executeQuery(sql)) {
-            while (rs.next()) {
-                stats.add(new CountStat(rs.getString("label"), rs.getInt("total")));
+        try (Statement statement = con.createStatement()) {
+            applyReadQuerySettings(statement);
+            try (ResultSet rs = statement.executeQuery(sql)) {
+                while (rs.next()) {
+                    stats.add(new CountStat(rs.getString("label"), rs.getInt("total")));
+                }
             }
         } catch (SQLException exception) {
             exception.printStackTrace();
@@ -175,12 +259,14 @@ public class EmployeeRecordDao {
                 + normalizedValueSql(childColumn) + " AS child_label, COUNT(*) AS total "
                 + "FROM employees GROUP BY parent_label, child_label "
                 + "ORDER BY parent_label ASC, total DESC, child_label ASC";
-        try (Statement statement = con.createStatement();
-             ResultSet rs = statement.executeQuery(sql)) {
-            while (rs.next()) {
-                String parent = rs.getString("parent_label");
-                grouped.computeIfAbsent(parent, ignored -> new ArrayList<>())
-                        .add(new CountStat(rs.getString("child_label"), rs.getInt("total")));
+        try (Statement statement = con.createStatement()) {
+            applyReadQuerySettings(statement);
+            try (ResultSet rs = statement.executeQuery(sql)) {
+                while (rs.next()) {
+                    String parent = rs.getString("parent_label");
+                    grouped.computeIfAbsent(parent, ignored -> new ArrayList<>())
+                            .add(new CountStat(rs.getString("child_label"), rs.getInt("total")));
+                }
             }
         } catch (SQLException exception) {
             exception.printStackTrace();
@@ -238,27 +324,165 @@ public class EmployeeRecordDao {
         return "Others";
     }
 
-    private List<MissingRequirementStat> missingRequirementStats(
-            List<EmployeeFieldDefinition> definitions,
+    private DashboardMissingStats missingDashboardStats(
+            List<EmployeeFieldDefinition> documentDefinitions,
+            List<EmployeeFieldDefinition> fieldDefinitions,
             int totalEmployees
     ) {
-        List<MissingRequirementStat> stats = new ArrayList<>();
-        for (EmployeeFieldDefinition definition : definitions) {
-            int missing = columnExists(definition.columnName())
-                    ? missingCount(definition.columnName())
-                    : totalEmployees;
-            stats.add(new MissingRequirementStat(
-                    definition.label(),
-                    definition.columnName(),
-                    missing,
-                    definition.documentField()
-            ));
+        List<EmployeeFieldDefinition> safeDocumentDefinitions = documentDefinitions == null ? List.of() : documentDefinitions;
+        List<EmployeeFieldDefinition> safeFieldDefinitions = fieldDefinitions == null ? List.of() : fieldDefinitions;
+        List<MissingMetric> metrics = new ArrayList<>();
+        List<MissingRequirementStat> missingDocuments = new ArrayList<>();
+        List<MissingRequirementStat> missingFields = new ArrayList<>();
+        Set<String> existingColumns;
+        try {
+            existingColumns = employeeColumns();
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            existingColumns = Set.of();
         }
+
+        int aliasIndex = 0;
+        boolean missingDocumentColumn = false;
+        for (EmployeeFieldDefinition definition : safeDocumentDefinitions) {
+            if (existingColumns.contains(definition.columnName().toUpperCase(Locale.ROOT))) {
+                String alias = "m" + aliasIndex++;
+                metrics.add(new MissingMetric(definition, alias));
+            } else {
+                missingDocumentColumn = true;
+                missingDocuments.add(missingRequirement(definition, totalEmployees));
+            }
+        }
+
+        boolean missingFieldColumn = false;
+        for (EmployeeFieldDefinition definition : safeFieldDefinitions) {
+            if (existingColumns.contains(definition.columnName().toUpperCase(Locale.ROOT))) {
+                String alias = "m" + aliasIndex++;
+                metrics.add(new MissingMetric(definition, alias));
+            } else {
+                missingFieldColumn = true;
+                missingFields.add(missingRequirement(definition, totalEmployees));
+            }
+        }
+
+        List<String> selectExpressions = new ArrayList<>();
+        List<String> documentConditions = new ArrayList<>();
+        List<String> fieldConditions = new ArrayList<>();
+        for (MissingMetric metric : metrics) {
+            String condition = missingValueCondition(quoteIdentifier(metric.definition().columnName()));
+            selectExpressions.add("SUM(CASE WHEN " + condition + " THEN 1 ELSE 0 END) AS " + metric.alias());
+            if (metric.definition().documentField()) {
+                documentConditions.add(condition);
+            } else {
+                fieldConditions.add(condition);
+            }
+        }
+
+        boolean hasDocumentConditions = !documentConditions.isEmpty();
+        boolean hasFieldConditions = !fieldConditions.isEmpty();
+        if (hasDocumentConditions) {
+            selectExpressions.add("SUM(CASE WHEN (" + String.join(" OR ", documentConditions)
+                    + ") THEN 1 ELSE 0 END) AS any_documents");
+        }
+        if (hasFieldConditions) {
+            selectExpressions.add("SUM(CASE WHEN (" + String.join(" OR ", fieldConditions)
+                    + ") THEN 1 ELSE 0 END) AS any_fields");
+        }
+        if (hasDocumentConditions || hasFieldConditions) {
+            List<String> allConditions = new ArrayList<>(documentConditions);
+            allConditions.addAll(fieldConditions);
+            selectExpressions.add("SUM(CASE WHEN (" + String.join(" OR ", allConditions)
+                    + ") THEN 1 ELSE 0 END) AS any_data");
+        }
+
+        int employeesMissingDocuments = missingDocumentColumn && !safeDocumentDefinitions.isEmpty()
+                ? totalEmployees
+                : 0;
+        int employeesMissingFields = missingFieldColumn && !safeFieldDefinitions.isEmpty()
+                ? totalEmployees
+                : 0;
+        int employeesMissingAnyData = (missingDocumentColumn || missingFieldColumn)
+                && (!safeDocumentDefinitions.isEmpty() || !safeFieldDefinitions.isEmpty())
+                ? totalEmployees
+                : 0;
+
+        if (!selectExpressions.isEmpty()) {
+            String sql = "SELECT " + String.join(", ", selectExpressions) + " FROM employees";
+            try (Statement statement = con.createStatement()) {
+                applyReadQuerySettings(statement);
+                try (ResultSet rs = statement.executeQuery(sql)) {
+                    if (rs.next()) {
+                        for (MissingMetric metric : metrics) {
+                            MissingRequirementStat stat = missingRequirement(metric.definition(), rs.getInt(metric.alias()));
+                            if (metric.definition().documentField()) {
+                                missingDocuments.add(stat);
+                            } else {
+                                missingFields.add(stat);
+                            }
+                        }
+                        if (!missingDocumentColumn && hasDocumentConditions) {
+                            employeesMissingDocuments = rs.getInt("any_documents");
+                        }
+                        if (!missingFieldColumn && hasFieldConditions) {
+                            employeesMissingFields = rs.getInt("any_fields");
+                        }
+                        if (!missingDocumentColumn && !missingFieldColumn
+                                && (hasDocumentConditions || hasFieldConditions)) {
+                            employeesMissingAnyData = rs.getInt("any_data");
+                        }
+                    }
+                }
+            } catch (SQLException exception) {
+                exception.printStackTrace();
+            }
+        }
+
+        sortMissingStats(missingDocuments);
+        sortMissingStats(missingFields);
+        return new DashboardMissingStats(
+                missingDocuments,
+                missingFields,
+                employeesMissingDocuments,
+                employeesMissingFields,
+                employeesMissingAnyData
+        );
+    }
+
+    private MissingRequirementStat missingRequirement(EmployeeFieldDefinition definition, int missingCount) {
+        return new MissingRequirementStat(
+                definition.label(),
+                definition.columnName(),
+                missingCount,
+                definition.documentField()
+        );
+    }
+
+    private void sortMissingStats(List<MissingRequirementStat> stats) {
         stats.sort(Comparator
                 .comparingInt(MissingRequirementStat::missingCount)
                 .reversed()
                 .thenComparing(MissingRequirementStat::label, String.CASE_INSENSITIVE_ORDER));
-        return stats;
+    }
+
+    private List<EmployeeFieldDefinition> requiredDefinitions() {
+        List<EmployeeFieldDefinition> required = new ArrayList<>();
+        try {
+            for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao(con).listFields()) {
+                if ("ID".equalsIgnoreCase(definition.columnName())) {
+                    continue;
+                }
+                if (definition.requiredField()) {
+                    required.add(definition);
+                }
+            }
+        } catch (RuntimeException exception) {
+            exception.printStackTrace();
+        }
+        required.sort(Comparator
+                .comparing(EmployeeFieldDefinition::heading, String.CASE_INSENSITIVE_ORDER)
+                .thenComparingInt(EmployeeFieldDefinition::sortOrder)
+                .thenComparing(EmployeeFieldDefinition::label, String.CASE_INSENSITIVE_ORDER));
+        return required;
     }
 
     private List<EmployeeFieldDefinition> requiredDefinitions(boolean documentField) {
@@ -294,53 +518,12 @@ public class EmployeeRecordDao {
         return documents;
     }
 
-    private int employeesMissingAny(List<MissingRequirementStat> requirements, int totalEmployees) {
-        List<String> conditions = new ArrayList<>();
-        for (MissingRequirementStat requirement : requirements) {
-            if (columnExists(requirement.column())) {
-                conditions.add(missingValueCondition(quoteIdentifier(requirement.column())));
-            }
-        }
-        if (requirements.isEmpty()) {
-            return 0;
-        }
-        if (conditions.isEmpty()) {
-            return totalEmployees;
-        }
-
-        String sql = "SELECT COUNT(*) FROM employees WHERE " + String.join(" OR ", conditions);
-        try (Statement statement = con.createStatement();
-             ResultSet rs = statement.executeQuery(sql)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException exception) {
-            exception.printStackTrace();
-        }
-        return 0;
-    }
-
     private int totalMissing(List<MissingRequirementStat> stats) {
         int total = 0;
         for (MissingRequirementStat stat : stats) {
             total += stat.missingCount();
         }
         return total;
-    }
-
-    private int missingCount(String column) {
-        String quoted = quoteIdentifier(column);
-        String sql = "SELECT SUM(CASE WHEN " + missingValueCondition(quoted)
-                + " THEN 1 ELSE 0 END) FROM employees";
-        try (Statement statement = con.createStatement();
-             ResultSet rs = statement.executeQuery(sql)) {
-            if (rs.next()) {
-                return rs.getInt(1);
-            }
-        } catch (SQLException exception) {
-            exception.printStackTrace();
-        }
-        return 0;
     }
 
     private String normalizedValueSql(String column) {
@@ -354,17 +537,6 @@ public class EmployeeRecordDao {
                 + ")) IN ('N/A', 'NA', 'NULL') OR TRIM(" + quotedColumn + ") = '-'";
     }
 
-    private boolean columnExists(String columnName) {
-        try (ResultSet rs = con.getMetaData().getColumns(con.getCatalog(), null, "employees", columnName)) {
-            if (rs.next()) {
-                return true;
-            }
-        } catch (SQLException exception) {
-            exception.printStackTrace();
-        }
-        return false;
-    }
-
     public List<MissingEmployeeRow> missingRequiredDataRows() {
         List<MissingEmployeeRow> rows = new ArrayList<>();
         List<EmployeeFieldDefinition> required = new ArrayList<>();
@@ -374,34 +546,36 @@ public class EmployeeRecordDao {
             return rows;
         }
 
-        try (Statement statement = con.createStatement();
-             ResultSet rs = statement.executeQuery("SELECT * FROM employees ORDER BY ID DESC")) {
-            ResultSetMetaData metaData = rs.getMetaData();
-            Map<String, Integer> resultColumns = resultColumns(metaData);
-            while (rs.next()) {
-                List<String> missing = new ArrayList<>();
-                for (EmployeeFieldDefinition definition : required) {
-                    Integer index = resultColumns.get(definition.columnName().toUpperCase(Locale.ROOT));
-                    String value = index == null ? null : rs.getString(index);
-                    if (isMissingValue(value)) {
-                        missing.add(definition.label());
+        try (Statement statement = con.createStatement()) {
+            applyReadQuerySettings(statement);
+            try (ResultSet rs = statement.executeQuery("SELECT * FROM employees ORDER BY ID DESC")) {
+                ResultSetMetaData metaData = rs.getMetaData();
+                Map<String, Integer> resultColumns = resultColumns(metaData);
+                while (rs.next()) {
+                    List<String> missing = new ArrayList<>();
+                    for (EmployeeFieldDefinition definition : required) {
+                        Integer index = resultColumns.get(definition.columnName().toUpperCase(Locale.ROOT));
+                        String value = index == null ? null : rs.getString(index);
+                        if (isMissingValue(value)) {
+                            missing.add(definition.label());
+                        }
                     }
+                    if (missing.isEmpty()) {
+                        continue;
+                    }
+                    rows.add(new MissingEmployeeRow(
+                            safe(valueFor(rs, resultColumns, "EMPLOYEE_CODE")),
+                            safe(valueFor(rs, resultColumns, "EMP_NAME")),
+                            String.join(", ", missing),
+                            safe(valueFor(rs, resultColumns, "DESIGNATION")),
+                            safe(valueFor(rs, resultColumns, "GRADE")),
+                            safe(valueFor(rs, resultColumns, "DEPARTMENT")),
+                            safe(valueFor(rs, resultColumns, "SECTION")),
+                            safe(valueFor(rs, resultColumns, "JOINING_DATE")),
+                            safe(valueFor(rs, resultColumns, "RESIGN_DATE")),
+                            safe(valueFor(rs, resultColumns, "EMP_CONTNO"))
+                    ));
                 }
-                if (missing.isEmpty()) {
-                    continue;
-                }
-                rows.add(new MissingEmployeeRow(
-                        safe(valueFor(rs, resultColumns, "EMPLOYEE_CODE")),
-                        safe(valueFor(rs, resultColumns, "EMP_NAME")),
-                        String.join(", ", missing),
-                        safe(valueFor(rs, resultColumns, "DESIGNATION")),
-                        safe(valueFor(rs, resultColumns, "GRADE")),
-                        safe(valueFor(rs, resultColumns, "DEPARTMENT")),
-                        safe(valueFor(rs, resultColumns, "SECTION")),
-                        safe(valueFor(rs, resultColumns, "JOINING_DATE")),
-                        safe(valueFor(rs, resultColumns, "RESIGN_DATE")),
-                        safe(valueFor(rs, resultColumns, "EMP_CONTNO"))
-                ));
             }
         } catch (SQLException exception) {
             exception.printStackTrace();
@@ -467,10 +641,11 @@ public class EmployeeRecordDao {
                 """;
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
+            applyReadQuerySettings(ps);
             ps.setString(1, empCode);
 
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
                 Employee e = new Employee();
                 e.setID(rs.getInt("ID"));
                 e.setEMPLOYEE_CODE(safe(rs.getString("EMPLOYEE_CODE")));
@@ -488,6 +663,7 @@ public class EmployeeRecordDao {
                 e.setJOINING_DATE(safe(rs.getString("JOINING_DATE")));
                 e.setRESIGN_DATE(safe(rs.getString("RESIGN_DATE")));
                 return e;
+                }
             }
 
         } catch (Exception ex) {
@@ -518,6 +694,7 @@ public class EmployeeRecordDao {
             String sql = "SELECT " + quotedColumnList(columns)
                     + " FROM employees WHERE EMPLOYEE_CODE = ? LIMIT 1";
             try (PreparedStatement ps = con.prepareStatement(sql)) {
+                applyReadQuerySettings(ps);
                 ps.setString(1, empCode.trim());
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
@@ -551,8 +728,9 @@ public class EmployeeRecordDao {
         String sql = "SELECT * FROM employees WHERE EMPLOYEE_CODE = ? LIMIT 1";
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
+            applyReadQuerySettings(ps);
             ps.setString(1, empCode);
-            ResultSet rs = ps.executeQuery();
+            try (ResultSet rs = ps.executeQuery()) {
 
             if (rs.next()) {
                 Employee e = new Employee();
@@ -692,6 +870,7 @@ public class EmployeeRecordDao {
 
                 return e;
             }
+            }
 
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -755,6 +934,7 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
     values.add(emp.getEMPLOYEE_CODE());
 
     try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+        ps.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
 
         for (int i = 0; i < values.size(); i++) {
             ps.setObject(i + 1, values.get(i));
@@ -887,6 +1067,18 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
     }
 
     public record MissingRequirementStat(String label, String column, int missingCount, boolean documentField) {
+    }
+
+    private record MissingMetric(EmployeeFieldDefinition definition, String alias) {
+    }
+
+    private record DashboardMissingStats(
+            List<MissingRequirementStat> documents,
+            List<MissingRequirementStat> fields,
+            int employeesMissingDocuments,
+            int employeesMissingFields,
+            int employeesMissingAnyData
+    ) {
     }
 
     public record MissingEmployeeRow(

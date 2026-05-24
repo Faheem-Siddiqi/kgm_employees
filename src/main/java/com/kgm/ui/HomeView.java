@@ -5,6 +5,7 @@ import com.kgm.service.ExcelExportService;
 import com.kgm.service.ExcelImportService;
 import com.kgm.service.ExcelSampleGenerator;
 import com.kgm.ui.component.FileUploadCard;
+import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.EmployeeTablePanel;
 import com.kgm.ui.panel.ExcelImportButton;
 import com.kgm.ui.panel.FooterPanel;
@@ -28,16 +29,21 @@ public class HomeView extends JFrame {
     private HomeStatsPanel statsPanel;
     private ExcelImportButton excelBtn;
     private JButton refreshBtn;
+    private boolean homeDataLoading;
+    private boolean dashboardStatsLoading;
+    private int homeLoadToken;
+    private int dashboardStatsLoadToken;
+    private SwingWorker<HomeTableData, String> homeDataWorker;
+    private SwingWorker<EmployeeRecordDao.DashboardStats, Void> dashboardStatsWorker;
 
     public HomeView() {
         HomeViewHelper.applyFrame(this);
 
-        EmployeeRecordDao repo = new EmployeeRecordDao();
-        tablePanel = new EmployeeTablePanel(repo);
-        statsPanel = new HomeStatsPanel(repo);
+        tablePanel = new EmployeeTablePanel(null);
+        statsPanel = new HomeStatsPanel(null);
 
         // Wire "Show in Table" from chart cards to the table filtering
-        statsPanel.setShowInTableHandler(command -> handleShowInTable(command, repo));
+        statsPanel.setShowInTableHandler(this::handleShowInTable);
 
         // Wire table filter callback to toggle Refresh / Clear Filter button text
         tablePanel.setOnFilterChanged(filterLabel -> {
@@ -94,17 +100,14 @@ public class HomeView extends JFrame {
                 return;
             }
 
-            var emp = repo.getEmployeeByCode(empCode);
-            if (emp != null) {
-                tablePanel.showSingleEmployee(emp);
-            } else {
-                DialogHelper.info(this, "No Result", "No employee found.");
-            }
+            searchEmployeeAsync(empCode);
         });
 
         clearBtn.addActionListener(e -> {
             searchField.setText("");
-            reloadHomeData();
+            if (tablePanel != null) {
+                tablePanel.clearFilter();
+            }
             HomeViewHelper.setTextButtonEnabled(clearBtn, false);
         });
 
@@ -159,13 +162,17 @@ public class HomeView extends JFrame {
         add(new FooterPanel(), BorderLayout.SOUTH);
 
         setVisible(true);
+        SwingUtilities.invokeLater(() -> loadHomeDataAsync(
+                "Loading Dashboard",
+                "Preparing employee table and analytics..."
+        ));
     }
 
     /**
      * Handles "Show in Table" clicks from chart cards.
      * Format: columnName::value::displayLabel
      */
-    private void handleShowInTable(String command, EmployeeRecordDao repo) {
+    private void handleShowInTable(String command) {
         if (command == null || command.isBlank()) {
             return;
         }
@@ -183,6 +190,41 @@ public class HomeView extends JFrame {
         } else {
             tablePanel.filterByColumn(columnName, value, displayLabel);
         }
+    }
+
+    private void searchEmployeeAsync(String employeeCode) {
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Searching Employee",
+                "Checking employee code..."
+        );
+        SwingWorker<Employee, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Employee doInBackground() {
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    return dao.getEmployeeByCode(employeeCode);
+                }
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                try {
+                    Employee emp = get();
+                    if (emp != null) {
+                        tablePanel.showSingleEmployee(emp);
+                    } else {
+                        DialogHelper.info(HomeView.this, "No Result", "No employee found.");
+                    }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    DialogHelper.error(HomeView.this, "Search stopped", "Search was interrupted.");
+                } catch (ExecutionException exception) {
+                    DialogHelper.error(HomeView.this, "Search failed", "Employee search could not be completed.");
+                }
+            }
+        };
+        worker.execute();
     }
 
     private void showExcelImportActions() {
@@ -268,12 +310,18 @@ public class HomeView extends JFrame {
         }
 
         setImportButtonEnabled(false);
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Importing Excel",
+                "Reading workbook and saving employees..."
+        );
         SwingWorker<ExcelImportService.ImportResult, Void> worker = new SwingWorker<>() {
             protected ExcelImportService.ImportResult doInBackground() throws Exception {
                 return excelImportService.importEmployees(file, importType);
             }
 
             protected void done() {
+                loader.close();
                 setImportButtonEnabled(true);
                 try {
                     ExcelImportService.ImportResult result = get();
@@ -303,12 +351,125 @@ public class HomeView extends JFrame {
     }
 
     private void reloadHomeData() {
-        if (tablePanel != null) {
-            tablePanel.reload();
+        loadHomeDataAsync("Refreshing Dashboard", "Loading latest employee table and analytics...");
+    }
+
+    private void loadHomeDataAsync(String title, String message) {
+        if (homeDataWorker != null && !homeDataWorker.isDone()) {
+            homeDataWorker.cancel(true);
         }
-        if (statsPanel != null) {
-            statsPanel.reload();
+        if (dashboardStatsWorker != null && !dashboardStatsWorker.isDone()) {
+            dashboardStatsWorker.cancel(true);
         }
+        int token = ++homeLoadToken;
+        homeDataLoading = true;
+        tablePanel.showLoading(message);
+        statsPanel.setStats(null);
+        if (refreshBtn != null) {
+            refreshBtn.setText("Loading...");
+            refreshBtn.setEnabled(true);
+        }
+
+        SwingWorker<HomeTableData, String> worker = new SwingWorker<>() {
+            @Override
+            protected HomeTableData doInBackground() {
+                publish("Loading employee table...");
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    java.util.List<Employee> employees = dao.getEmployeeSummaries();
+                    publish("Preparing employee rows...");
+                    java.util.List<Object[]> rows = EmployeeTablePanel.toRows(employees);
+                    return new HomeTableData(employees, rows);
+                }
+            }
+
+            @Override
+            protected void process(java.util.List<String> chunks) {
+                if (token == homeLoadToken && !chunks.isEmpty()) {
+                    tablePanel.showLoading(chunks.get(chunks.size() - 1));
+                }
+            }
+
+            @Override
+            protected void done() {
+                boolean latest = token == homeLoadToken;
+                try {
+                    if (!latest || isCancelled()) {
+                        return;
+                    }
+                    HomeTableData data = get();
+                    if (!isDisplayable()) {
+                        return;
+                    }
+                    tablePanel.setRepository(null);
+                    tablePanel.setEmployees(data.employees(), data.rows());
+                    statsPanel.setRepository(null);
+                    statsPanel.setStats(null);
+                    loadDashboardStatsAsync();
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    if (latest) {
+                        tablePanel.showLoadFailed("Dashboard loading was interrupted.");
+                    }
+                    DialogHelper.error(HomeView.this, "Dashboard stopped", "Dashboard loading was interrupted.");
+                } catch (ExecutionException exception) {
+                    if (latest) {
+                        tablePanel.showLoadFailed("Dashboard data could not be loaded.");
+                    }
+                    DialogHelper.error(HomeView.this, "Dashboard Load Failed", "Dashboard data could not be loaded.");
+                } finally {
+                    if (latest) {
+                        homeDataLoading = false;
+                        homeDataWorker = null;
+                    }
+                    if (latest && refreshBtn != null && isDisplayable()) {
+                        refreshBtn.setEnabled(true);
+                        refreshBtn.setText("Refresh");
+                        HomeViewHelper.styleRefreshButton(refreshBtn);
+                    }
+                }
+            }
+        };
+        homeDataWorker = worker;
+        worker.execute();
+    }
+
+    private void loadDashboardStatsAsync() {
+        if (dashboardStatsWorker != null && !dashboardStatsWorker.isDone()) {
+            dashboardStatsWorker.cancel(true);
+        }
+        int token = ++dashboardStatsLoadToken;
+        dashboardStatsLoading = true;
+
+        SwingWorker<EmployeeRecordDao.DashboardStats, Void> worker = new SwingWorker<>() {
+            @Override
+            protected EmployeeRecordDao.DashboardStats doInBackground() {
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    return dao.dashboardStats();
+                }
+            }
+
+            @Override
+            protected void done() {
+                boolean latest = token == dashboardStatsLoadToken;
+                if (latest) {
+                    dashboardStatsLoading = false;
+                    dashboardStatsWorker = null;
+                }
+                if (!latest || isCancelled() || !isDisplayable()) {
+                    return;
+                }
+                try {
+                    statsPanel.setStats(get());
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    DialogHelper.error(HomeView.this, "Dashboard analytics stopped", "Dashboard analytics loading was interrupted.");
+                } catch (ExecutionException exception) {
+                    DialogHelper.error(HomeView.this, "Dashboard Analytics Failed", "Dashboard analytics could not be loaded.");
+                }
+            }
+        };
+        dashboardStatsWorker = worker;
+        worker.execute();
     }
 
     private void downloadSampleExcel() {
@@ -323,18 +484,42 @@ public class HomeView extends JFrame {
         }
 
         File target = xlsxFile(selectedFile);
-        try {
-            ExcelSampleGenerator.writeSampleWorkbook(target);
-            showDownloadedFileSuccess(
-                    target,
-                    "Sample Excel Ready",
-                    "Sample Excel file saved:\n" + target.getAbsolutePath()
-            );
-        } catch (IOException exception) {
-            DialogHelper.error(this, "Sample not saved", friendlySampleSaveFailure(target, exception));
-        } catch (RuntimeException exception) {
-            DialogHelper.error(this, "Sample not saved", exception.getMessage());
-        }
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Saving Sample",
+                "Building the latest import sample..."
+        );
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                ExcelSampleGenerator.writeSampleWorkbook(target);
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                try {
+                    get();
+                    showDownloadedFileSuccess(
+                            target,
+                            "Sample Excel Ready",
+                            "Sample Excel file saved:\n" + target.getAbsolutePath()
+                    );
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    DialogHelper.error(HomeView.this, "Sample not saved", "Sample save was interrupted.");
+                } catch (ExecutionException exception) {
+                    Throwable cause = exception.getCause();
+                    if (cause instanceof IOException ioException) {
+                        DialogHelper.error(HomeView.this, "Sample not saved", friendlySampleSaveFailure(target, ioException));
+                    } else {
+                        DialogHelper.error(HomeView.this, "Sample not saved", cause == null ? exception.getMessage() : cause.getMessage());
+                    }
+                }
+            }
+        };
+        worker.execute();
     }
 
     private void exportEmployeeExcel() {
@@ -356,12 +541,18 @@ public class HomeView extends JFrame {
 
         File target = ensureExcelExtension(selectedFile, selectedFormat);
         setExcelButtonBusy("Exporting...");
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Exporting Excel",
+                "Saving employee workbook..."
+        );
         SwingWorker<ExcelExportService.ExportResult, Void> worker = new SwingWorker<>() {
             protected ExcelExportService.ExportResult doInBackground() throws Exception {
                 return excelExportService.exportEmployees(target);
             }
 
             protected void done() {
+                loader.close();
                 setExcelButtonReady();
                 try {
                     ExcelExportService.ExportResult result = get();
@@ -612,5 +803,11 @@ public class HomeView extends JFrame {
         excelBtn.setEnabled(true);
         excelBtn.setText("Import Excel");
         excelBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
+    private record HomeTableData(
+            java.util.List<Employee> employees,
+            java.util.List<Object[]> rows
+    ) {
     }
 }

@@ -36,7 +36,7 @@ public class UniversalTablePanel extends JPanel {
     private final JLabel rangeLabel = new JLabel();
     private final JButton previousButton = new JButton("Previous");
     private final JButton nextButton = new JButton("Next");
-    private final String emptyText;
+    private String emptyText;
     private int actionColumn = -1;
     private Consumer<Integer> onAction;
     private Consumer<Integer> statusDeleteAction;
@@ -364,6 +364,13 @@ public class UniversalTablePanel extends JPanel {
         refresh();
     }
 
+    public void setEmptyText(String emptyText) {
+        this.emptyText = emptyText == null || emptyText.isBlank()
+                ? "No records found"
+                : emptyText.trim();
+        refresh();
+    }
+
     public void addRow(Object[] row) {
         rows.add(row);
         currentPage = lastPage();
@@ -622,7 +629,7 @@ public class UniversalTablePanel extends JPanel {
         FontMetrics cellMetrics = table.getFontMetrics(table.getFont());
         int width = headerMetrics.stringWidth(table.getColumnName(column)) + padding;
 
-        for (Object[] row : rows) {
+        for (Object[] row : rowsForWidthMeasurement()) {
             Object value = row[column];
             int cellWidth = cellMetrics.stringWidth(value == null ? "" : String.valueOf(value)) + padding;
             if (wrappedTextColumns.contains(column)) {
@@ -638,6 +645,18 @@ public class UniversalTablePanel extends JPanel {
         }
 
         return Math.max(72, width);
+    }
+
+    private List<Object[]> rowsForWidthMeasurement() {
+        if (rows.isEmpty()) {
+            return rows;
+        }
+        if (!paginationEnabled) {
+            return rows.subList(0, Math.min(rows.size(), PAGE_SIZE));
+        }
+        int start = Math.max(0, Math.min(currentPage * PAGE_SIZE, rows.size()));
+        int end = Math.min(start + PAGE_SIZE, rows.size());
+        return rows.subList(start, end);
     }
 
     private int wrappedTextHeight(String text, int columnWidth) {

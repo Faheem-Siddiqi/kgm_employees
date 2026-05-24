@@ -35,7 +35,7 @@ public class HomeStatsChartsPanel extends JPanel {
     private static final int CARD_GAP = HomeStatsChartHelper.CARD_GAP;
     private static final int SINGLE_COLUMN_WIDTH = HomeStatsChartHelper.SINGLE_COLUMN_WIDTH;
 
-    private final EmployeeRecordDao repo;
+    private EmployeeRecordDao repo;
     private final JPanel chartsPanel = new JPanel(new GridBagLayout());
     private final JLabel departmentTitle = new JLabel("Employees by Department");
     private final JButton departmentBack = new JButton("Back");
@@ -93,15 +93,19 @@ public class HomeStatsChartsPanel extends JPanel {
 
         add(header, BorderLayout.NORTH);
         add(chartsPanel, BorderLayout.CENTER);
-        reload();
+        rebuildCharts();
     }
 
     public void setShowInTableHandler(Consumer<String> handler) {
         this.showInTableHandler = handler;
     }
 
-    public void reload() {
-        stats = repo.dashboardStats();
+    public void setRepository(EmployeeRecordDao repo) {
+        this.repo = repo;
+    }
+
+    public void setStats(EmployeeRecordDao.DashboardStats stats) {
+        this.stats = stats;
         selectedDepartment = null;
         selectedMissingGroup = null;
         selectedGrade = null;
@@ -109,8 +113,19 @@ public class HomeStatsChartsPanel extends JPanel {
         rebuildCharts();
     }
 
+    public void reload() {
+        if (repo != null) {
+            setStats(repo.dashboardStats());
+        }
+    }
+
     private void rebuildCharts() {
         chartsPanel.removeAll();
+        if (stats == null) {
+            chartsPanel.revalidate();
+            chartsPanel.repaint();
+            return;
+        }
 
         configureDepartmentChart();
         configureMissingChart();

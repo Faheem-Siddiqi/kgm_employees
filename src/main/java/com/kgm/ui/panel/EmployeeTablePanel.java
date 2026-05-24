@@ -30,8 +30,9 @@ public class EmployeeTablePanel extends JPanel {
             "Action"
     };
 
-    private final EmployeeRecordDao repo;
+    private EmployeeRecordDao repo;
     private final UniversalTablePanel tablePanel;
+    private final List<Employee> loadedEmployees = new ArrayList<>();
     private final List<Employee> displayedEmployees = new ArrayList<>();
     private Consumer<String> onFilterChanged;
     private String activeFilterLabel;
@@ -62,7 +63,52 @@ public class EmployeeTablePanel extends JPanel {
         tablePanel.setPaginationBottomGap(5);
 
         add(tablePanel, BorderLayout.NORTH);
-        reload();
+        tablePanel.clearRows();
+    }
+
+    public void setRepository(EmployeeRecordDao repo) {
+        this.repo = repo;
+    }
+
+    public void showLoading(String message) {
+        activeFilterLabel = null;
+        displayedEmployees.clear();
+        String text = message == null || message.isBlank()
+                ? "Loading employee records..."
+                : message.trim();
+        tablePanel.setEmptyText(text);
+        tablePanel.clearRows();
+    }
+
+    public void showLoadFailed(String message) {
+        activeFilterLabel = null;
+        displayedEmployees.clear();
+        String text = message == null || message.isBlank()
+                ? "Employee records could not be loaded."
+                : message.trim();
+        tablePanel.setEmptyText(text);
+        tablePanel.clearRows();
+    }
+
+    public void setEmployees(List<Employee> employees) {
+        setEmployees(employees, toRows(employees));
+    }
+
+    public void setEmployees(List<Employee> employees, List<Object[]> preparedRows) {
+        tablePanel.setEmptyText("No employee records yet");
+        loadedEmployees.clear();
+        if (employees != null) {
+            loadedEmployees.addAll(employees);
+        }
+
+        activeFilterLabel = null;
+        displayedEmployees.clear();
+        displayedEmployees.addAll(loadedEmployees);
+        tablePanel.setPaginationEnabled(true);
+        tablePanel.setRows(preparedRows == null ? toRows(displayedEmployees) : preparedRows);
+        if (onFilterChanged != null) {
+            onFilterChanged.accept(null);
+        }
     }
 
     /**
@@ -87,13 +133,9 @@ public class EmployeeTablePanel extends JPanel {
     public void filterByColumn(String columnName, String value, String filterLabel) {
         this.activeFilterLabel = filterLabel;
         displayedEmployees.clear();
-        int totalEmployees = repo.countEmployees();
-        if (totalEmployees > 0) {
-            List<Employee> allEmployees = repo.getEmployees(0, totalEmployees);
-            for (Employee emp : allEmployees) {
-                if (matchesFilter(emp, columnName, value)) {
-                    displayedEmployees.add(emp);
-                }
+        for (Employee emp : loadedEmployees) {
+            if (matchesFilter(emp, columnName, value)) {
+                displayedEmployees.add(emp);
             }
         }
 
@@ -109,7 +151,10 @@ public class EmployeeTablePanel extends JPanel {
      */
     public void clearFilter() {
         this.activeFilterLabel = null;
-        reload();
+        displayedEmployees.clear();
+        displayedEmployees.addAll(loadedEmployees);
+        tablePanel.setPaginationEnabled(true);
+        tablePanel.setRows(toRows(displayedEmployees));
         if (onFilterChanged != null) {
             onFilterChanged.accept(null);
         }
@@ -172,6 +217,7 @@ public class EmployeeTablePanel extends JPanel {
 
     public void showSingleEmployee(Employee employee) {
         this.activeFilterLabel = null;
+        tablePanel.setEmptyText("No employee records yet");
         displayedEmployees.clear();
         if (employee != null) {
             displayedEmployees.add(employee);
@@ -183,26 +229,25 @@ public class EmployeeTablePanel extends JPanel {
 
     public void clearTable() {
         this.activeFilterLabel = null;
+        tablePanel.setEmptyText("No employee records yet");
         displayedEmployees.clear();
         tablePanel.clearRows();
     }
 
     public void reload() {
-        displayedEmployees.clear();
-        int totalEmployees = repo.countEmployees();
-        if (totalEmployees > 0) {
-            displayedEmployees.addAll(repo.getEmployees(0, totalEmployees));
+        if (repo == null) {
+            clearTable();
+            return;
         }
 
-        tablePanel.setPaginationEnabled(true);
-        tablePanel.setRows(toRows(displayedEmployees));
+        setEmployees(repo.getEmployeeSummaries());
     }
 
     /**
      * Formats the department display as "Department - Section" if section exists,
      * otherwise just shows the department name.
      */
-    private String formatDepartment(Employee employee) {
+    private static String formatDepartment(Employee employee) {
         String department = employee.getDEPARTMENT();
         if (department == null || department.trim().isEmpty() || department.equalsIgnoreCase("N/A")) {
             return "";
@@ -220,8 +265,11 @@ public class EmployeeTablePanel extends JPanel {
         return department;
     }
 
-    private List<Object[]> toRows(List<Employee> employees) {
+    public static List<Object[]> toRows(List<Employee> employees) {
         List<Object[]> rows = new ArrayList<>();
+        if (employees == null) {
+            return rows;
+        }
         for (Employee employee : employees) {
             rows.add(new Object[]{
                     employee.getEMPLOYEE_CODE(),

@@ -25,7 +25,7 @@ public class HomeStatsKPIPanel extends JPanel {
     private static final Color PURPLE = new Color(106, 90, 205);
     private static final Color RED = new Color(203, 75, 64);
 
-    private final EmployeeRecordDao repo;
+    private EmployeeRecordDao repo;
     private final JPanel metricRow = new JPanel(new GridLayout(1, 5, 12, 0));
     private EmployeeRecordDao.DashboardStats stats;
 
@@ -57,16 +57,37 @@ public class HomeStatsKPIPanel extends JPanel {
 
         add(header, BorderLayout.NORTH);
         add(metricRow, BorderLayout.CENTER);
-        reload();
+        rebuildMetrics();
+    }
+
+    public void setRepository(EmployeeRecordDao repo) {
+        this.repo = repo;
+    }
+
+    public void setStats(EmployeeRecordDao.DashboardStats stats) {
+        this.stats = stats;
+        rebuildMetrics();
     }
 
     public void reload() {
-        stats = repo.dashboardStats();
-        rebuildMetrics();
+        if (repo != null) {
+            setStats(repo.dashboardStats());
+        }
     }
 
     private void rebuildMetrics() {
         metricRow.removeAll();
+        if (stats == null) {
+            metricRow.add(metricCard("Total Ex-Employees:", "-", BLUE));
+            metricRow.add(metricCard("Departments", "-", TEAL));
+            metricRow.add(metricCard("Grades", "-", PURPLE));
+            metricRow.add(metricCard("Designations", "-", ORANGE));
+            metricRow.add(metricCard("Missing Data", "-", RED));
+            metricRow.revalidate();
+            metricRow.repaint();
+            return;
+        }
+
         int departments = stats.employeesByDepartment().size();
         int grades = stats.employeesByGrade().size();
         int designations = stats.employeesByDesignation().size();
