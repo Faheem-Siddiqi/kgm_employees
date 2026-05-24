@@ -430,116 +430,237 @@ public class EmployeeDetailView extends JFrame {
     private EmployeeReportService.PackageOptions showDownloadOptionsDialog(
             List<EmployeeReportService.AvailableDocument> availableDocuments
     ) {
-        JDialog dialog = new JDialog(this, "Choose Download Contents", true);
+        JDialog dialog = new JDialog(this, "Download Employee Report", true);
         EmployeeReportService.PackageOptions[] selectedOptions = new EmployeeReportService.PackageOptions[1];
 
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(Color.WHITE);
+        final Color primary = new Color(20, 101, 192);
+        final Color primarySoft = new Color(232, 241, 255);
+        final Color pageBg = new Color(245, 247, 250);
+        final Color cardBg = Color.WHITE;
+        final Color textDark = new Color(17, 24, 39);
+        final Color textMuted = new Color(100, 116, 139);
+        final Color border = new Color(226, 232, 240);
+        final Color success = new Color(22, 101, 52);
+        final Color successSoft = new Color(220, 252, 231);
+        final Color warning = new Color(180, 83, 9);
+        final Color warningSoft = new Color(254, 243, 199);
+        final Color error = new Color(185, 28, 28);
 
-        JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(new Color(0, 112, 210));
-        header.setBorder(BorderFactory.createEmptyBorder(16, 22, 16, 22));
-        JLabel title = new JLabel("Choose Download Contents");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 17));
-        title.setForeground(Color.WHITE);
-        header.add(title, BorderLayout.WEST);
+        JPanel root = new JPanel(new BorderLayout());
+        root.setBackground(pageBg);
+        root.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
+
+        JPanel header = new JPanel(new BorderLayout(14, 0));
+        header.setBackground(cardBg);
+        header.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, border),
+                BorderFactory.createEmptyBorder(18, 22, 18, 22)
+        ));
+
+        JLabel icon = new JLabel("↓", SwingConstants.CENTER);
+        icon.setOpaque(true);
+        icon.setBackground(primarySoft);
+        icon.setForeground(primary);
+        icon.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 22));
+        icon.setPreferredSize(new Dimension(48, 48));
+        icon.setBorder(new RoundedBorder(primarySoft, 24, 0));
+        header.add(icon, BorderLayout.WEST);
+
+        JPanel headerText = new JPanel();
+        headerText.setOpaque(false);
+        headerText.setLayout(new BoxLayout(headerText, BoxLayout.Y_AXIS));
+
+        JLabel title = new JLabel("Download Employee Report");
+        title.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 20));
+        title.setForeground(textDark);
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel subtitle = new JLabel(htmlWrap("Build a clean employee package with profile PDF, merged documents PDF, and separate saved files."));
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        subtitle.setForeground(textMuted);
+        subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        headerText.add(title);
+        headerText.add(Box.createVerticalStrut(4));
+        headerText.add(subtitle);
+        header.add(headerText, BorderLayout.CENTER);
 
         JPanel body = new JPanel();
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-        body.setBackground(Color.WHITE);
-        body.setBorder(BorderFactory.createEmptyBorder(18, 22, 14, 22));
+        body.setBackground(pageBg);
+        body.setBorder(BorderFactory.createEmptyBorder(18, 20, 18, 20));
 
-        JLabel helperText = new JLabel("Select what should be saved in the employee folder.");
-        helperText.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        helperText.setForeground(new Color(35, 43, 54));
-        helperText.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JScrollPane bodyScroll = new JScrollPane(body);
+        bodyScroll.setBorder(BorderFactory.createEmptyBorder());
+        bodyScroll.getViewport().setBackground(pageBg);
+        bodyScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        bodyScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        bodyScroll.getVerticalScrollBar().setUnitIncrement(18);
+        bodyScroll.getVerticalScrollBar().setBlockIncrement(120);
+        styleModernScrollPane(bodyScroll);
 
-        JCheckBox pdfProfile = createDownloadCheckbox("PDF profile", true);
-        JCheckBox allDocuments = createDownloadCheckbox("All saved documents", true);
-        JCheckBox allDocumentsPdf = createDownloadCheckbox("All Documents (PDF)", false);
-        JPanel optionRow = new JPanel(new GridLayout(0, 2, 12, 0));
-        optionRow.setBackground(Color.WHITE);
-        optionRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        optionRow.add(pdfProfile);
-        optionRow.add(allDocuments);
-        optionRow.add(allDocumentsPdf);
+        JCheckBox pdfProfile = createDownloadCheckbox("Employee profile PDF", true);
+        JCheckBox allDocumentsPdf = createDownloadCheckbox("All Documents as one PDF", false);
+        JCheckBox allDocuments = createDownloadCheckbox("Copy all saved documents", true);
 
-        JLabel documentHint = new JLabel("The all-documents option is off. Choose the specific files to include.");
-        documentHint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        documentHint.setForeground(new Color(99, 115, 129));
-        documentHint.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JPanel optionsCard = createModernCard();
+        optionsCard.add(createSectionHeader(
+                "Package contents",
+                "Select what should be generated or copied into the employee folder."
+        ));
+        optionsCard.add(Box.createVerticalStrut(12));
+        optionsCard.add(createOptionCard(
+                pdfProfile,
+                "Generate a readable employee profile report.",
+                "Recommended",
+                successSoft,
+                success
+        ));
+        optionsCard.add(Box.createVerticalStrut(10));
+        optionsCard.add(createOptionCard(
+                allDocumentsPdf,
+                "Combine supported document images into one PDF file.",
+                "Optional",
+                primarySoft,
+                primary
+        ));
+        optionsCard.add(Box.createVerticalStrut(10));
+        optionsCard.add(createOptionCard(
+                allDocuments,
+                "Copy every available saved document separately. Turn this off to pick specific files.",
+                "Files",
+                warningSoft,
+                warning
+        ));
 
-        JPanel documentGrid = new JPanel(new GridLayout(0, 2, 8, 6));
-        documentGrid.setBackground(Color.WHITE);
-        documentGrid.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JPanel documentSection = createModernCard();
+        documentSection.add(createSectionHeader(
+                "Choose separate documents",
+                "Shown only when Copy all saved documents is off. Missing files stay visible but disabled."
+        ));
+        documentSection.add(Box.createVerticalStrut(12));
+
+        JPanel documentList = new JPanel();
+        documentList.setLayout(new BoxLayout(documentList, BoxLayout.Y_AXIS));
+        documentList.setBackground(cardBg);
+        documentList.setAlignmentX(Component.LEFT_ALIGNMENT);
+
         Map<String, JCheckBox> documentChecks = new LinkedHashMap<>();
         for (EmployeeReportService.AvailableDocument availableDocument : availableDocuments) {
-            String label = availableDocument.fileReady()
-                    ? availableDocument.label()
-                    : availableDocument.label() + " (file missing)";
-            JCheckBox checkbox = createDownloadCheckbox(label, false);
+            JCheckBox checkbox = createDownloadCheckbox(availableDocument.label(), false);
+            checkbox.setEnabled(availableDocument.fileReady() && !allDocuments.isSelected());
+            checkbox.setToolTipText(availableDocument.fileReady()
+                    ? "Include this document as a separate copied file."
+                    : "This document path exists, but the file is missing.");
             documentChecks.put(availableDocument.label(), checkbox);
-            documentGrid.add(checkbox);
-        }
-        if (availableDocuments.isEmpty()) {
-            JLabel empty = new JLabel(" No saved document files are available for this employee.");
-            empty.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-            empty.setForeground(new Color(99, 115, 129));
-            documentGrid.add(empty);
+            documentList.add(createDocumentCard(checkbox, availableDocument));
+            documentList.add(Box.createVerticalStrut(8));
         }
 
-        JPanel individualWrapper = new JPanel();
-        individualWrapper.setLayout(new BoxLayout(individualWrapper, BoxLayout.Y_AXIS));
-        individualWrapper.setBackground(Color.WHITE);
-        individualWrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
-        individualWrapper.add(documentHint);
-        individualWrapper.add(Box.createVerticalStrut(8));
-        JScrollPane documentListScroll = new JScrollPane(documentGrid);
-        documentListScroll.setBorder(BorderFactory.createLineBorder(new Color(220, 226, 232)));
-        documentListScroll.getViewport().setBackground(Color.WHITE);
+        if (availableDocuments.isEmpty()) {
+            JPanel empty = createInfoBox(
+                    "No saved documents found",
+                    "This employee has no ready document files to copy. You can still generate the profile PDF.",
+                    warningSoft,
+                    warning
+            );
+            documentList.add(empty);
+        }
+
+        JScrollPane documentListScroll = new JScrollPane(documentList);
+        documentListScroll.setBorder(new RoundedBorder(border, 14, 1));
+        documentListScroll.getViewport().setBackground(cardBg);
         documentListScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         documentListScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
-        documentListScroll.setPreferredSize(new Dimension(470, Math.min(190, Math.max(74, ((availableDocuments.size() + 1) / 2) * 40))));
+        documentListScroll.getVerticalScrollBar().setUnitIncrement(16);
+        styleModernScrollPane(documentListScroll);
         documentListScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
-        individualWrapper.add(documentListScroll);
-        individualWrapper.setVisible(false);
+        documentSection.add(documentListScroll);
+
+        JPanel selectionSummary = createInfoBox("Ready", "All ready saved documents will be copied separately.", successSoft, success);
+        JLabel selectionTitle = (JLabel) selectionSummary.getClientProperty("titleLabel");
+        JLabel selectionDescription = (JLabel) selectionSummary.getClientProperty("descriptionLabel");
 
         JLabel validation = new JLabel(" ");
         validation.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        validation.setForeground(new Color(217, 45, 32));
+        validation.setForeground(error);
+        validation.setBorder(BorderFactory.createEmptyBorder(2, 4, 0, 4));
         validation.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        boolean[] individualSelectionStarted = {false};
-        allDocuments.addItemListener(event -> {
-            boolean showIndividualDocuments = !allDocuments.isSelected();
-            if (showIndividualDocuments && !individualSelectionStarted[0]) {
-                for (JCheckBox checkbox : documentChecks.values()) {
+        Runnable refreshState = () -> {
+            boolean chooseSpecificDocs = !allDocuments.isSelected();
+
+            documentSection.setVisible(chooseSpecificDocs);
+
+            for (JCheckBox checkbox : documentChecks.values()) {
+                EmployeeReportService.AvailableDocument doc = findDocumentByLabel(availableDocuments, checkbox.getText());
+                boolean fileReady = doc != null && doc.fileReady();
+                checkbox.setEnabled(chooseSpecificDocs && fileReady);
+                if (!chooseSpecificDocs) {
                     checkbox.setSelected(false);
                 }
-                individualSelectionStarted[0] = true;
             }
-            individualWrapper.setVisible(showIndividualDocuments);
-            validation.setText(" ");
-            individualWrapper.revalidate();
-            individualWrapper.repaint();
-            dialog.pack();
-            dialog.setLocationRelativeTo(this);
-        });
 
-        body.add(helperText);
-        body.add(Box.createVerticalStrut(16));
-        body.add(optionRow);
+            long readyCount = availableDocuments.stream().filter(EmployeeReportService.AvailableDocument::fileReady).count();
+            long selectedCount = documentChecks.values().stream().filter(JCheckBox::isSelected).count();
+
+            if (allDocuments.isSelected()) {
+                selectionTitle.setText("Copy mode: All documents");
+                selectionDescription.setText(readyCount == 0
+                        ? "No saved document files are ready to copy."
+                        : "All ready saved documents will be copied separately: " + readyCount);
+            } else {
+                selectionTitle.setText("Copy mode: Specific documents");
+                selectionDescription.setText(selectedCount == 0
+                        ? "Choose one or more ready documents, or turn on Copy all saved documents."
+                        : "Selected separate documents: " + selectedCount);
+            }
+
+            validation.setText(" ");
+            documentList.revalidate();
+            documentList.repaint();
+            body.revalidate();
+            body.repaint();
+            bodyScroll.revalidate();
+            bodyScroll.repaint();
+            dialog.pack();
+            resizeReportDialog(dialog);
+            dialog.setLocationRelativeTo(this);
+        };
+
+        allDocuments.addItemListener(event -> refreshState.run());
+        for (JCheckBox checkbox : documentChecks.values()) {
+            checkbox.addItemListener(event -> refreshState.run());
+        }
+
+        body.add(optionsCard);
         body.add(Box.createVerticalStrut(14));
-        body.add(individualWrapper);
+        body.add(documentSection);
+        body.add(Box.createVerticalStrut(14));
+        body.add(selectionSummary);
         body.add(Box.createVerticalStrut(8));
         body.add(validation);
 
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        footer.setBackground(new Color(247, 249, 251));
-        footer.setBorder(BorderFactory.createEmptyBorder(14, 22, 14, 22));
+        JPanel footer = new JPanel(new BorderLayout(12, 8));
+        footer.setBackground(cardBg);
+        footer.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, border),
+                BorderFactory.createEmptyBorder(14, 20, 14, 20)
+        ));
 
+        JLabel footerHint = new JLabel(htmlWrap("Next step: choose a folder where the package should be saved."));
+        footerHint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        footerHint.setForeground(textMuted);
+        footer.add(footerHint, BorderLayout.CENTER);
+
+        JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        buttonRow.setOpaque(false);
         JButton cancel = createDialogButton("Cancel", false);
         JButton chooseFolder = createDialogButton("Choose Folder", true);
+        buttonRow.add(cancel);
+        buttonRow.add(chooseFolder);
+        footer.add(buttonRow, BorderLayout.EAST);
+
         cancel.addActionListener(event -> dialog.dispose());
         chooseFolder.addActionListener(event -> {
             List<String> selectedDocumentLabels = new ArrayList<>();
@@ -557,13 +678,14 @@ public class EmployeeDetailView extends JFrame {
 
             boolean hasMergedDocumentPdfSelection = allDocumentsPdf.isSelected()
                     && hasReadyMergeableDocument(availableDocuments);
+
             if (allDocumentsPdf.isSelected() && !hasMergedDocumentPdfSelection) {
-                validation.setText(" No saved document images are available for the All Documents PDF.");
+                validation.setText("No saved document images are available for the All Documents PDF.");
                 return;
             }
 
             if (!pdfProfile.isSelected() && !hasDocumentSelection && !hasMergedDocumentPdfSelection) {
-                validation.setText("Select the PDF profile, All Documents PDF, or at least one document file.");
+                validation.setText("Select profile PDF, All Documents PDF, all documents, or at least one separate document.");
                 return;
             }
 
@@ -575,20 +697,217 @@ public class EmployeeDetailView extends JFrame {
             );
             dialog.dispose();
         });
-        footer.add(cancel);
-        footer.add(chooseFolder);
 
         root.add(header, BorderLayout.NORTH);
-        root.add(body, BorderLayout.CENTER);
+        root.add(bodyScroll, BorderLayout.CENTER);
         root.add(footer, BorderLayout.SOUTH);
 
         dialog.setContentPane(root);
         dialog.getRootPane().setDefaultButton(chooseFolder);
-        dialog.pack();
-        dialog.setMinimumSize(new Dimension(520, 260));
+        refreshState.run();
+        resizeReportDialog(dialog);
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
         return selectedOptions[0];
+    }
+
+    private JPanel createModernCard() {
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBackground(Color.WHITE);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(new Color(226, 232, 240), 18, 1),
+                BorderFactory.createEmptyBorder(16, 16, 16, 16)
+        ));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return card;
+    }
+
+    private JPanel createSectionHeader(String titleText, String helperText) {
+        JPanel header = new JPanel();
+        header.setOpaque(false);
+        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+        header.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel title = new JLabel(titleText);
+        title.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 15));
+        title.setForeground(new Color(17, 24, 39));
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel helper = new JLabel(htmlWrap(helperText));
+        helper.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        helper.setForeground(new Color(100, 116, 139));
+        helper.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        header.add(title);
+        header.add(Box.createVerticalStrut(3));
+        header.add(helper);
+        return header;
+    }
+
+    private JPanel createOptionCard(
+            JCheckBox checkbox,
+            String helperText,
+            String badgeText,
+            Color badgeBg,
+            Color badgeFg
+    ) {
+        JPanel row = new JPanel(new BorderLayout(12, 4));
+        row.setBackground(new Color(248, 250, 252));
+        row.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(new Color(226, 232, 240), 14, 1),
+                BorderFactory.createEmptyBorder(10, 12, 10, 12)
+        ));
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel left = new JPanel();
+        left.setOpaque(false);
+        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        left.add(checkbox);
+
+        JLabel helper = new JLabel(htmlWrap(helperText));
+        helper.setBorder(BorderFactory.createEmptyBorder(0, 25, 0, 0));
+        helper.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        helper.setForeground(new Color(100, 116, 139));
+        helper.setAlignmentX(Component.LEFT_ALIGNMENT);
+        left.add(helper);
+
+        row.add(left, BorderLayout.CENTER);
+        row.add(createBadge(badgeText, badgeBg, badgeFg), BorderLayout.EAST);
+        return row;
+    }
+
+    private JPanel createDocumentCard(
+            JCheckBox checkbox,
+            EmployeeReportService.AvailableDocument availableDocument
+    ) {
+        JPanel row = new JPanel(new BorderLayout(12, 4));
+        row.setBackground(new Color(248, 250, 252));
+        row.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(new Color(226, 232, 240), 12, 1),
+                BorderFactory.createEmptyBorder(9, 11, 9, 11)
+        ));
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel left = new JPanel();
+        left.setOpaque(false);
+        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        left.add(checkbox);
+
+        String statusText;
+        Color badgeBg;
+        Color badgeFg;
+        String badge;
+        if (!availableDocument.fileReady()) {
+            statusText = "File missing — cannot be included.";
+            badgeBg = new Color(254, 226, 226);
+            badgeFg = new Color(185, 28, 28);
+            badge = "Missing";
+        } else if (availableDocument.mergeableForDocumentsPdf()) {
+            statusText = "Ready — can be copied and included in All Documents PDF.";
+            badgeBg = new Color(220, 252, 231);
+            badgeFg = new Color(22, 101, 52);
+            badge = "PDF Ready";
+        } else {
+            statusText = "Ready — can be copied separately.";
+            badgeBg = new Color(232, 241, 255);
+            badgeFg = new Color(20, 101, 192);
+            badge = "Ready";
+        }
+
+        JLabel status = new JLabel(htmlWrap(statusText));
+        status.setBorder(BorderFactory.createEmptyBorder(0, 25, 0, 0));
+        status.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        status.setForeground(new Color(100, 116, 139));
+        status.setAlignmentX(Component.LEFT_ALIGNMENT);
+        left.add(status);
+
+        row.add(left, BorderLayout.CENTER);
+        row.add(createBadge(badge, badgeBg, badgeFg), BorderLayout.EAST);
+        return row;
+    }
+
+    private JPanel createInfoBox(String titleText, String detailText, Color bg, Color fg) {
+        JPanel box = new JPanel(new BorderLayout(10, 0));
+        box.setBackground(bg);
+        box.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(bg, 14, 0),
+                BorderFactory.createEmptyBorder(11, 13, 11, 13)
+        ));
+        box.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel dot = new JLabel("●", SwingConstants.CENTER);
+        dot.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        dot.setForeground(fg);
+        box.add(dot, BorderLayout.WEST);
+
+        JPanel text = new JPanel();
+        text.setOpaque(false);
+        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+
+        JLabel title = new JLabel(titleText);
+        title.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
+        title.setForeground(fg);
+        JLabel desc = new JLabel(htmlWrap(detailText));
+        desc.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        desc.setForeground(fg);
+
+        text.add(title);
+        text.add(Box.createVerticalStrut(2));
+        text.add(desc);
+        box.add(text, BorderLayout.CENTER);
+
+        box.putClientProperty("titleLabel", title);
+        box.putClientProperty("descriptionLabel", desc);
+        return box;
+    }
+
+    private JLabel createBadge(String text, Color bg, Color fg) {
+        JLabel badge = new JLabel(text, SwingConstants.CENTER);
+        badge.setOpaque(true);
+        badge.setBackground(bg);
+        badge.setForeground(fg);
+        badge.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 11));
+        badge.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(bg, 20, 0),
+                BorderFactory.createEmptyBorder(4, 10, 4, 10)
+        ));
+        return badge;
+    }
+
+    private EmployeeReportService.AvailableDocument findDocumentByLabel(
+            List<EmployeeReportService.AvailableDocument> availableDocuments,
+            String label
+    ) {
+        for (EmployeeReportService.AvailableDocument document : availableDocuments) {
+            if (document.label().equals(label)) {
+                return document;
+            }
+        }
+        return null;
+    }
+
+    private void resizeReportDialog(JDialog dialog) {
+        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+        int availableWidth = Math.max(360, screen.width - 90);
+        int availableHeight = Math.max(320, screen.height - 110);
+        int width = Math.min(820, Math.max(500, (int) (screen.width * 0.58)));
+        int height = Math.min(680, Math.max(420, (int) (screen.height * 0.78)));
+        width = Math.min(width, availableWidth);
+        height = Math.min(height, availableHeight);
+        dialog.setMinimumSize(new Dimension(Math.min(460, width), Math.min(360, height)));
+        dialog.setPreferredSize(new Dimension(width, height));
+        dialog.setSize(new Dimension(width, height));
+    }
+
+    private void styleModernScrollPane(JScrollPane scrollPane) {
+        scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(9, 0));
+        scrollPane.getHorizontalScrollBar().setPreferredSize(new Dimension(0, 9));
+        scrollPane.getViewport().setOpaque(true);
+    }
+
+    private String htmlWrap(String text) {
+        return "<html><body style='width:360px'>" + text + "</body></html>";
     }
 
     private boolean hasReadyDocument(List<EmployeeReportService.AvailableDocument> availableDocuments) {
@@ -623,30 +942,75 @@ public class EmployeeDetailView extends JFrame {
 
     private JCheckBox createDownloadCheckbox(String text, boolean selected) {
         JCheckBox checkbox = new JCheckBox(text, selected);
-        checkbox.setBackground(Color.WHITE);
-        checkbox.setForeground(new Color(35, 43, 54));
+        checkbox.setOpaque(false);
+        checkbox.setForeground(new Color(17, 24, 39));
         checkbox.setFocusPainted(false);
-        checkbox.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        checkbox.setBorder(BorderFactory.createEmptyBorder(6, 4, 6, 4));
+        checkbox.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        checkbox.setBorder(BorderFactory.createEmptyBorder(3, 0, 3, 0));
+        checkbox.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return checkbox;
     }
 
     private JButton createDialogButton(String text, boolean primary) {
         JButton button = new JButton(text);
-        button.setPreferredSize(new Dimension(primary ? 126 : 92, 34));
+        button.setPreferredSize(new Dimension(primary ? 142 : 96, 38));
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         button.setFocusPainted(false);
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(primary ? new Color(20, 101, 192) : new Color(226, 232, 240), 18, primary ? 0 : 1),
+                BorderFactory.createEmptyBorder(8, 14, 8, 14)
+        ));
         if (primary) {
-            button.setBackground(new Color(0, 112, 210));
+            button.setBackground(new Color(20, 101, 192));
             button.setForeground(Color.WHITE);
             button.setBorderPainted(false);
         } else {
             button.setBackground(Color.WHITE);
-            button.setForeground(new Color(99, 115, 129));
-            button.setBorder(BorderFactory.createLineBorder(new Color(220, 226, 232)));
+            button.setForeground(new Color(71, 85, 105));
+            button.setBorderPainted(true);
         }
         return button;
+    }
+
+    private static class RoundedBorder extends javax.swing.border.AbstractBorder {
+        private final Color color;
+        private final int radius;
+        private final int thickness;
+
+        RoundedBorder(Color color, int radius, int thickness) {
+            this.color = color;
+            this.radius = radius;
+            this.thickness = thickness;
+        }
+
+        @Override
+        public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
+            if (thickness <= 0) {
+                return;
+            }
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            for (int i = 0; i < thickness; i++) {
+                g2.drawRoundRect(x + i, y + i, width - i - i - 1, height - i - i - 1, radius, radius);
+            }
+            g2.dispose();
+        }
+
+        @Override
+        public Insets getBorderInsets(Component c) {
+            return new Insets(thickness, thickness, thickness, thickness);
+        }
+
+        @Override
+        public Insets getBorderInsets(Component c, Insets insets) {
+            insets.left = thickness;
+            insets.top = thickness;
+            insets.right = thickness;
+            insets.bottom = thickness;
+            return insets;
+        }
     }
 
     private boolean panelHasEditableFields(Container container) {
