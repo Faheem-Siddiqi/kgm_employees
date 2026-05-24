@@ -8,7 +8,6 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
-import java.io.FilenameFilter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -151,91 +150,19 @@ public class FileUploadCard extends JPanel {
     }
 
     public static File chooseFile(Component parent, String title, FileFilterSpec filter) {
-        FileDialog dialog = nativeFileDialog(parent, title, FileDialog.LOAD);
-        applyFilter(dialog, filter);
-        dialog.setVisible(true);
-        return selectedFile(dialog);
+        return NativeFileDialog.chooseFile(parent, title, filter);
     }
 
     public static File[] chooseFiles(Component parent, String title, FileFilterSpec filter) {
-        FileDialog dialog = nativeFileDialog(parent, title, FileDialog.LOAD);
-        dialog.setMultipleMode(true);
-        applyFilter(dialog, filter);
-        dialog.setVisible(true);
-        File[] files = dialog.getFiles();
-        return files == null ? new File[0] : files;
+        return NativeFileDialog.chooseFiles(parent, title, filter);
     }
 
     public static File chooseSaveFile(Component parent, String title, String suggestedFileName, FileFilterSpec filter) {
-        FileDialog dialog = nativeFileDialog(parent, title, FileDialog.SAVE);
-        if (suggestedFileName != null && !suggestedFileName.isBlank()) {
-            dialog.setFile(suggestedFileName);
-        }
-        applyFilter(dialog, filter);
-        dialog.setVisible(true);
-        return selectedFile(dialog);
+        return NativeFileDialog.chooseSaveFile(parent, title, suggestedFileName, filter);
     }
 
-    public static File chooseDirectory(Component parent, String title, String approveButtonText) {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle(title);
-        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        chooser.setApproveButtonText(approveButtonText);
-        return chooser.showSaveDialog(parent) == JFileChooser.APPROVE_OPTION
-                ? chooser.getSelectedFile()
-                : null;
-    }
-
-    private static FileDialog nativeFileDialog(Component parent, String title, int mode) {
-        Window owner = parent == null ? null : SwingUtilities.getWindowAncestor(parent);
-        if (owner instanceof Frame frame) {
-            return new FileDialog(frame, title, mode);
-        }
-        if (owner instanceof Dialog dialog) {
-            return new FileDialog(dialog, title, mode);
-        }
-        return new FileDialog((Frame) null, title, mode);
-    }
-
-    private static void applyFilter(FileDialog dialog, FileFilterSpec filter) {
-        if (filter == null || filter.extensions().length == 0) {
-            return;
-        }
-        FilenameFilter filenameFilter = (directory, name) -> hasAllowedExtension(name, filter.extensions());
-        dialog.setFilenameFilter(filenameFilter);
-        if (dialog.getMode() == FileDialog.LOAD) {
-            dialog.setFile(glob(filter.extensions()));
-        }
-    }
-
-    private static File selectedFile(FileDialog dialog) {
-        String fileName = dialog.getFile();
-        if (fileName == null || fileName.isBlank()) {
-            return null;
-        }
-        String directory = dialog.getDirectory();
-        return directory == null ? new File(fileName) : new File(directory, fileName);
-    }
-
-    private static boolean hasAllowedExtension(String fileName, String[] extensions) {
-        String normalized = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);
-        for (String extension : extensions) {
-            if (normalized.endsWith("." + extension)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String glob(String[] extensions) {
-        StringBuilder pattern = new StringBuilder();
-        for (String extension : extensions) {
-            if (pattern.length() > 0) {
-                pattern.append(';');
-            }
-            pattern.append("*.").append(extension);
-        }
-        return pattern.toString();
+    public static File chooseDirectory(Component parent, String title, String suggestedDirectoryName) {
+        return NativeFileDialog.chooseDirectory(parent, title, suggestedDirectoryName);
     }
 
     private static String[] cleanExtensions(String[] rawExtensions) {

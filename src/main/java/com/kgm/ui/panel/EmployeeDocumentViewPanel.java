@@ -37,6 +37,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
     private JTextField searchField;
     private JButton clearSearchButton;
     private JScrollPane documentScrollPane;
+    private Runnable pendingChangesListener;
 
     public EmployeeDocumentViewPanel() {
         this(null);
@@ -296,6 +297,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
         }
         updateCount();
         model.fireTableDataChanged();
+        notifyPendingChanges();
     }
 
     private void chooseMultipleFiles() {
@@ -318,6 +320,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
         refreshDocumentRows();
         updateCount();
         model.fireTableDataChanged();
+        notifyPendingChanges();
         showBulkUploadSummary(summary);
     }
 
@@ -378,6 +381,16 @@ public class EmployeeDocumentViewPanel extends JPanel {
             }
         }
         return false;
+    }
+
+    public void setPendingChangesListener(Runnable pendingChangesListener) {
+        this.pendingChangesListener = pendingChangesListener;
+    }
+
+    private void notifyPendingChanges() {
+        if (pendingChangesListener != null) {
+            pendingChangesListener.run();
+        }
     }
 
     public Employee getDocumentUpdates(String empCode) throws IOException {

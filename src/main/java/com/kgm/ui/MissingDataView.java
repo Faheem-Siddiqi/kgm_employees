@@ -159,8 +159,8 @@ public class MissingDataView extends JFrame {
             return;
         }
         String employeeCode = rows.get(row).employeeCode();
-        dispose();
         new EmployeeDetailView(employeeCode);
+        SwingUtilities.invokeLater(this::dispose);
     }
 
     private GridBagConstraints pageConstraints(int y, int bottomGap) {

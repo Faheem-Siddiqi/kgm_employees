@@ -28,7 +28,7 @@ import java.util.Map;
 public class EmployeeBasicDetailsPanel extends JPanel {
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
-    private final List<EmployeeFieldDefinition> definitions = EmployeeBasicFieldUtil.loadBasicDefinitions();
+    private final List<EmployeeFieldDefinition> definitions;
     private final Map<String, JComponent> inputsByColumn = new LinkedHashMap<>();
 
     private JLabel photoPreview;
@@ -38,14 +38,23 @@ public class EmployeeBasicDetailsPanel extends JPanel {
     private Employee employee;
 
     public EmployeeBasicDetailsPanel() {
-        EmployeeBasicDetailsPanelHelper.stylePanel(this);
-        add(EmployeeBasicDetailsPanelHelper.createFormContent(buildForm()), BorderLayout.NORTH);
+        this(null, EmployeeBasicFieldUtil.loadBasicDefinitions());
     }
 
     public EmployeeBasicDetailsPanel(Employee employee) {
-        this();
+        this(employee, EmployeeBasicFieldUtil.loadBasicDefinitions());
+    }
+
+    public EmployeeBasicDetailsPanel(Employee employee, List<EmployeeFieldDefinition> definitions) {
+        this.definitions = definitions == null || definitions.isEmpty()
+                ? EmployeeBasicFieldUtil.loadBasicDefinitions()
+                : List.copyOf(definitions);
         this.employee = employee;
-        loadEmployeeData();
+        EmployeeBasicDetailsPanelHelper.stylePanel(this);
+        add(EmployeeBasicDetailsPanelHelper.createFormContent(buildForm()), BorderLayout.NORTH);
+        if (employee != null) {
+            loadEmployeeData();
+        }
     }
 
     private JPanel buildForm() {

@@ -1,7 +1,9 @@
 package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRecordDao;
+import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
+import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.panel.EmployeeBasicDetailsPanel;
@@ -12,6 +14,7 @@ import com.kgm.ui.panel.EmployeeAdditionalDetailsPanel;
 import com.kgm.service.EmployeeReportService;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDetailViewHelper;
+import com.kgm.util.EmployeeBasicFieldUtil;
 
 import javax.swing.*;
 import java.awt.*;
@@ -29,30 +32,37 @@ public class EmployeeDetailView extends JFrame {
     private String empCode;
     private JButton updateBtn;
     private Employee employee;
-    private JDialog loadingDialog;
 
     public EmployeeDetailView(String empCode) {
         this.empCode = (empCode != null) ? empCode.trim() : null;
         showLoadingShell();
         setVisible(true);
-        showLoadingDialog();
         loadEmployeeAsync();
     }
 
     public EmployeeDetailView() {
-        initializeUI(null, false);
+        initializeUI((Employee) null, false);
     }
 
     public void refreshDynamicFields() {
         if (empCode == null || empCode.isBlank()) {
-            initializeUI(null, false);
+            initializeUI((Employee) null, false);
             return;
         }
-        Employee refreshed = new EmployeeRecordDao().getFullEmployeeByCode(empCode);
-        initializeUI(refreshed, refreshed != null);
+        showLoadingShell();
+        loadEmployeeAsync();
     }
 
     private void initializeUI(Employee emp, boolean isWithData) {
+        initializeUI(new DetailLoadResult(
+                emp,
+                EmployeeBasicFieldUtil.loadBasicDefinitions(),
+                loadDetailDefinitions()
+        ), isWithData);
+    }
+
+    private void initializeUI(DetailLoadResult detailData, boolean isWithData) {
+        Employee emp = detailData == null ? null : detailData.employee();
         this.employee = emp;
         getContentPane().removeAll();
         EmployeeDetailViewHelper.applyFrame(this);
@@ -61,11 +71,8 @@ public class EmployeeDetailView extends JFrame {
         topContainer.add(new HeaderPanel("Employee Record"), BorderLayout.NORTH);
         String nameValue = (emp != null) ? emp.getEMP_NAME() : "";
         String codeValue = (emp != null) ? emp.getEMPLOYEE_CODE() : "";
-        add(topContainer, BorderLayout.NORTH);
-
-        JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
         Runnable onDownloadReport = isWithData && emp != null ? this::downloadEmployeeReport : null;
-        centerWrapper.add(EmployeeDetailViewHelper.screenHeader(
+        topContainer.add(EmployeeDetailViewHelper.screenHeader(
                 nameValue,
                 codeValue,
                 () -> {
@@ -73,7 +80,16 @@ public class EmployeeDetailView extends JFrame {
                     new HomeView();
                 },
                 onDownloadReport
-        ), EmployeeDetailViewHelper.pageConstraints(0));
+        ), BorderLayout.CENTER);
+        add(topContainer, BorderLayout.NORTH);
+
+        JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
+        List<EmployeeFieldDefinition> basicDefinitions = detailData == null || detailData.basicDefinitions() == null
+                ? EmployeeBasicFieldUtil.loadBasicDefinitions()
+                : detailData.basicDefinitions();
+        List<EmployeeFieldDefinition> detailDefinitions = detailData == null || detailData.detailDefinitions() == null
+                ? List.of()
+                : detailData.detailDefinitions();
 
         JTabbedPane tabs = new HugHeightTabbedPane();
 
@@ -82,11 +98,11 @@ public class EmployeeDetailView extends JFrame {
                 : new EmployeeDocumentViewPanel();
 
         if (isWithData) {
-            tabs.addTab("Basic", new EmployeeBasicDetailsPanel(emp));
-            tabs.addTab("Others", new EmployeeAdditionalDetailsPanel(emp));
+            tabs.addTab("Basic", new EmployeeBasicDetailsPanel(emp, basicDefinitions));
+            tabs.addTab("Others", new EmployeeAdditionalDetailsPanel(emp, detailDefinitions));
         } else {
-            tabs.addTab("Core", new EmployeeBasicDetailsPanel());
-            tabs.addTab("Details", new EmployeeAdditionalDetailsPanel());
+            tabs.addTab("Core", new EmployeeBasicDetailsPanel(null, basicDefinitions));
+            tabs.addTab("Details", new EmployeeAdditionalDetailsPanel(null, detailDefinitions));
         }
 
         tabs.addTab("Documents", documentPanel);
@@ -109,8 +125,8 @@ public class EmployeeDetailView extends JFrame {
         EmployeeDetailViewHelper.styleUpdateButton(updateBtn);
         footerActions.add(updateBtn);
 
-        JPanel tabContent = EmployeeDetailViewHelper.createTabContent(tabs, footerActions);
-        centerWrapper.add(tabContent, EmployeeDetailViewHelper.pageConstraints(1));
+        JPanel tabContent = EmployeeDetailViewHelper.createTabContent(tabs, null);
+        centerWrapper.add(tabContent, EmployeeDetailViewHelper.pageConstraints(0));
 
         JScrollPane pageScroll = EmployeeDetailViewHelper.createPageScrollPane(centerWrapper);
         tabs.addChangeListener(event -> SwingUtilities.invokeLater(() -> {
@@ -120,10 +136,15 @@ public class EmployeeDetailView extends JFrame {
         }));
         EmployeeDetailViewHelper.installPageWheelForwarding(pageScroll, centerWrapper);
         add(pageScroll, BorderLayout.CENTER);
-        add(new FooterPanel(), BorderLayout.SOUTH);
+
+        JPanel southContainer = new JPanel(new BorderLayout());
+        southContainer.setBackground(Color.WHITE);
+        southContainer.add(footerActions, BorderLayout.NORTH);
+        southContainer.add(new FooterPanel(), BorderLayout.SOUTH);
+        add(southContainer, BorderLayout.SOUTH);
 
         Runnable refreshButtonState = () -> {
-            boolean canUpdate = false;
+            boolean canUpdate = isWithData && documentPanel.hasPendingDocumentUpdates();
 
             for (int i = 0; i < tabs.getTabCount(); i++) {
                 Component comp = tabs.getComponentAt(i);
@@ -139,9 +160,10 @@ public class EmployeeDetailView extends JFrame {
                 }
             }
 
-            updateBtn.setEnabled(canUpdate);
+            updateBtn.setEnabled(isWithData && canUpdate);
         };
 
+        documentPanel.setPendingChangesListener(refreshButtonState);
         tabs.addChangeListener(e -> refreshButtonState.run());
         refreshButtonState.run();
 
@@ -218,23 +240,22 @@ public class EmployeeDetailView extends JFrame {
 
         JPanel topContainer = EmployeeDetailViewHelper.createTopContainer();
         topContainer.add(new HeaderPanel("Employee Record"), BorderLayout.NORTH);
-        add(topContainer, BorderLayout.NORTH);
-
-        JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
-        centerWrapper.add(EmployeeDetailViewHelper.screenHeader(
+        topContainer.add(EmployeeDetailViewHelper.screenHeader(
                 "Loading employee details",
                 empCode == null ? "" : empCode,
                 () -> {
-                    closeLoadingDialog();
                     dispose();
                     new HomeView();
                 },
                 null
-        ), EmployeeDetailViewHelper.pageConstraints(0));
+        ), BorderLayout.CENTER);
+        add(topContainer, BorderLayout.NORTH);
+
+        JPanel centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
 
         JPanel loadingPanel = new JPanel(new GridBagLayout());
         loadingPanel.setBackground(Color.WHITE);
-        loadingPanel.setBorder(BorderFactory.createEmptyBorder(70, 28, 80, 28));
+        loadingPanel.setBorder(BorderFactory.createEmptyBorder(40, 28, 56, 28));
 
         JPanel box = new JPanel();
         box.setBackground(Color.WHITE);
@@ -251,34 +272,74 @@ public class EmployeeDetailView extends JFrame {
         box.add(label);
         box.add(Box.createVerticalStrut(16));
         box.add(progress);
+        box.add(Box.createVerticalStrut(28));
+        box.add(createSkeletonPanel());
         loadingPanel.add(box);
 
-        centerWrapper.add(loadingPanel, EmployeeDetailViewHelper.pageConstraints(1));
+        centerWrapper.add(loadingPanel, EmployeeDetailViewHelper.pageConstraints(0));
         add(EmployeeDetailViewHelper.createPageScrollPane(centerWrapper), BorderLayout.CENTER);
-        add(new FooterPanel(), BorderLayout.SOUTH);
+
+        JPanel footerActions = EmployeeDetailViewHelper.createActionRow();
+        updateBtn = new JButton("Update");
+        EmployeeDetailViewHelper.styleUpdateButton(updateBtn);
+        updateBtn.setEnabled(false);
+        footerActions.add(updateBtn);
+
+        JPanel southContainer = new JPanel(new BorderLayout());
+        southContainer.setBackground(Color.WHITE);
+        southContainer.add(footerActions, BorderLayout.NORTH);
+        southContainer.add(new FooterPanel(), BorderLayout.SOUTH);
+        add(southContainer, BorderLayout.SOUTH);
         revalidate();
         repaint();
     }
 
+    private JPanel createSkeletonPanel() {
+        JPanel skeleton = new JPanel();
+        skeleton.setOpaque(false);
+        skeleton.setLayout(new BoxLayout(skeleton, BoxLayout.Y_AXIS));
+        skeleton.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        int[] widths = {520, 460, 560, 420};
+        for (int width : widths) {
+            JPanel row = new JPanel();
+            row.setBackground(new Color(245, 247, 250));
+            row.setBorder(BorderFactory.createLineBorder(new Color(232, 238, 245)));
+            row.setPreferredSize(new Dimension(width, 26));
+            row.setMaximumSize(new Dimension(width, 26));
+            row.setAlignmentX(Component.CENTER_ALIGNMENT);
+            skeleton.add(row);
+            skeleton.add(Box.createVerticalStrut(10));
+        }
+        return skeleton;
+    }
+
     private void loadEmployeeAsync() {
-        SwingWorker<Employee, Void> worker = new SwingWorker<>() {
+        SwingWorker<DetailLoadResult, Void> worker = new SwingWorker<>() {
             @Override
-            protected Employee doInBackground() {
+            protected DetailLoadResult doInBackground() {
                 if (empCode == null || empCode.isBlank()) {
-                    return null;
+                    return new DetailLoadResult(null, List.of(), List.of());
                 }
-                return new EmployeeRecordDao().getFullEmployeeByCode(empCode);
+                Employee loadedEmployee = new EmployeeRecordDao().getFullEmployeeByCode(empCode);
+                if (loadedEmployee == null) {
+                    return new DetailLoadResult(null, List.of(), List.of());
+                }
+                return new DetailLoadResult(
+                        loadedEmployee,
+                        EmployeeBasicFieldUtil.loadBasicDefinitions(),
+                        loadDetailDefinitions()
+                );
             }
 
             @Override
             protected void done() {
-                closeLoadingDialog();
                 if (!isDisplayable()) {
                     return;
                 }
                 try {
-                    Employee loadedEmployee = get();
-                    if (loadedEmployee == null) {
+                    DetailLoadResult detailData = get();
+                    if (detailData.employee() == null) {
                         DialogHelper.warning(
                                 EmployeeDetailView.this,
                                 "Employee Not Found",
@@ -287,7 +348,7 @@ public class EmployeeDetailView extends JFrame {
                         new HomeView();
                         return;
                     }
-                    initializeUI(loadedEmployee, true);
+                    initializeUI(detailData, true);
                 } catch (Exception exception) {
                     exception.printStackTrace();
                     DialogHelper.error(
@@ -302,33 +363,12 @@ public class EmployeeDetailView extends JFrame {
         worker.execute();
     }
 
-    private void showLoadingDialog() {
-        loadingDialog = new JDialog(this, "Loading", false);
-        JPanel root = new JPanel(new BorderLayout(14, 12));
-        root.setBackground(Color.WHITE);
-        root.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
-
-        JLabel label = new JLabel("Loading employee details...");
-        label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        label.setForeground(new Color(35, 43, 54));
-        JProgressBar progress = new JProgressBar();
-        progress.setIndeterminate(true);
-        progress.setPreferredSize(new Dimension(260, 8));
-
-        root.add(label, BorderLayout.NORTH);
-        root.add(progress, BorderLayout.CENTER);
-        loadingDialog.setContentPane(root);
-        loadingDialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        loadingDialog.pack();
-        loadingDialog.setResizable(false);
-        loadingDialog.setLocationRelativeTo(this);
-        loadingDialog.setVisible(true);
-    }
-
-    private void closeLoadingDialog() {
-        if (loadingDialog != null) {
-            loadingDialog.dispose();
-            loadingDialog = null;
+    private List<EmployeeFieldDefinition> loadDetailDefinitions() {
+        try {
+            return new EmployeeFieldDefinitionDao().listDetailFields();
+        } catch (RuntimeException exception) {
+            exception.printStackTrace();
+            return List.of();
         }
     }
 
@@ -372,8 +412,8 @@ public class EmployeeDetailView extends JFrame {
 
         File selectedFolder = FileUploadCard.chooseDirectory(
                 this,
-                "Choose Folder for Employee Report Package",
-                "Save Package Here"
+                "Save Employee Report Package",
+                reportService.suggestedPackageFolderName(currentEmployee)
         );
         if (selectedFolder == null) {
             return;
@@ -381,7 +421,7 @@ public class EmployeeDetailView extends JFrame {
 
         try {
             EmployeeReportService.PackageResult result = reportService
-                    .generateEmployeePackage(empCode, selectedFolder, options);
+                    .generateEmployeePackageAt(empCode, selectedFolder, options);
             String pdfStatus = result.pdfFile() == null ? "Not included" : "Saved";
             String mergedPdfStatus = result.mergedDocumentsPdfFile() == null
                     ? "Not included"
@@ -1041,6 +1081,13 @@ public class EmployeeDetailView extends JFrame {
         }
 
         return false;
+    }
+
+    private record DetailLoadResult(
+            Employee employee,
+            List<EmployeeFieldDefinition> basicDefinitions,
+            List<EmployeeFieldDefinition> detailDefinitions
+    ) {
     }
 
     private static class HugHeightTabbedPane extends JTabbedPane {

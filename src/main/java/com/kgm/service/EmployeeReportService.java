@@ -63,6 +63,23 @@ public class EmployeeReportService {
             File selectedDirectory,
             PackageOptions options
     ) throws Exception {
+        return generateEmployeePackage(employeeCode, selectedDirectory, options, false);
+    }
+
+    public PackageResult generateEmployeePackageAt(
+            String employeeCode,
+            File packageDirectory,
+            PackageOptions options
+    ) throws Exception {
+        return generateEmployeePackage(employeeCode, packageDirectory, options, true);
+    }
+
+    private PackageResult generateEmployeePackage(
+            String employeeCode,
+            File selectedDirectory,
+            PackageOptions options,
+            boolean selectedDirectoryIsPackageFolder
+    ) throws Exception {
         if (employeeCode == null || employeeCode.isBlank()) {
             throw new IllegalArgumentException("Employee code is required.");
         }
@@ -90,12 +107,20 @@ public class EmployeeReportService {
         }
 
         Path baseDirectory = selectedDirectory.toPath().toAbsolutePath().normalize();
-        Files.createDirectories(baseDirectory);
-        if (!Files.isDirectory(baseDirectory)) {
-            throw new IOException("Selected location is not a folder: " + baseDirectory);
+        Path packageFolder;
+        if (selectedDirectoryIsPackageFolder) {
+            packageFolder = uniqueDirectory(baseDirectory);
+            Path parent = packageFolder.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+        } else {
+            Files.createDirectories(baseDirectory);
+            if (!Files.isDirectory(baseDirectory)) {
+                throw new IOException("Selected location is not a folder: " + baseDirectory);
+            }
+            packageFolder = uniqueDirectory(baseDirectory.resolve(packageFolderName(employee)));
         }
-
-        Path packageFolder = uniqueDirectory(baseDirectory.resolve(packageFolderName(employee)));
         Files.createDirectories(packageFolder);
 
         List<PackagedDocument> documents = selectedDocuments.isEmpty()
@@ -135,6 +160,10 @@ public class EmployeeReportService {
         String name = sanitizeFileName(employee.getEMP_NAME(), "Employee");
         String code = sanitizeFileName(employee.getEMPLOYEE_CODE(), "Record");
         return name + " - " + code;
+    }
+
+    public String suggestedPackageFolderName(Employee employee) {
+        return packageFolderName(employee);
     }
 
     public List<AvailableDocument> availableDocuments(Employee employee) {

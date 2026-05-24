@@ -24,6 +24,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
     private final Employee data;
+    private final List<EmployeeFieldDefinition> definitions;
     private final Map<String, JTextField> textFieldMap = new LinkedHashMap<>();
     private final Map<String, UniversalTextArea> textAreaMap = new LinkedHashMap<>();
     private final Map<String, JComboBox<String>> dropdownFieldMap = new LinkedHashMap<>();
@@ -36,14 +37,18 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     }
 
     public EmployeeAdditionalDetailsPanel(Employee data) {
+        this(data, loadDefaultDefinitions());
+    }
+
+    public EmployeeAdditionalDetailsPanel(Employee data, List<EmployeeFieldDefinition> definitions) {
         this.data = data;
+        this.definitions = definitions == null ? List.of() : List.copyOf(definitions);
         EmployeeAdditionalDetailsPanelHelper.stylePanel(this);
         add(EmployeeAdditionalDetailsPanelHelper.createContent(buildUI()), BorderLayout.NORTH);
     }
 
     private JPanel buildUI() {
         JPanel root = EmployeeAdditionalDetailsPanelHelper.createRootPanel();
-        List<EmployeeFieldDefinition> definitions = loadDefinitions();
         Map<String, List<EmployeeFieldDefinition>> grouped = groupByHeading(definitions);
 
         topAnchor = EmployeeAdditionalDetailsPanelHelper.createBreadcrumbPanel();
@@ -73,7 +78,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
         return root;
     }
 
-    private List<EmployeeFieldDefinition> loadDefinitions() {
+    private static List<EmployeeFieldDefinition> loadDefaultDefinitions() {
         try {
             return new EmployeeFieldDefinitionDao().listDetailFields();
         } catch (RuntimeException exception) {

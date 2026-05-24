@@ -246,10 +246,9 @@ public class EmployeeTablePanel extends JPanel {
 
         String employeeCode = displayedEmployees.get(row).getEMPLOYEE_CODE();
         Window window = SwingUtilities.getWindowAncestor(this);
-        if (window != null) {
-            window.dispose();
-        }
-
         new EmployeeDetailView(employeeCode);
+        if (window != null) {
+            SwingUtilities.invokeLater(window::dispose);
+        }
     }
 }

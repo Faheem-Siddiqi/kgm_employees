@@ -134,6 +134,8 @@ The project follows a layered desktop-application architecture:
 | **EmployeeBasicDetailsPanel.java** | Metadata-driven Basic employee detail form used in detail/edit flows. Allows built-in field updates, keeps employee ID locked, handles missing profile-image upload, and ignores empty placeholders such as `N/A`. |
 | **EmployeeAdditionalDetailsPanel.java** | Additional employee detail panel for employment, payroll, banking, reporting, compliance, benefits, and vaccination fields. Allows normal employee-field updates while ignoring empty placeholders. |
 | **ExcelImportButton.java** | Reusable styled button for triggering Excel import and sample-download workflows. |
+| **FileUploadCard.java** | Reusable upload/download card component used by employee photo, document, Excel, and report-package file actions. |
+| **NativeFileDialog.java** | Shared native AWT file dialog helper for uploads, multi-file uploads, save targets, and report package folder targets. |
 | **UniversalTablePanel.java** | Reusable paginated table component for links, actions, status cells, and responsive row-height layout. |
 
 ---
@@ -218,7 +220,8 @@ The project follows a layered desktop-application architecture:
    EmployeeRegistrationFormPanel + EmployeeDocumentUploadPanel -> EmployeeRegistrationDao -> MySQL
 
 5. View Employee Details
-   EmployeeTablePanel Action cell -> EmployeeDetailView -> EmployeeRecordDao.getFullEmployeeByCode
+   EmployeeTablePanel Action cell -> EmployeeDetailView loading shell -> EmployeeRecordDao.getFullEmployeeByCode
+   -> field metadata preload -> detail tabs render when data is ready
 
 6. Update Employee Details
    EmployeeDetailView -> EmployeeBasicDetailsPanel / EmployeeAdditionalDetailsPanel
@@ -232,7 +235,7 @@ The project follows a layered desktop-application architecture:
 
 8. Download Employee Report Package
    EmployeeDetailView selection dialog -> EmployeeReportService -> EmployeeRecordDao.getFullEmployeeByCode
-   -> optional PDF profile + optional all-documents PDF + all or selected saved documents in a selected local folder
+   -> native save dialog -> optional PDF profile + optional all-documents PDF + all or selected saved documents in a selected local folder
 
 9. Field and Category Management
    HomeView -> FieldManagementView -> EmployeeFieldDefinitionDao -> employees / employee_field_metadata
@@ -330,6 +333,8 @@ The application uses `EmployeeDocumentUtil` as the single source of truth for do
 - After a bulk upload attempt, the user receives a summary showing how many documents are ready to save and which files were discarded with the reason.
 - Employee detail downloads first ask what to include: PDF profile, all saved documents, `All Documents (PDF)`, or specific saved document names when `All saved documents` is turned off. Saved records with missing source files are still named in the picker so the user can see their status.
 - `All Documents (PDF)` merges only available saved document images, excludes the employee profile photo, starts each document on a new page, preserves image size, splits tall images across pages when needed, and does not add a header or footer.
+- Employee detail navigation paints an immediate loading shell before database queries run. The employee record and field metadata load on a background worker, while Dashboard, Download Profile, and Update actions stay fixed outside the tab scroll area.
+- File uploads, multi-file document uploads, Excel save/import actions, and employee report package downloads use the shared `FileUploadCard` / `NativeFileDialog` path so the app avoids old Swing file chooser surfaces.
 
 ---
 
