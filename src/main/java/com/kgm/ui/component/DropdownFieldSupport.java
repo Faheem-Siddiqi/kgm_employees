@@ -10,6 +10,7 @@ import java.util.Locale;
 
 public final class DropdownFieldSupport {
     private static final String AUTOCOMPLETE_INSTALLED = "kgm.dropdown.autocompleteInstalled";
+    private static final String PLACEHOLDER_KEY = "kgm.dropdown.placeholder";
 
     private DropdownFieldSupport() {
     }
@@ -32,14 +33,24 @@ public final class DropdownFieldSupport {
         Object value = comboBox.isEditable()
                 ? comboBox.getEditor().getItem()
                 : comboBox.getSelectedItem();
-        return value == null ? "" : value.toString().trim();
+        String text = value == null ? "" : value.toString().trim();
+        // If the selected value matches the placeholder, treat it as empty
+        String placeholder = getPlaceholder(comboBox);
+        if (placeholder != null && placeholder.equalsIgnoreCase(text)) {
+            return "";
+        }
+        return text;
     }
 
     public static void setValue(JComboBox<String> comboBox, String value) {
         String cleanValue = value == null ? "" : value.trim();
-        if (cleanValue.isEmpty()) {
+        String placeholder = getPlaceholder(comboBox);
+        if (cleanValue.isEmpty() || (placeholder != null && placeholder.equalsIgnoreCase(cleanValue))) {
             if (comboBox.getItemCount() > 0) {
                 comboBox.setSelectedIndex(0);
+            }
+            if (comboBox.isEditable() && comboBox.getEditor().getEditorComponent() instanceof JTextField editor) {
+                editor.setText("");
             }
             return;
         }
@@ -51,6 +62,18 @@ public final class DropdownFieldSupport {
         if (comboBox.isEditable()) {
             comboBox.getEditor().setItem(cleanValue);
         }
+    }
+
+    public static void setPlaceholder(JComboBox<String> comboBox, String placeholder) {
+        comboBox.putClientProperty(PLACEHOLDER_KEY, placeholder);
+        if (comboBox.getEditor().getEditorComponent() instanceof JTextField editor) {
+            editor.setToolTipText(placeholder);
+        }
+    }
+
+    private static String getPlaceholder(JComboBox<?> comboBox) {
+        Object prop = comboBox.getClientProperty(PLACEHOLDER_KEY);
+        return prop instanceof String text ? text : null;
     }
 
     private static void installAutocomplete(JComboBox<String> comboBox) {

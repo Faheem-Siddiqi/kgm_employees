@@ -1,7 +1,9 @@
+com\kgm\ui\panel\HomeStatsChartsPanel$DashboardChart.class
 com\kgm\ui\styling\LoginViewHelper.class
 com\kgm\ui\styling\UniversalDateRangePickerHelper$CalendarIcon.class
 com\kgm\ui\styling\TablePaginationHelper$3.class
 com\kgm\ui\styling\TableThemeHelper$2.class
+com\kgm\ui\component\FileUploadCard$FileFilterSpec.class
 com\kgm\service\ExcelImportService$ImportType.class
 com\kgm\ui\FieldManagementView$1.class
 com\kgm\service\ExcelImportService$RowData.class
@@ -24,11 +26,13 @@ com\kgm\ui\EmployeeDetailView$HugHeightTabbedPane.class
 com\kgm\ui\panel\FooterPanel.class
 com\kgm\model\EmployeeFieldDefinition.class
 com\kgm\ui\panel\HomeStatsChartsPanel$DashboardBarChart.class
+com\kgm\util\PhoneFormatter.class
 com\kgm\service\EmployeeReportService$ImagePdfPage.class
 com\kgm\service\ExcelExportService.class
 com\kgm\ui\panel\UniversalTablePanel$7.class
 com\kgm\service\AuthService.class
 com\kgm\dao\EmployeeFieldDefinitionDao.class
+com\kgm\ui\styling\HomeStatsChartHelper$RoundedBorder.class
 com\kgm\ui\styling\TableThemeHelper.class
 com\kgm\ui\styling\EmployeeAdditionalDetailsPanelHelper$RoundedBorder.class
 com\kgm\util\EmployeeDocumentUtil$BulkUploadItem.class
@@ -38,14 +42,13 @@ com\kgm\ui\panel\UniversalTablePanel$2.class
 com\kgm\service\EmployeeReportService$PdfDocument.class
 com\kgm\ui\FieldManagementView$OptionEditorPanel.class
 com\kgm\ui\styling\UniversalTablePanelHelper.class
-com\kgm\ui\panel\EmployeeRegistrationFormPanel$2.class
 com\kgm\ui\panel\EmployeeDocumentViewPanel$ActionEditor.class
 com\kgm\ui\styling\EmployeeRegistrationFormPanelHelper.class
+com\kgm\util\DateDisplayFormatter.class
 com\kgm\ui\FieldManagementView$PlaceholderTextField.class
 com\kgm\ui\panel\EmployeeDocumentUploadPanel$ActionRenderer.class
 com\kgm\ui\panel\UniversalTablePanel$8.class
 com\kgm\service\EmployeeReportService$DocumentEntry.class
-com\kgm\ui\panel\HomeStatsChartsPanel$RoundedBorder.class
 com\kgm\ui\styling\EmployeeDocumentUploadPanelHelper.class
 com\kgm\ui\styling\UniversalTablePanelHelper$2.class
 com\kgm\model\Employee.class
@@ -61,6 +64,7 @@ com\kgm\ui\panel\UniversalTablePanel.class
 com\kgm\ui\panel\UniversalTablePanel$9.class
 com\kgm\util\FilterUtil.class
 com\kgm\ui\styling\EmployeeAdditionalDetailsPanelHelper.class
+com\kgm\util\PhoneFormatter$PhoneDocumentFilter.class
 com\kgm\ui\panel\EmployeeRegistrationFormPanel$1.class
 com\kgm\service\EmployeeReportService$MergedDocumentsPdfResult.class
 com\kgm\Main.class
@@ -78,6 +82,7 @@ com\kgm\ui\styling\LoginViewHelper$RoundedBorder.class
 com\kgm\ui\panel\HomeStatsKPIPanel$RoundedBorder.class
 com\kgm\ui\styling\LoginViewHelper$PrimaryButton$2.class
 com\kgm\ui\styling\UniversalDatePickerHelper.class
+com\kgm\ui\styling\HomeStatsChartHelper.class
 com\kgm\ui\FieldManagementView$2.class
 com\kgm\database\DatabaseInitializer.class
 com\kgm\ui\component\DropdownFieldSupport.class
@@ -101,7 +106,9 @@ com\kgm\ui\styling\EmployeeDetailViewHelper.class
 com\kgm\ui\panel\UniversalTablePanel$5.class
 com\kgm\ui\panel\EmployeeDocumentUploadPanel.class
 com\kgm\ui\panel\HomeStatsKPIPanel.class
+com\kgm\ui\panel\HomeStatsChartsPanel$DashboardPieChart.class
 com\kgm\util\ValidationUtil.class
+com\kgm\ui\panel\HomeStatsChartsPanel$DashboardPieChart$1.class
 com\kgm\ui\styling\TableThemeHelper$5.class
 com\kgm\ui\styling\EmployeeRegistrationFormPanelHelper$2.class
 com\kgm\ui\styling\LoginViewHelper$1.class
@@ -109,6 +116,7 @@ com\kgm\ui\panel\EmployeeDocumentUploadPanel$2.class
 com\kgm\ui\styling\LoginViewHelper$PrimaryButton.class
 com\kgm\ui\styling\UniversalDateRangePickerHelper.class
 com\kgm\service\EmployeeReportService$DocumentImagePdf.class
+com\kgm\ui\component\FileUploadCard$1.class
 com\kgm\dao\EmployeeRecordDao$CountStat.class
 com\kgm\ui\dialog\UniversalDialog$Type.class
 com\kgm\ui\panel\UniversalTablePanel$ClippedTextCellRenderer.class
@@ -148,6 +156,7 @@ com\kgm\ui\component\UniversalDateRangePicker$1.class
 com\kgm\ui\styling\EmployeeRegistrationFormPanelHelper$1.class
 com\kgm\service\ExcelImportService$PendingImportRow.class
 com\kgm\service\ExcelImportService.class
+com\kgm\ui\component\FileUploadCard.class
 com\kgm\ui\panel\UniversalTablePanel$10.class
 com\kgm\ui\FieldManagementView$FieldFormData.class
 com\kgm\ui\panel\ExcelImportButton.class
@@ -155,6 +164,7 @@ com\kgm\dao\EmployeeRegistrationDao.class
 com\kgm\ui\EmployeeDetailView.class
 com\kgm\ui\EmployeeRegistrationView$HugHeightTabbedPane.class
 com\kgm\util\EmployeeDocumentUtil$DocumentMatch.class
+com\kgm\ui\panel\HomeStatsChartsPanel$2.class
 com\kgm\util\EmployeeDocumentUtil.class
 com\kgm\ui\styling\EmployeeBasicDetailsPanelHelper.class
 com\kgm\ui\styling\TablePaginationHelper$4.class
@@ -164,7 +174,6 @@ com\kgm\service\ExcelSampleGenerator.class
 com\kgm\ui\styling\TablePaginationHelper$2.class
 com\kgm\ui\panel\UniversalTablePanel$WrappedTextCellRenderer.class
 com\kgm\ui\panel\UniversalTablePanel$6.class
-com\kgm\ui\panel\EmployeeBasicDetailsPanel$2.class
 com\kgm\ui\panel\EmployeeRegistrationFormPanel$FormField.class
 com\kgm\ui\panel\HomeStatsChartsPanel$DashboardBarChart$2.class
 com\kgm\ui\panel\UniversalTablePanel$3.class
@@ -185,10 +194,13 @@ com\kgm\ui\panel\EmployeeDocumentUploadPanel$ActionEditor.class
 com\kgm\service\EmployeeReportService$PdfCanvas.class
 com\kgm\ui\panel\EmployeeBasicDetailsPanel.class
 com\kgm\ui\panel\UniversalTablePanel$4.class
+com\kgm\ui\panel\HomeStatsChartsPanel$ChartCardSpec.class
 com\kgm\ui\panel\HomeStatsPanel.class
 com\kgm\ui\component\UniversalDateRangePicker$DateRange.class
 com\kgm\ui\panel\EmployeeBasicDetailsPanel$1.class
 com\kgm\ui\panel\HomeStatsChartsPanel$ChartItem.class
+com\kgm\ui\panel\HomeStatsChartsPanel$1.class
 com\kgm\service\EmployeeReportService$PackageResult.class
+com\kgm\ui\panel\HomeStatsChartsPanel$DashboardPieChart$2.class
 com\kgm\ui\styling\HomeViewHelper$RoundedBorder.class
 com\kgm\ui\panel\HomeStatsChartsPanel.class

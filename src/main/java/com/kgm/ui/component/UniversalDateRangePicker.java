@@ -1,6 +1,7 @@
 package com.kgm.ui.component;
 
 import com.kgm.ui.styling.UniversalDateRangePickerHelper;
+import com.kgm.util.DateDisplayFormatter;
 import com.toedter.calendar.JCalendar;
 
 import javax.swing.*;
@@ -13,7 +14,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 public class UniversalDateRangePicker extends JPanel {
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern(DateDisplayFormatter.DISPLAY_PATTERN);
 
     private final JLabel displayLabel = UniversalDateRangePickerHelper.createDisplayLabel();
     private final JLabel iconLabel = UniversalDateRangePickerHelper.createIconLabel();

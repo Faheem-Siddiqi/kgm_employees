@@ -170,6 +170,7 @@ public final class ExcelSampleGenerator {
         }
         return switch (dbColumn.toUpperCase(Locale.ROOT)) {
             case "EMPLOYEE_CODE" -> SAMPLE_EMPLOYEE_CODES[sampleIndex];
+            case "UNT_CODE", "DESCR" -> "KGM";
             case "EMP_NAME" -> SAMPLE_NAMES[sampleIndex];
             case "FATHER_NAME" -> SAMPLE_FATHER_NAMES[sampleIndex];
             case "NID" -> SAMPLE_CNICS[sampleIndex];
@@ -177,7 +178,7 @@ public final class ExcelSampleGenerator {
             case "PERSONAL_EMAIL" -> "employee" + (sampleIndex + 1) + "@example.com";
             case "DEPARTMENT" -> sampleFrom(new String[]{"HR", "Finance", "Production", "Admin", "IT"}, sampleIndex);
             case "DESIGNATION" -> sampleFrom(new String[]{"Officer", "Assistant Manager", "Supervisor", "Clerk", "Manager"}, sampleIndex);
-            case "SECTION" -> sampleFrom(new String[]{"Admin", "Payroll", "Spinning", "Records", "Support"}, sampleIndex);
+            case "SECTION" -> "N/A";
             case "GRADE" -> sampleFrom(new String[]{"G-5", "M-14", "S-2", "G-7", "M-10"}, sampleIndex);
             case "SHIFT" -> sampleFrom(new String[]{"Morning", "G", "Evening", "Night", "General"}, sampleIndex);
             case "DOB" -> SAMPLE_DOBS[sampleIndex];

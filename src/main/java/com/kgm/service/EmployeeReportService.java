@@ -5,6 +5,8 @@ import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.CnicFormatter;
+import com.kgm.util.DateDisplayFormatter;
+import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
 
 import javax.imageio.ImageIO;
@@ -387,7 +389,7 @@ public class EmployeeReportService {
                 {"Father Name", display(employee.getFATHER_NAME())},
                 {"Mother Name", display(employee.getMOTHER_NAME())},
                 {"Gender", display(employee.getGENDER())},
-                {"Date of Birth", display(employee.getDOB())},
+                {"Date of Birth", display(DateDisplayFormatter.format(employee.getDOB()))},
                 {"Marital Status", display(employee.getM_STATUS())},
                 {"Nationality", display(employee.getNATIONALITY())},
                 {"Religion", display(employee.getRELIGION())},
@@ -400,8 +402,8 @@ public class EmployeeReportService {
                 {"Designation", display(employee.getDESIGNATION())},
                 {"Grade", display(employee.getGRADE())},
                 {"Employee Status", display(employee.getEMP_STATUS())},
-                {"Joining Date", display(employee.getJOINING_DATE())},
-                {"Resign Date", display(employee.getRESIGN_DATE())},
+                {"Joining Date", display(DateDisplayFormatter.format(employee.getJOINING_DATE()))},
+                {"Resign Date", display(DateDisplayFormatter.format(employee.getRESIGN_DATE()))},
                 {"Resign Reason", display(employee.getRESIGN_REASON())},
                 {"Shift", display(employee.getSHIFT())},
                 {"Probation Period", display(employee.getPROB_PERIOD())},
@@ -455,6 +457,9 @@ public class EmployeeReportService {
                     continue;
                 }
                 String value = employee.getDynamicField(definition.columnName());
+                if (EmployeeBasicFieldUtil.isDateField(definition)) {
+                    value = DateDisplayFormatter.format(value);
+                }
                 rows.computeIfAbsent(definition.heading(), ignored -> new ArrayList<>())
                         .add(new String[]{definition.label(), display(value)});
             }

@@ -3,11 +3,15 @@ package com.kgm.ui.panel;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.DropdownFieldSupport;
+import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.component.UniversalDatePicker;
+import com.kgm.ui.component.UniversalTextArea;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationFormPanelHelper;
 import com.kgm.util.CnicFormatter;
 import com.kgm.util.EmployeeBasicFieldUtil;
+import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.PhoneFormatter;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -21,12 +25,13 @@ import java.util.List;
 import java.util.Map;
 
 public class EmployeeRegistrationFormPanel extends JPanel {
-    private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+    private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
     private List<EmployeeFieldDefinition> definitions = EmployeeBasicFieldUtil.loadBasicDefinitions();
     private final Map<String, JComponent> inputsByColumn = new LinkedHashMap<>();
 
     private JLabel photoPreview;
+    private FileUploadCard photoUploadCard;
     private File selectedImage;
 
     public EmployeeRegistrationFormPanel() {
@@ -77,18 +82,11 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             }
         });
 
-        JLabel uploadLabel = new JLabel("Upload / Replace");
-        EmployeeRegistrationFormPanelHelper.styleUploadLabel(uploadLabel);
-        uploadLabel.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                chooseImage(photoPreview);
-            }
-        });
+        photoUploadCard = new FileUploadCard("Employee Photo", "JPEG only - Max 400KB", "Choose");
+        photoUploadCard.addActionListener(event -> chooseImage(photoPreview));
 
         JPanel bottom = EmployeeRegistrationFormPanelHelper.createPhotoInfoPanel();
-        bottom.add(EmployeeRegistrationFormPanelHelper.createPhotoInfoLabel("JPEG only - Max 400KB"));
-        bottom.add(Box.createVerticalStrut(5));
-        bottom.add(uploadLabel);
+        bottom.add(photoUploadCard);
 
         left.add(photoPreview, BorderLayout.CENTER);
         left.add(bottom, BorderLayout.SOUTH);
@@ -105,13 +103,18 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         int row = 0;
         for (int index = 0; index < definitions.size(); index += 2) {
             EmployeeFieldDefinition first = definitions.get(index);
-            if (EmployeeBasicFieldUtil.isMultilineField(first.columnName())) {
+            EmployeeFieldDefinition second = index + 1 < definitions.size() ? definitions.get(index + 1) : null;
+            if (EmployeeBasicFieldUtil.isMultilineField(first)
+                    && (second == null || !EmployeeBasicFieldUtil.isMultilineField(second))) {
                 addFullWidthField(panel, gbc, row++, first);
+                if (second != null) {
+                    addSingleField(panel, gbc, row++, second);
+                }
                 continue;
             }
-
-            EmployeeFieldDefinition second = index + 1 < definitions.size() ? definitions.get(index + 1) : null;
-            if (second != null && EmployeeBasicFieldUtil.isMultilineField(second.columnName())) {
+            if (second != null
+                    && EmployeeBasicFieldUtil.isMultilineField(second)
+                    && !EmployeeBasicFieldUtil.isMultilineField(first)) {
                 addSingleField(panel, gbc, row++, first);
                 addFullWidthField(panel, gbc, row++, second);
                 continue;
@@ -160,38 +163,65 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         if (EmployeeBasicFieldUtil.isDateField(definition)) {
             input = new UniversalDatePicker();
         } else if (EmployeeBasicFieldUtil.isDropdownField(definition)) {
-            JComboBox<String> combo = new JComboBox<>(EmployeeBasicFieldUtil.dropdownOptions(definition, false));
+            JComboBox<String> combo = new JComboBox<>(EmployeeBasicFieldUtil.dropdownOptions(definition, true));
             DropdownFieldSupport.configure(combo, definition.variableOptionField());
+            // Set placeholder text for value() to treat as empty
+            String placeholder = EmployeeBasicFieldUtil.dropdownPlaceholder(definition.variableOptionField());
+            DropdownFieldSupport.setPlaceholder(combo, placeholder);
             input = combo;
-        } else if (EmployeeBasicFieldUtil.isMultilineField(column)) {
-            JTextArea area = new JTextArea(4, 20);
-            EmployeeRegistrationFormPanelHelper.styleAddressArea(area);
-            input = EmployeeRegistrationFormPanelHelper.createAddressScrollPane(area);
+        } else if (EmployeeBasicFieldUtil.isMultilineField(definition)) {
+            input = new UniversalTextArea();
         } else {
             input = new JTextField();
             if ("NID".equalsIgnoreCase(column)) {
                 CnicFormatter.installFormatter((JTextField) input);
             }
+            if ("EMP_CONTNO".equalsIgnoreCase(column)) {
+                PhoneFormatter.installFormatter((JTextField) input);
+            }
         }
 
         EmployeeRegistrationFormPanelHelper.styleInput(input);
+        applyDefaultValue(column, input);
         inputsByColumn.put(column, input);
         return input;
     }
 
-    private void chooseImage(JLabel target) {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg"));
-        chooser.setAcceptAllFileFilterUsed(false);
+    private void applyDefaultValue(String column, JComponent input) {
+        String value = defaultValue(column);
+        if (value.isBlank()) {
+            return;
+        }
+        if (input instanceof UniversalTextArea area) {
+            area.setText(value);
+        } else if (input instanceof JTextField textField) {
+            textField.setText(value);
+        }
+    }
 
-        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+    private String defaultValue(String column) {
+        if ("DESCR".equalsIgnoreCase(column)) {
+            return "KGM";
+        }
+        if ("SECTION".equalsIgnoreCase(column)) {
+            return "N/A";
+        }
+        return "";
+    }
+
+    private void chooseImage(JLabel target) {
+        File file = FileUploadCard.chooseFile(
+                this,
+                "Upload Employee Photo",
+                FileUploadCard.jpegImages()
+        );
+        if (file == null) {
             return;
         }
 
-        File file = chooser.getSelectedFile();
-        if (file.length() > 400 * 1024) {
-            DialogHelper.warning(this, "File Too Large", "Max 400KB allowed.");
+        String validationMessage = EmployeeDocumentUtil.validateImageFile(file);
+        if (validationMessage != null) {
+            DialogHelper.warning(this, "Invalid Image", validationMessage);
             return;
         }
 
@@ -211,6 +241,9 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             );
             target.setIcon(new ImageIcon(scaled));
             target.setText("");
+            if (photoUploadCard != null) {
+                photoUploadCard.setStatus(file.getName());
+            }
         } catch (Exception e) {
             DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
         }
@@ -259,6 +292,9 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         if (input instanceof JComboBox<?> combo) {
             return DropdownFieldSupport.value(combo);
         }
+        if (input instanceof UniversalTextArea area) {
+            return area.getText().trim();
+        }
         if (input instanceof JScrollPane scrollPane
                 && scrollPane.getViewport().getView() instanceof JTextArea area) {
             return area.getText().trim();
@@ -296,16 +332,28 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             } else if (input instanceof JScrollPane scrollPane
                     && scrollPane.getViewport().getView() instanceof JTextArea area) {
                 area.setText("");
+            } else if (input instanceof UniversalTextArea area) {
+                area.setText("");
             } else if (input instanceof JTextField textField) {
                 textField.setText("");
             }
         }
+        applyDefaultValues();
         selectedImage = null;
+        if (photoUploadCard != null) {
+            photoUploadCard.setStatus("");
+        }
         photoPreview.setIcon(null);
         photoPreview.setText("Photo");
         requestInitialFocus();
         revalidate();
         repaint();
+    }
+
+    private void applyDefaultValues() {
+        for (Map.Entry<String, JComponent> entry : inputsByColumn.entrySet()) {
+            applyDefaultValue(entry.getKey(), entry.getValue());
+        }
     }
 
     private void requestInitialFocus() {

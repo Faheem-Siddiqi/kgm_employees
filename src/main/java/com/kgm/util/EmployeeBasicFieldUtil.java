@@ -19,6 +19,8 @@ public final class EmployeeBasicFieldUtil {
     private static final Set<String> FUNDAMENTALS_HEADING_KEYS = Set.of("fundamental", "fundamentals");
     public static final List<String> BASIC_COLUMNS = List.of(
             "EMPLOYEE_CODE",
+            "UNT_CODE",
+            "DESCR",
             "EMP_NAME",
             "FATHER_NAME",
             "NID",
@@ -34,6 +36,7 @@ public final class EmployeeBasicFieldUtil {
             "RESIGN_REASON",
             "JOINING_DATE",
             "RESIGN_DATE",
+            "CURRENT_ADR",
             "PERMANENT_ADR"
     );
     public static final Set<String> DATE_COLUMNS = Set.of("DOB", "JOINING_DATE", "RESIGN_DATE");
@@ -123,16 +126,24 @@ public final class EmployeeBasicFieldUtil {
         if ("GENDER".equalsIgnoreCase(columnName)) {
             values = new String[]{"Male", "Female", "Other"};
         } else if ("RESIGN_REASON".equalsIgnoreCase(columnName)) {
-            values = new String[]{"Layoff", "Retirement", "Other"};
+            values = new String[]{"Layoff", "Resignation", "Other"};
         } else {
             values = new String[0];
         }
-        return withOptionalBlank(values, includeBlank);
+        if (!includeBlank) {
+            return values;
+        }
+        String placeholder = columnName != null && "RESIGN_REASON".equalsIgnoreCase(columnName)
+                ? dropdownPlaceholder(true) : dropdownPlaceholder(false);
+        String[] result = new String[values.length + 1];
+        result[0] = placeholder;
+        System.arraycopy(values, 0, result, 1, values.length);
+        return result;
     }
 
     public static String[] dropdownOptions(EmployeeFieldDefinition definition, boolean includeBlank) {
         if (definition == null) {
-            return withOptionalBlank(new String[0], includeBlank);
+            return new String[0];
         }
 
         LinkedHashSet<String> values = new LinkedHashSet<>();
@@ -148,21 +159,34 @@ public final class EmployeeBasicFieldUtil {
                 values.add(option);
             }
         }
-        return withOptionalBlank(values.toArray(new String[0]), includeBlank);
+        if (includeBlank) {
+            String placeholder = dropdownPlaceholder(definition.variableOptionField());
+            String[] result = new String[values.size() + 1];
+            result[0] = placeholder;
+            int index = 1;
+            for (String v : values) {
+                result[index++] = v;
+            }
+            return result;
+        }
+        return values.toArray(new String[0]);
     }
 
-    private static String[] withOptionalBlank(String[] values, boolean includeBlank) {
-        if (!includeBlank) {
-            return values;
-        }
-        String[] withBlank = new String[values.length + 1];
-        withBlank[0] = "";
-        System.arraycopy(values, 0, withBlank, 1, values.length);
-        return withBlank;
+    /**
+     * Returns the default placeholder label for a dropdown based on whether it allows custom values.
+     * Fixed dropdowns show "Choose", variable (type-to-select) dropdowns show "Type to select".
+     */
+    public static String dropdownPlaceholder(boolean variableOptionField) {
+        return variableOptionField ? "Type to select" : "Choose";
     }
 
     public static boolean isMultilineField(String columnName) {
-        return "PERMANENT_ADR".equalsIgnoreCase(columnName);
+        return "PERMANENT_ADR".equalsIgnoreCase(columnName)
+                || "CURRENT_ADR".equalsIgnoreCase(columnName);
+    }
+
+    public static boolean isMultilineField(EmployeeFieldDefinition definition) {
+        return definition != null && (definition.textAreaField() || isMultilineField(definition.columnName()));
     }
 
     public static String valueFor(Employee employee, String columnName) {
@@ -221,6 +245,7 @@ public final class EmployeeBasicFieldUtil {
                 true,
                 isComboField(column),
                 isComboField(column),
+                isMultilineField(column),
                 String.join("\n", comboOptions(column, false)),
                 true
         );
@@ -241,6 +266,8 @@ public final class EmployeeBasicFieldUtil {
     private static Map<String, String> defaultLabels() {
         Map<String, String> labels = new LinkedHashMap<>();
         labels.put("EMPLOYEE_CODE", "Employee ID");
+        labels.put("UNT_CODE", "Unit Code");
+        labels.put("DESCR", "DESCR");
         labels.put("EMP_NAME", "Name");
         labels.put("FATHER_NAME", "Father Name");
         labels.put("NID", "CNIC");
@@ -256,6 +283,7 @@ public final class EmployeeBasicFieldUtil {
         labels.put("RESIGN_REASON", "Resign Reason");
         labels.put("JOINING_DATE", "Date of Joining");
         labels.put("RESIGN_DATE", "Date of Resignation");
+        labels.put("CURRENT_ADR", "Current Address");
         labels.put("PERMANENT_ADR", "Permanent Address");
         return labels;
     }

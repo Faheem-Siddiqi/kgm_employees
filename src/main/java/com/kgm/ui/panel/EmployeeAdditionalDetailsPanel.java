@@ -5,13 +5,14 @@ import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.DropdownFieldSupport;
 import com.kgm.ui.component.UniversalDatePicker;
+import com.kgm.ui.component.UniversalTextArea;
 import com.kgm.ui.styling.EmployeeAdditionalDetailsPanelHelper;
+import com.kgm.util.DateDisplayFormatter;
 import com.kgm.util.EmployeeBasicFieldUtil;
 
 import javax.swing.*;
 import java.awt.*;
 import java.lang.reflect.Field;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -21,20 +22,10 @@ import java.util.Map;
 
 public class EmployeeAdditionalDetailsPanel extends JPanel {
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-    private static final String[] READ_DATE_FORMATS = {
-            "dd/MM/yyyy HH:mm:ss",
-            "dd/MM/yyyy H:mm:ss",
-            "dd-MM-yyyy HH:mm:ss",
-            "dd-MM-yyyy H:mm:ss",
-            "yyyy-MM-dd HH:mm:ss",
-            "yyyy-MM-dd H:mm:ss",
-            "dd/MM/yyyy",
-            "dd-MM-yyyy",
-            "yyyy-MM-dd"
-    };
 
     private final Employee data;
     private final Map<String, JTextField> textFieldMap = new LinkedHashMap<>();
+    private final Map<String, UniversalTextArea> textAreaMap = new LinkedHashMap<>();
     private final Map<String, JComboBox<String>> dropdownFieldMap = new LinkedHashMap<>();
     private final Map<String, UniversalDatePicker> dateFieldMap = new LinkedHashMap<>();
     private final Map<String, Boolean> dateDirtyMap = new LinkedHashMap<>();
@@ -146,20 +137,68 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
 
         int row = 0;
         for (int index = 0; index < definitions.size(); index += 2) {
-            gbc.gridy = row++;
-            gbc.gridx = 0;
-            gbc.weightx = 0.5;
-            grid.add(createField(definitions.get(index)), gbc);
-
-            gbc.gridx = 1;
-            gbc.weightx = 0.5;
-            if (index + 1 < definitions.size()) {
-                grid.add(createField(definitions.get(index + 1)), gbc);
-            } else {
-                grid.add(EmployeeAdditionalDetailsPanelHelper.createGridFiller(), gbc);
+            EmployeeFieldDefinition first = definitions.get(index);
+            EmployeeFieldDefinition second = index + 1 < definitions.size() ? definitions.get(index + 1) : null;
+            if (EmployeeBasicFieldUtil.isMultilineField(first)
+                    && (second == null || !EmployeeBasicFieldUtil.isMultilineField(second))) {
+                addFullWidthField(grid, gbc, row++, first);
+                if (second != null) {
+                    addSingleField(grid, gbc, row++, second);
+                }
+                continue;
             }
+            if (second != null
+                    && EmployeeBasicFieldUtil.isMultilineField(second)
+                    && !EmployeeBasicFieldUtil.isMultilineField(first)) {
+                addSingleField(grid, gbc, row++, first);
+                addFullWidthField(grid, gbc, row++, second);
+                continue;
+            }
+
+            addPairFields(grid, gbc, row++, first, second);
         }
         return grid;
+    }
+
+    private void addSingleField(JPanel grid, GridBagConstraints gbc, int row, EmployeeFieldDefinition definition) {
+        gbc.gridy = row;
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.5;
+        grid.add(createField(definition), gbc);
+
+        gbc.gridx = 1;
+        grid.add(EmployeeAdditionalDetailsPanelHelper.createGridFiller(), gbc);
+    }
+
+    private void addFullWidthField(JPanel grid, GridBagConstraints gbc, int row, EmployeeFieldDefinition definition) {
+        gbc.gridy = row;
+        gbc.gridx = 0;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        grid.add(createField(definition), gbc);
+        gbc.gridwidth = 1;
+    }
+
+    private void addPairFields(
+            JPanel grid,
+            GridBagConstraints gbc,
+            int row,
+            EmployeeFieldDefinition first,
+            EmployeeFieldDefinition second
+    ) {
+        gbc.gridy = row;
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        gbc.weightx = 0.5;
+        grid.add(createField(first), gbc);
+
+        gbc.gridx = 1;
+        if (second == null) {
+            grid.add(EmployeeAdditionalDetailsPanelHelper.createGridFiller(), gbc);
+        } else {
+            grid.add(createField(second), gbc);
+        }
     }
 
     private JPanel createField(EmployeeFieldDefinition definition) {
@@ -181,6 +220,10 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             );
             dropdownFieldMap.put(definition.columnName(), combo);
             field = combo;
+        } else if (EmployeeBasicFieldUtil.isMultilineField(definition)) {
+            UniversalTextArea textArea = new UniversalTextArea(displayValue(value));
+            textAreaMap.put(definition.columnName(), textArea);
+            field = textArea;
         } else {
             JTextField textField = EmployeeAdditionalDetailsPanelHelper.createField(displayValue(value));
             textField.setEditable(true);
@@ -201,6 +244,18 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             }
 
             String value = field.getText();
+            if (isEmpty(value)) {
+                return;
+            }
+
+            writeValue(employee, column, value.trim());
+        });
+        textAreaMap.forEach((column, area) -> {
+            if (!area.isEditable()) {
+                return;
+            }
+
+            String value = area.getText();
             if (isEmpty(value)) {
                 return;
             }
@@ -265,15 +320,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             return null;
         }
 
-        for (String pattern : READ_DATE_FORMATS) {
-            SimpleDateFormat format = new SimpleDateFormat(pattern);
-            format.setLenient(false);
-            try {
-                return format.parse(value.trim());
-            } catch (ParseException ignored) {
-            }
-        }
-        return null;
+        return DateDisplayFormatter.parse(value);
     }
 
     private boolean isEmpty(String value) {

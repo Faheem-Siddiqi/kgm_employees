@@ -5,6 +5,7 @@ import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.UniversalTablePanel;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
+import com.kgm.util.DateDisplayFormatter;
 
 import javax.swing.*;
 import java.awt.*;
@@ -14,7 +15,7 @@ import java.util.List;
 public class MissingDataView extends JFrame {
     private static final int EMPLOYEE_CODE_COLUMN = 0;
     private static final int MISSING_COLUMN = 2;
-    private static final int ACTION_COLUMN = 8;
+    private static final int ACTION_COLUMN = 9;
 
     private static final String[] COLUMNS = {
             "Employee ID",
@@ -25,6 +26,7 @@ public class MissingDataView extends JFrame {
             "Department-Section",
             "Date of Joining",
             "Date of Resignation",
+            "Phone Number",
             "Action"
     };
 
@@ -68,7 +70,7 @@ public class MissingDataView extends JFrame {
 
         JLabel title = new JLabel("Employees Missing Required Data");
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        JLabel subtitle = new JLabel("Shows employees missing required Field Management values or required document uploads.");
+        JLabel subtitle = new JLabel("Shows employees missing required Field Management values or required document uploads in Graph");
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         subtitle.setForeground(new Color(99, 115, 129));
         titleBlock.add(title);
@@ -102,6 +104,7 @@ public class MissingDataView extends JFrame {
         tablePanel.setColumnAlignment(5, SwingConstants.LEFT);
         tablePanel.setColumnAlignment(6, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(7, SwingConstants.CENTER);
+        tablePanel.setColumnAlignment(8, SwingConstants.CENTER);
         tablePanel.setPreferredColumnWidthLimit(MISSING_COLUMN, 420);
         tablePanel.setPreferredColumnWidthLimit(5, 220);
         tablePanel.setPaginationBottomGap(5);
@@ -126,8 +129,9 @@ public class MissingDataView extends JFrame {
                     row.designation(),
                     row.grade(),
                     formatDepartment(row),
-                    row.joiningDate(),
-                    row.resignationDate(),
+                    DateDisplayFormatter.format(row.joiningDate()),
+                    DateDisplayFormatter.format(row.resignationDate()),
+                    row.phoneNumber(),
                     "View"
             });
         }

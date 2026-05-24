@@ -2,6 +2,7 @@ package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.model.Employee;
+import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.panel.EmployeeBasicDetailsPanel;
 import com.kgm.ui.panel.EmployeeDocumentViewPanel;
@@ -369,18 +370,18 @@ public class EmployeeDetailView extends JFrame {
             return;
         }
 
-        JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle("Choose Folder for Employee Report Package");
-        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        chooser.setApproveButtonText("Save Package Here");
-
-        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+        File selectedFolder = FileUploadCard.chooseDirectory(
+                this,
+                "Choose Folder for Employee Report Package",
+                "Save Package Here"
+        );
+        if (selectedFolder == null) {
             return;
         }
 
         try {
             EmployeeReportService.PackageResult result = reportService
-                    .generateEmployeePackage(empCode, chooser.getSelectedFile(), options);
+                    .generateEmployeePackage(empCode, selectedFolder, options);
             String pdfStatus = result.pdfFile() == null ? "Not included" : "Saved";
             String mergedPdfStatus = result.mergedDocumentsPdfFile() == null
                     ? "Not included"

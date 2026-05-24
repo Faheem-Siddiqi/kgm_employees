@@ -17,6 +17,7 @@ public record EmployeeFieldDefinition(
         boolean coreField,
         boolean dropdownField,
         boolean variableOptionField,
+        boolean textAreaField,
         String dropdownOptions,
         boolean requiredField
 ) {

@@ -4,6 +4,7 @@ import com.kgm.dao.EmployeeRecordDao;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.function.Consumer;
 
 /**
  * Home Stats Panel - Main dashboard container.
@@ -28,6 +29,10 @@ public class HomeStatsPanel extends JPanel {
         add(separator);
         
         add(chartsPanel);
+    }
+
+    public void setShowInTableHandler(Consumer<String> handler) {
+        chartsPanel.setShowInTableHandler(handler);
     }
 
     public void reload() {

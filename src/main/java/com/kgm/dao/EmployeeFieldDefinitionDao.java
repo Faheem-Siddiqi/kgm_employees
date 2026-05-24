@@ -37,8 +37,9 @@ public class EmployeeFieldDefinitionDao {
 
     private static final List<EmployeeFieldDefinition> BUILT_IN_FIELDS = List.of(
             def("ID", "ID", "System", false, false, 1),
-            def("UNT_CODE", "Unit Code", "Employment Details", false, true, 10),
             def("EMPLOYEE_CODE", "Employee ID", FUNDAMENTALS_HEADING, false, false, 20),
+            def("UNT_CODE", "Unit Code", FUNDAMENTALS_HEADING, false, false, 21),
+            def("DESCR", "DESCR", FUNDAMENTALS_HEADING, false, false, 22),
             def("EMP_NAME", "Name", FUNDAMENTALS_HEADING, false, false, 30),
             def("FATHER_NAME", "Father Name", FUNDAMENTALS_HEADING, false, false, 40),
             def("MOTHER_NAME", "Mother Name", "Personal / HR Details", false, true, 50),
@@ -70,7 +71,6 @@ public class EmployeeFieldDefinitionDao {
             def("DIVISION", "Division", "Organization / Structure", false, true, 410),
             def("BRANCH_CODE", "Branch Code", "Organization / Structure", false, true, 420),
             def("BRANCH_NAME", "Branch Name", "Organization / Structure", false, true, 430),
-            def("DESCR", "Description", "Organization / Structure", false, true, 440),
 
             def("GROSS_SALARY", "Gross Salary", "Payroll / Allowances", false, true, 500),
             def("PAY_CATEGORY", "Pay Category", "Payroll / Allowances", false, true, 510),
@@ -116,8 +116,8 @@ public class EmployeeFieldDefinitionDao {
             def("EOBI_STATUS", "EOBI Status", "Compliance / Status", false, true, 910),
 
             def("EMP_CONTNO", "Phone", FUNDAMENTALS_HEADING, false, false, 1000),
-            def("CURRENT_ADR", "Current Address", "Contact", false, true, 1010),
-            def("PERMANENT_ADR", "Permanent Address", FUNDAMENTALS_HEADING, false, false, 1020),
+            def("CURRENT_ADR", "Current Address", FUNDAMENTALS_HEADING, false, false, true, 1010),
+            def("PERMANENT_ADR", "Permanent Address", FUNDAMENTALS_HEADING, false, false, true, 1020),
             def("PERSONAL_EMAIL", "Email", FUNDAMENTALS_HEADING, false, false, 1030),
             def("OFFICIAL_EMAIL", "Official Email", "Contact", false, true, 1040),
             def("EMERGENCY_NO", "Emergency No", "Emergency / Misc", false, true, 1050),
@@ -200,6 +200,7 @@ public class EmployeeFieldDefinitionDao {
                         core_field TINYINT(1) NOT NULL DEFAULT 0,
                         dropdown_field TINYINT(1) NOT NULL DEFAULT 0,
                         variable_option_field TINYINT(1) NOT NULL DEFAULT 0,
+                        text_area_field TINYINT(1) NOT NULL DEFAULT 0,
                         required_field TINYINT(1) NOT NULL DEFAULT 0,
                         dropdown_options TEXT,
                         sort_order INT NOT NULL DEFAULT 0,
@@ -211,6 +212,10 @@ public class EmployeeFieldDefinitionDao {
         ensureMetadataColumn("core_field", "TINYINT(1) NOT NULL DEFAULT 0");
         ensureMetadataColumn("dropdown_field", "TINYINT(1) NOT NULL DEFAULT 0");
         ensureMetadataColumn("variable_option_field", "TINYINT(1) NOT NULL DEFAULT 0");
+        boolean textAreaFieldColumnAdded = ensureMetadataColumnAdded(
+                "text_area_field",
+                "TINYINT(1) NOT NULL DEFAULT 0"
+        );
         ensureMetadataColumn("dropdown_options", "TEXT");
         boolean requiredFieldColumnAdded = ensureMetadataColumnAdded(
                 "required_field",
@@ -219,6 +224,9 @@ public class EmployeeFieldDefinitionDao {
 
         removeRetiredFields();
         syncBuiltInMetadata();
+        if (textAreaFieldColumnAdded) {
+            seedDefaultTextAreaFields();
+        }
         if (requiredFieldColumnAdded) {
             seedDefaultRequiredFields();
         }
@@ -243,6 +251,7 @@ public class EmployeeFieldDefinitionDao {
                     true,
                     false,
                     3000 + column.getValue(),
+                    false,
                     false,
                     false,
                     false,
@@ -325,7 +334,7 @@ public class EmployeeFieldDefinitionDao {
     }
 
     public EmployeeFieldDefinition addField(String label, String heading, boolean documentField, boolean dateField) {
-        return addField(label, heading, documentField, dateField, false, false, "");
+        return addField(label, heading, documentField, dateField, false, false, false, "");
     }
 
     public EmployeeFieldDefinition addField(
@@ -335,6 +344,7 @@ public class EmployeeFieldDefinitionDao {
             boolean dateField,
             boolean dropdownField,
             boolean variableOptionField,
+            boolean textAreaField,
             String dropdownOptions
     ) {
         String cleanLabel = requireText(label, "Field label is required.");
@@ -348,6 +358,7 @@ public class EmployeeFieldDefinitionDao {
         boolean effectiveDateField = !documentField && dateField;
         boolean effectiveDropdownField = !documentField && dropdownField;
         boolean effectiveVariableOptionField = effectiveDropdownField && variableOptionField;
+        boolean effectiveTextAreaField = !documentField && !effectiveDateField && !effectiveDropdownField && textAreaField;
         String cleanDropdownOptions = effectiveDropdownField ? normalizeOptions(dropdownOptions) : "";
 
         try (Statement stmt = conn.createStatement()) {
@@ -369,6 +380,7 @@ public class EmployeeFieldDefinitionDao {
                     fundamentalsField,
                     effectiveDropdownField,
                     effectiveVariableOptionField,
+                    effectiveTextAreaField,
                     cleanDropdownOptions,
                     fundamentalsField
             );
@@ -419,6 +431,7 @@ public class EmployeeFieldDefinitionDao {
                     fundamentalsField || current.coreField(),
                     current.dropdownField(),
                     current.variableOptionField(),
+                    current.textAreaField(),
                     current.dropdownOptions(),
                     current.requiredField()
             );
@@ -439,6 +452,7 @@ public class EmployeeFieldDefinitionDao {
                 dateField,
                 current.dropdownField(),
                 current.variableOptionField(),
+                current.textAreaField(),
                 current.dropdownOptions()
         );
     }
@@ -450,6 +464,7 @@ public class EmployeeFieldDefinitionDao {
             boolean dateField,
             boolean dropdownField,
             boolean variableOptionField,
+            boolean textAreaField,
             String dropdownOptions
     ) {
         EmployeeFieldDefinition current = requireExistingField(columnName);
@@ -468,6 +483,10 @@ public class EmployeeFieldDefinitionDao {
         boolean effectiveDateField = !current.documentField() && dateField;
         boolean effectiveDropdownField = !current.documentField() && dropdownField;
         boolean effectiveVariableOptionField = effectiveDropdownField && variableOptionField;
+        boolean effectiveTextAreaField = !current.documentField()
+                && !effectiveDateField
+                && !effectiveDropdownField
+                && textAreaField;
         String cleanDropdownOptions = effectiveDropdownField ? normalizeOptions(dropdownOptions) : "";
         boolean effectiveProtectedField = current.documentField() || fundamentalsField || protectedSystemField;
         boolean effectiveCustomField = !effectiveProtectedField;
@@ -478,7 +497,7 @@ public class EmployeeFieldDefinitionDao {
                 UPDATE employee_field_metadata
                 SET display_label = ?, heading = ?, custom_field = ?, protected_field = ?,
                     detail_field = ?, core_field = ?, date_field = ?, dropdown_field = ?,
-                    variable_option_field = ?, dropdown_options = ?
+                    variable_option_field = ?, text_area_field = ?, dropdown_options = ?
                 WHERE column_name = ?
                 """)) {
             ps.setString(1, cleanLabel);
@@ -490,8 +509,9 @@ public class EmployeeFieldDefinitionDao {
             ps.setBoolean(7, effectiveDateField);
             ps.setBoolean(8, effectiveDropdownField);
             ps.setBoolean(9, effectiveVariableOptionField);
-            ps.setString(10, cleanDropdownOptions);
-            ps.setString(11, current.columnName());
+            ps.setBoolean(10, effectiveTextAreaField);
+            ps.setString(11, cleanDropdownOptions);
+            ps.setString(12, current.columnName());
             ps.executeUpdate();
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to update employee field: " + exception.getMessage(), exception);
@@ -521,6 +541,7 @@ public class EmployeeFieldDefinitionDao {
                 effectiveCoreField,
                 effectiveDropdownField,
                 effectiveVariableOptionField,
+                effectiveTextAreaField,
                 cleanDropdownOptions,
                 current.requiredField()
         );
@@ -555,6 +576,7 @@ public class EmployeeFieldDefinitionDao {
                 current.coreField(),
                 current.dropdownField(),
                 current.variableOptionField(),
+                current.textAreaField(),
                 current.dropdownOptions(),
                 required
         );
@@ -709,9 +731,10 @@ public class EmployeeFieldDefinitionDao {
         }
         boolean effectiveDateField = !definition.documentField() && dateField;
         try (PreparedStatement ps = conn.prepareStatement(
-                "UPDATE employee_field_metadata SET date_field = ? WHERE column_name = ?")) {
+                "UPDATE employee_field_metadata SET date_field = ?, text_area_field = CASE WHEN ? THEN 0 ELSE text_area_field END WHERE column_name = ?")) {
             ps.setBoolean(1, effectiveDateField);
-            ps.setString(2, definition.columnName());
+            ps.setBoolean(2, effectiveDateField);
+            ps.setString(3, definition.columnName());
             ps.executeUpdate();
             applyValueDefaultsForType(definition.columnName(), definition.documentField(), effectiveDateField);
         } catch (SQLException exception) {
@@ -786,7 +809,7 @@ public class EmployeeFieldDefinitionDao {
         String sql = """
                 SELECT column_name, display_label, heading, document_field, custom_field,
                        protected_field, detail_field, date_field, sort_order,
-                       core_field, dropdown_field, variable_option_field, dropdown_options, required_field
+                       core_field, dropdown_field, variable_option_field, text_area_field, dropdown_options, required_field
                 FROM employee_field_metadata
                 ORDER BY document_field, heading, sort_order, display_label
                 """;
@@ -806,6 +829,7 @@ public class EmployeeFieldDefinitionDao {
                         rs.getBoolean("core_field"),
                         rs.getBoolean("dropdown_field"),
                         rs.getBoolean("variable_option_field"),
+                        rs.getBoolean("text_area_field"),
                         rs.getString("dropdown_options"),
                         rs.getBoolean("required_field")
                 );
@@ -859,6 +883,18 @@ public class EmployeeFieldDefinitionDao {
         }
     }
 
+    private void seedDefaultTextAreaFields() throws SQLException {
+        List<String> textAreaColumns = List.of("CURRENT_ADR", "PERMANENT_ADR");
+        String sql = "UPDATE employee_field_metadata SET text_area_field = 1 WHERE UPPER(column_name) IN ("
+                + placeholders(textAreaColumns.size()) + ")";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (int index = 0; index < textAreaColumns.size(); index++) {
+                ps.setString(index + 1, textAreaColumns.get(index));
+            }
+            ps.executeUpdate();
+        }
+    }
+
     private EmployeeFieldDefinition customDetailDefinition(
             EmployeeFieldDefinition builtIn,
             EmployeeFieldDefinition existing
@@ -872,6 +908,9 @@ public class EmployeeFieldDefinitionDao {
         boolean dateField = existing != null && existing.dateField();
         boolean dropdownField = existing != null && existing.dropdownField();
         boolean variableOptionField = dropdownField && existing != null && existing.variableOptionField();
+        boolean textAreaField = existing != null
+                ? existing.textAreaField()
+                : defaultTextAreaField(builtIn.columnName());
         String dropdownOptions = dropdownField ? normalizeOptions(existing.dropdownOptions()) : "";
 
         return new EmployeeFieldDefinition(
@@ -887,6 +926,7 @@ public class EmployeeFieldDefinitionDao {
                 fundamentalsField,
                 dropdownField,
                 variableOptionField,
+                textAreaField,
                 dropdownOptions,
                 existing != null && existing.requiredField()
         );
@@ -907,6 +947,7 @@ public class EmployeeFieldDefinitionDao {
         }
         boolean defaultDateField = EmployeeBasicFieldUtil.DATE_COLUMNS.contains(column);
         boolean defaultDropdownField = isDefaultDropdownColumn(column);
+        boolean defaultTextAreaField = defaultTextAreaField(column);
         String defaultOptions = defaultDropdownOptions(column);
 
         boolean dateField = document
@@ -929,6 +970,11 @@ public class EmployeeFieldDefinitionDao {
                         ? defaultOptions
                         : normalizeOptions(existing.dropdownOptions())
                 : "";
+        boolean textAreaField = document || dateField || dropdownField
+                ? false
+                : existing == null
+                        ? defaultTextAreaField
+                        : existing.textAreaField();
         boolean requiredField = existing == null
                 ? defaultRequiredField(builtIn)
                 : existing.requiredField();
@@ -946,6 +992,7 @@ public class EmployeeFieldDefinitionDao {
                 core,
                 dropdownField,
                 variableOptionField,
+                textAreaField,
                 dropdownOptions,
                 requiredField
         );
@@ -973,7 +1020,7 @@ public class EmployeeFieldDefinitionDao {
         try (PreparedStatement ps = conn.prepareStatement("""
                 UPDATE employee_field_metadata
                 SET custom_field = 0, protected_field = 1, detail_field = 0, core_field = 0,
-                    dropdown_field = 0, variable_option_field = 0, dropdown_options = ''
+                    dropdown_field = 0, variable_option_field = 0, text_area_field = 0, dropdown_options = ''
                 WHERE UPPER(column_name) = 'ID'
                 """)) {
             ps.executeUpdate();
@@ -1054,6 +1101,10 @@ public class EmployeeFieldDefinitionDao {
 
     private boolean isDefaultDropdownColumn(String column) {
         return "GENDER".equalsIgnoreCase(column) || "RESIGN_REASON".equalsIgnoreCase(column);
+    }
+
+    private boolean defaultTextAreaField(String column) {
+        return "CURRENT_ADR".equalsIgnoreCase(column) || "PERMANENT_ADR".equalsIgnoreCase(column);
     }
 
     private String defaultDropdownOptions(String column) {
@@ -1138,8 +1189,8 @@ public class EmployeeFieldDefinitionDao {
                 INSERT IGNORE INTO employee_field_metadata
                     (column_name, display_label, heading, document_field, custom_field,
                      protected_field, detail_field, date_field, sort_order,
-                     core_field, dropdown_field, variable_option_field, dropdown_options, required_field)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     core_field, dropdown_field, variable_option_field, text_area_field, dropdown_options, required_field)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         writeMetadata(definition, sql);
     }
@@ -1149,8 +1200,8 @@ public class EmployeeFieldDefinitionDao {
                 REPLACE INTO employee_field_metadata
                     (column_name, display_label, heading, document_field, custom_field,
                      protected_field, detail_field, date_field, sort_order,
-                     core_field, dropdown_field, variable_option_field, dropdown_options, required_field)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     core_field, dropdown_field, variable_option_field, text_area_field, dropdown_options, required_field)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         writeMetadata(definition, sql);
     }
@@ -1169,8 +1220,9 @@ public class EmployeeFieldDefinitionDao {
             ps.setBoolean(10, definition.coreField());
             ps.setBoolean(11, definition.dropdownField());
             ps.setBoolean(12, definition.variableOptionField());
-            ps.setString(13, normalizeOptions(definition.dropdownOptions()));
-            ps.setBoolean(14, definition.requiredField());
+            ps.setBoolean(13, definition.textAreaField());
+            ps.setString(14, normalizeOptions(definition.dropdownOptions()));
+            ps.setBoolean(15, definition.requiredField());
             ps.executeUpdate();
         }
     }
@@ -1371,6 +1423,18 @@ public class EmployeeFieldDefinitionDao {
             boolean detail,
             int sortOrder
     ) {
+        return def(column, label, heading, document, detail, false, sortOrder);
+    }
+
+    private static EmployeeFieldDefinition def(
+            String column,
+            String label,
+            String heading,
+            boolean document,
+            boolean detail,
+            boolean textAreaField,
+            int sortOrder
+    ) {
         return new EmployeeFieldDefinition(
                 column,
                 label,
@@ -1384,6 +1448,7 @@ public class EmployeeFieldDefinitionDao {
                 false,
                 false,
                 false,
+                textAreaField,
                 "",
                 EmployeeBasicFieldUtil.BASIC_COLUMNS.contains(column)
                         || DEFAULT_REQUIRED_DOCUMENT_COLUMNS.contains(column)

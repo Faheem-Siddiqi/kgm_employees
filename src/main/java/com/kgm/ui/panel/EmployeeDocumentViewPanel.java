@@ -1,6 +1,7 @@
 package com.kgm.ui.panel;
 
 import com.kgm.model.Employee;
+import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDocumentViewPanelHelper;
 import com.kgm.ui.styling.TablePaginationHelper;
@@ -271,44 +272,44 @@ public class EmployeeDocumentViewPanel extends JPanel {
             return;
         }
 
-        JFileChooser fc = new JFileChooser();
-        fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg"
-        ));
-
-        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            File file = fc.getSelectedFile();
-            String validationMessage = EmployeeDocumentUtil.validateImageFile(file);
-            if (validationMessage != null) {
-                DialogHelper.warning(this, "Cannot Upload File", validationMessage);
-                return;
-            }
-
-            files[documentIndex] = file;
-            filePaths[documentIndex] = file.getAbsolutePath();
-            int modelRow = findModelRowByDocumentIndex(documentIndex);
-            if (modelRow >= 0) {
-                model.setValueAt(file.getName(), modelRow, 1);
-                model.setValueAt("Ready to Save (" + EmployeeDocumentUtil.formatSize(file.length()) + ")", modelRow, 2);
-            }
-            updateCount();
-            model.fireTableDataChanged();
+        File file = FileUploadCard.chooseFile(
+                this,
+                "Upload " + EmployeeDocumentUtil.cleanDocumentLabel(documentIndex),
+                FileUploadCard.jpegImages()
+        );
+        if (file == null) {
+            return;
         }
+
+        String validationMessage = EmployeeDocumentUtil.validateImageFile(file);
+        if (validationMessage != null) {
+            DialogHelper.warning(this, "Cannot Upload File", validationMessage);
+            return;
+        }
+
+        files[documentIndex] = file;
+        filePaths[documentIndex] = file.getAbsolutePath();
+        int modelRow = findModelRowByDocumentIndex(documentIndex);
+        if (modelRow >= 0) {
+            model.setValueAt(file.getName(), modelRow, 1);
+            model.setValueAt("Ready to Save (" + EmployeeDocumentUtil.formatSize(file.length()) + ")", modelRow, 2);
+        }
+        updateCount();
+        model.fireTableDataChanged();
     }
 
     private void chooseMultipleFiles() {
-        JFileChooser fc = new JFileChooser();
-        fc.setMultiSelectionEnabled(true);
-        fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg"
-        ));
-
-        if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+        File[] selectedFiles = FileUploadCard.chooseFiles(
+                this,
+                "Upload Employee Documents",
+                FileUploadCard.jpegImages()
+        );
+        if (selectedFiles.length == 0) {
             return;
         }
 
         EmployeeDocumentUtil.BulkUploadResult summary =
-                EmployeeDocumentUtil.matchBulkFiles(fc.getSelectedFiles(), lockedDocuments);
+                EmployeeDocumentUtil.matchBulkFiles(selectedFiles, lockedDocuments);
         for (EmployeeDocumentUtil.BulkUploadItem item : summary.uploadedDocuments()) {
             files[item.documentIndex()] = item.file();
             filePaths[item.documentIndex()] = item.file().getAbsolutePath();

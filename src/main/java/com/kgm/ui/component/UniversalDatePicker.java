@@ -1,6 +1,7 @@
 package com.kgm.ui.component;
 
 import com.kgm.ui.styling.UniversalDatePickerHelper;
+import com.kgm.util.DateDisplayFormatter;
 import com.toedter.calendar.JCalendar;
 
 import javax.swing.*;
@@ -8,7 +9,6 @@ import javax.swing.border.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -267,7 +267,7 @@ public class UniversalDatePicker extends JPanel {
             return "";
         }
 
-        return new SimpleDateFormat(UniversalDatePickerHelper.DATE_FORMAT).format(date);
+        return DateDisplayFormatter.format(date);
     }
 
     private void showCalendar() {

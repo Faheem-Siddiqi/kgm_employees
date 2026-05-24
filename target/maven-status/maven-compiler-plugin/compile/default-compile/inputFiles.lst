@@ -15,8 +15,10 @@ D:\KGM_Ex_Employees-main\src\main\java\com\kgm\service\ExcelExportService.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\service\ExcelImportService.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\service\ExcelSampleGenerator.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\component\DropdownFieldSupport.java
+D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\component\FileUploadCard.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\component\UniversalDatePicker.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\component\UniversalDateRangePicker.java
+D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\component\UniversalTextArea.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\dialog\UniversalDialog.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\EmployeeDetailView.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\EmployeeRegistrationView.java
@@ -47,6 +49,7 @@ D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\EmployeeDocumentUpload
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\EmployeeDocumentViewPanelHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\EmployeeRegistrationFormPanelHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\EmployeeRegistrationViewHelper.java
+D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\HomeStatsChartHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\HomeViewHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\LoginViewHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\TablePaginationHelper.java
@@ -56,10 +59,12 @@ D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\UniversalDateRangePick
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\UniversalDialogHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\UniversalTablePanelHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\CnicFormatter.java
+D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\DateDisplayFormatter.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\EmployeeBasicFieldUtil.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\EmployeeDocumentUtil.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\FileUtil.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\FilterUtil.java
+D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\PhoneFormatter.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\SessionManager.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\SessionWatcher.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\ValidationUtil.java

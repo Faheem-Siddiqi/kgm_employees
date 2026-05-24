@@ -4,6 +4,7 @@ import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.service.ExcelExportService;
 import com.kgm.service.ExcelImportService;
 import com.kgm.service.ExcelSampleGenerator;
+import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.panel.EmployeeTablePanel;
 import com.kgm.ui.panel.ExcelImportButton;
 import com.kgm.ui.panel.FooterPanel;
@@ -15,7 +16,6 @@ import com.kgm.ui.styling.HomeViewHelper;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -27,6 +27,7 @@ public class HomeView extends JFrame {
     private EmployeeTablePanel tablePanel;
     private HomeStatsPanel statsPanel;
     private ExcelImportButton excelBtn;
+    private JButton refreshBtn;
 
     public HomeView() {
         HomeViewHelper.applyFrame(this);
@@ -34,6 +35,23 @@ public class HomeView extends JFrame {
         EmployeeRecordDao repo = new EmployeeRecordDao();
         tablePanel = new EmployeeTablePanel(repo);
         statsPanel = new HomeStatsPanel(repo);
+
+        // Wire "Show in Table" from chart cards to the table filtering
+        statsPanel.setShowInTableHandler(command -> handleShowInTable(command, repo));
+
+        // Wire table filter callback to toggle Refresh / Clear Filter button text
+        tablePanel.setOnFilterChanged(filterLabel -> {
+            if (filterLabel == null) {
+                refreshBtn.setText("Refresh");
+                HomeViewHelper.styleRefreshButton(refreshBtn);
+            } else {
+                refreshBtn.setText("Clear Filter (" + filterLabel + ")");
+                refreshBtn.setBackground(new Color(180, 60, 50));
+                refreshBtn.setForeground(Color.WHITE);
+                refreshBtn.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+                refreshBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            }
+        });
 
         JPanel top = HomeViewHelper.createTopPanel();
         top.add(new HeaderPanel("Home Dashboard"), BorderLayout.NORTH);
@@ -106,9 +124,16 @@ public class HomeView extends JFrame {
             dispose();
         });
 
-        JButton refreshBtn = new JButton("Refresh");
+        refreshBtn = new JButton("Refresh");
         HomeViewHelper.styleRefreshButton(refreshBtn);
-        refreshBtn.addActionListener(e -> reloadHomeData());
+        refreshBtn.addActionListener(e -> {
+            if (tablePanel.getActiveFilterLabel() != null) {
+                // Clear the filter and reload
+                tablePanel.clearFilter();
+            } else {
+                reloadHomeData();
+            }
+        });
 
         JButton settingsBtn = new JButton("Settings");
         HomeViewHelper.styleAddButton(settingsBtn);
@@ -136,6 +161,30 @@ public class HomeView extends JFrame {
         setVisible(true);
     }
 
+    /**
+     * Handles "Show in Table" clicks from chart cards.
+     * Format: columnName::value::displayLabel
+     */
+    private void handleShowInTable(String command, EmployeeRecordDao repo) {
+        if (command == null || command.isBlank()) {
+            return;
+        }
+        String[] parts = command.split("::");
+        if (parts.length < 2) {
+            return;
+        }
+        String columnName = parts[0];
+        String value = parts[1];
+        String displayLabel = parts.length >= 3 ? parts[2] : columnName;
+
+        if ("ALL".equalsIgnoreCase(value)) {
+            // Show all employees for this column category (no specific value filter)
+            tablePanel.filterByColumn(columnName, null, displayLabel);
+        } else {
+            tablePanel.filterByColumn(columnName, value, displayLabel);
+        }
+    }
+
     private void showExcelImportActions() {
         int selected = DialogHelper.option(
                 this,
@@ -155,15 +204,15 @@ public class HomeView extends JFrame {
     }
 
     private void chooseExcelImportFile() {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle("Import Employee Excel Sheet");
-        chooser.setFileFilter(new FileNameExtensionFilter("Excel files (*.xlsx, *.xls)", "xlsx", "xls"));
-        chooser.setAcceptAllFileFilterUsed(false);
-        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+        File selectedFile = FileUploadCard.chooseFile(
+                this,
+                "Import Employee Excel Sheet",
+                FileUploadCard.excelWorkbooks()
+        );
+        if (selectedFile == null) {
             return;
         }
 
-        File selectedFile = chooser.getSelectedFile();
         if (!ExcelImportService.isExcelFile(selectedFile)) {
             showUnsupportedImportFileDialog();
             return;
@@ -263,16 +312,17 @@ public class HomeView extends JFrame {
     }
 
     private void downloadSampleExcel() {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle("Save Employee Import Sample");
-        chooser.setSelectedFile(new File("employee_import_sample.xlsx"));
-        chooser.setFileFilter(new FileNameExtensionFilter("Excel workbook (*.xlsx)", "xlsx"));
-        chooser.setAcceptAllFileFilterUsed(false);
-        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+        File selectedFile = FileUploadCard.chooseSaveFile(
+                this,
+                "Save Employee Import Sample",
+                "employee_import_sample.xlsx",
+                FileUploadCard.xlsxWorkbook()
+        );
+        if (selectedFile == null) {
             return;
         }
 
-        File target = xlsxFile(chooser.getSelectedFile());
+        File target = xlsxFile(selectedFile);
         try {
             ExcelSampleGenerator.writeSampleWorkbook(target);
             showDownloadedFileSuccess(
@@ -288,13 +338,13 @@ public class HomeView extends JFrame {
     }
 
     private void exportEmployeeExcel() {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle("Save Employee Excel Export");
-        chooser.setSelectedFile(new File("employee_export.xlsx"));
-        chooser.setFileFilter(new FileNameExtensionFilter("Excel workbook (*.xlsx)", "xlsx"));
-        chooser.addChoosableFileFilter(new FileNameExtensionFilter("Excel 97-2003 workbook (*.xls)", "xls"));
-        chooser.setAcceptAllFileFilterUsed(false);
-        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+        File selectedFile = FileUploadCard.chooseSaveFile(
+                this,
+                "Save Employee Excel Export",
+                "employee_export.xlsx",
+                FileUploadCard.excelWorkbooks()
+        );
+        if (selectedFile == null) {
             return;
         }
 
@@ -304,7 +354,7 @@ public class HomeView extends JFrame {
             return; // User cancelled
         }
 
-        File target = ensureExcelExtension(chooser.getSelectedFile(), selectedFormat);
+        File target = ensureExcelExtension(selectedFile, selectedFormat);
         setExcelButtonBusy("Exporting...");
         SwingWorker<ExcelExportService.ExportResult, Void> worker = new SwingWorker<>() {
             protected ExcelExportService.ExportResult doInBackground() throws Exception {

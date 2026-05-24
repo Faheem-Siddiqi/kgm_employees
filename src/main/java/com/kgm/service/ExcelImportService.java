@@ -326,12 +326,15 @@ public class ExcelImportService {
         }
         return switch (column) {
             case "EMPLOYEE_CODE" -> "Employee ID";
+            case "UNT_CODE" -> "Unit Code";
+            case "DESCR" -> "DESCR";
             case "EMP_NAME" -> "Name";
             case "NID" -> "CNIC";
             case "EMP_CONTNO" -> "Phone";
             case "PERSONAL_EMAIL" -> "Email";
             case "JOINING_DATE" -> "Date of Joining";
             case "RESIGN_DATE" -> "Date of Resignation";
+            case "CURRENT_ADR" -> "Current Address";
             case "PERMANENT_ADR" -> "Permanent Address";
             case "DOB" -> "Date of Birth";
             default -> definition == null ? titleFromColumn(column) : definition.label();
@@ -344,6 +347,8 @@ public class ExcelImportService {
         }
         return switch (column) {
             case "EMPLOYEE_CODE" -> "EMP-1001";
+            case "UNT_CODE" -> "KGM";
+            case "DESCR" -> "KGM";
             case "EMP_NAME" -> "Ali Khan";
             case "FATHER_NAME" -> "Ahmed Khan";
             case "NID" -> CnicFormatter.FORMAT_EXAMPLE;
@@ -351,7 +356,7 @@ public class ExcelImportService {
             case "PERSONAL_EMAIL" -> "ali.khan@example.com";
             case "DEPARTMENT" -> "HR";
             case "DESIGNATION" -> "Officer";
-            case "SECTION" -> "Admin";
+            case "SECTION" -> "N/A";
             case "GRADE" -> "G-5";
             case "SHIFT" -> "Morning";
             case "DOB" -> "3/8/1984 00:00:00";
@@ -359,6 +364,7 @@ public class ExcelImportService {
             case "RESIGN_REASON" -> "Retirement";
             case "JOINING_DATE" -> "8/23/2010 00:00:00";
             case "RESIGN_DATE" -> "1/1/2024 00:00:00";
+            case "CURRENT_ADR" -> "House 1, Lahore";
             case "PERMANENT_ADR" -> "House 1, Lahore";
             default -> dateField ? DATE_FORMAT_HINT : "N/A";
         };
@@ -861,6 +867,8 @@ public class ExcelImportService {
     private static Map<String, List<String>> aliases() {
         Map<String, List<String>> aliases = new LinkedHashMap<>();
         aliases.put("EMPLOYEE_CODE", List.of("Employee ID", "Employee Code", "ID", "Emp ID", "Emp Code"));
+        aliases.put("UNT_CODE", List.of("Unit Code", "UNT Code"));
+        aliases.put("DESCR", List.of("DESCR", "Description"));
         aliases.put("EMP_NAME", List.of("Name", "Employee Name", "Worker Name"));
         aliases.put("FATHER_NAME", List.of("Father Name", "Father"));
         aliases.put("NID", List.of("CNIC", "CNIC / NID", "NID", "NIC"));

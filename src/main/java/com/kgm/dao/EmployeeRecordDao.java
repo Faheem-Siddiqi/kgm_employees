@@ -120,6 +120,7 @@ public class EmployeeRecordDao {
         int total = countEmployees();
         Map<String, List<CountStat>> sectionsByDepartment = countByParentChild("DEPARTMENT", "SECTION");
         Map<String, List<CountStat>> departmentsByGrade = countByParentChild("GRADE", "DEPARTMENT");
+        Map<String, List<CountStat>> departmentsByDesignation = countByParentChild("DESIGNATION", "DEPARTMENT");
         List<CountStat> departments = countByColumn("DEPARTMENT");
         List<ContributionStat> grades = contributions(countByColumn("GRADE"), departmentsByGrade);
         List<CountStat> designations = countByColumn("DESIGNATION");
@@ -138,6 +139,7 @@ public class EmployeeRecordDao {
                 sectionsByDepartment,
                 grades,
                 designations,
+                departmentsByDesignation,
                 exitTrends,
                 missingDocumentsFromRequirements(missingDocuments),
                 employeesMissingDocuments,
@@ -205,9 +207,9 @@ public class EmployeeRecordDao {
 
     private List<CountStat> exitTrends() {
         Map<String, Integer> totals = new LinkedHashMap<>();
-        totals.put("Layoffs", 0);
-        totals.put("Resignations", 0);
-        totals.put("Other exits", 0);
+        totals.put("Layoff", 0);
+        totals.put("Resignation", 0);
+        totals.put("Others", 0);
         for (CountStat reason : countByColumn("RESIGN_REASON")) {
             String bucket = exitBucket(reason.label());
             totals.put(bucket, totals.getOrDefault(bucket, 0) + reason.count());
@@ -223,15 +225,15 @@ public class EmployeeRecordDao {
     private String exitBucket(String reason) {
         String text = reason == null ? "" : reason.toLowerCase();
         if (text.contains("lay")) {
-            return "Layoffs";
+            return "Layoff";
         }
         if (text.contains("resign")
                 || text.contains("retire")
                 || text.contains("left")
                 || text.contains("quit")) {
-            return "Resignations";
+            return "Resignation";
         }
-        return "Other exits";
+        return "Others";
     }
 
     private List<MissingRequirementStat> missingRequirementStats(
@@ -395,7 +397,8 @@ public class EmployeeRecordDao {
                         safe(valueFor(rs, resultColumns, "DEPARTMENT")),
                         safe(valueFor(rs, resultColumns, "SECTION")),
                         safe(valueFor(rs, resultColumns, "JOINING_DATE")),
-                        safe(valueFor(rs, resultColumns, "RESIGN_DATE"))
+                        safe(valueFor(rs, resultColumns, "RESIGN_DATE")),
+                        safe(valueFor(rs, resultColumns, "EMP_CONTNO"))
                 ));
             }
         } catch (SQLException exception) {
@@ -780,7 +783,8 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
             String department,
             String section,
             String joiningDate,
-            String resignationDate
+            String resignationDate,
+            String phoneNumber
     ) {
     }
 
@@ -790,6 +794,7 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
             Map<String, List<CountStat>> sectionsByDepartment,
             List<ContributionStat> employeesByGrade,
             List<CountStat> employeesByDesignation,
+            Map<String, List<CountStat>> departmentsByDesignation,
             List<CountStat> exitTrends,
             List<MissingDocumentStat> missingDocuments,
             int employeesMissingRequiredDocuments,

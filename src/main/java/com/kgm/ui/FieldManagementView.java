@@ -27,9 +27,10 @@ public class FieldManagementView extends JFrame {
     private static final int FIELD_HEADING = 2;
     private static final int FIELD_CATEGORY = 3;
     private static final int FIELD_DATE = 4;
-    private static final int FIELD_DROPDOWN = 5;
-    private static final int FIELD_ORIGIN = 7;
-    private static final int FIELD_ACTION = 8;
+    private static final int FIELD_TEXT_AREA = 5;
+    private static final int FIELD_DROPDOWN = 6;
+    private static final int FIELD_ORIGIN = 8;
+    private static final int FIELD_ACTION = 9;
 
     private static final int CATEGORY_SELECT = 0;
     private static final int CATEGORY_FIELDS = 2;
@@ -44,7 +45,7 @@ public class FieldManagementView extends JFrame {
     private static final int REQUIRED_ACTION = 5;
 
     private static final String[] FIELD_COLUMNS = {
-            "DB Column", "Label", "Heading", "Category", "Date", "Dropdown", "Locked", "Origin", "Action"
+            "DB Column", "Label", "Heading", "Category", "Date", "Text Area", "Dropdown", "Locked", "Origin", "Action"
     };
     private static final String[] CATEGORY_COLUMNS = {
             "Select", "Category", "Fields", "Count", "Action"
@@ -187,11 +188,15 @@ public class FieldManagementView extends JFrame {
         tablePanel.setCheckboxColumn(FIELD_DATE, row -> row >= 0
                 && row < displayedFields.size()
                 && displayedFields.get(row).dateField());
+        tablePanel.setCheckboxColumn(FIELD_TEXT_AREA, row -> row >= 0
+                && row < displayedFields.size()
+                && displayedFields.get(row).textAreaField());
         tablePanel.setStatusColumn(FIELD_ORIGIN, this::deleteFieldAtRow, row -> row >= 0
                 && row < displayedFields.size()
                 && displayedFields.get(row).customField());
         tablePanel.setActionColumn(FIELD_ACTION, "Edit", this::editFieldAtRow);
         tablePanel.setColumnAlignment(FIELD_DATE, SwingConstants.CENTER);
+        tablePanel.setColumnAlignment(FIELD_TEXT_AREA, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(FIELD_DROPDOWN, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(FIELD_CATEGORY, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(FIELD_HEADING, SwingConstants.LEFT);
@@ -519,6 +524,7 @@ public class FieldManagementView extends JFrame {
                     definition.heading(),
                     definition.usageLabel(),
                     definition.dateField(),
+                    definition.textAreaField(),
                     dropdownLabel(definition),
                     definition.protectedField() ? "Yes" : "No",
                     definition.sourceLabel(),
@@ -857,6 +863,7 @@ public class FieldManagementView extends JFrame {
                     data.dateField(),
                     data.dropdownField(),
                     data.variableOptionField(),
+                    data.textAreaField(),
                     data.dropdownOptions()
             );
             EmployeeDocumentUtil.refreshDocumentTypes();
@@ -891,6 +898,7 @@ public class FieldManagementView extends JFrame {
                     data.dateField(),
                     data.dropdownField(),
                     data.variableOptionField(),
+                    data.textAreaField(),
                     data.dropdownOptions()
             );
             EmployeeDocumentUtil.refreshDocumentTypes();
@@ -966,6 +974,9 @@ public class FieldManagementView extends JFrame {
         JCheckBox dateField = new JCheckBox("Use calendar for this field");
         dateField.setSelected(current != null && current.dateField());
         dateField.setOpaque(false);
+        JCheckBox textAreaField = new JCheckBox("Use larger text area");
+        textAreaField.setSelected(current != null && current.textAreaField());
+        textAreaField.setOpaque(false);
         JCheckBox dropdownField = new JCheckBox("Use dropdown for this field");
         dropdownField.setSelected(current != null && current.dropdownField());
         dropdownField.setOpaque(false);
@@ -985,29 +996,41 @@ public class FieldManagementView extends JFrame {
         dropdownField.setEnabled(!"Documents".equals(category.getSelectedItem()));
         dateField.addActionListener(event -> {
             if (dateField.isSelected()) {
+                textAreaField.setSelected(false);
                 dropdownField.setSelected(false);
                 variableOption.setSelected(false);
             }
-            refreshDropdownControls(form, category, dateField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
+            refreshDropdownControls(form, category, dateField, textAreaField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
+        });
+        textAreaField.addActionListener(event -> {
+            if (textAreaField.isSelected() && !"Documents".equals(category.getSelectedItem())) {
+                dateField.setSelected(false);
+                dropdownField.setSelected(false);
+                variableOption.setSelected(false);
+            }
+            refreshDropdownControls(form, category, dateField, textAreaField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
         });
         dropdownField.addActionListener(event -> {
             if (dropdownField.isSelected() && !"Documents".equals(category.getSelectedItem())) {
                 dateField.setSelected(false);
+                textAreaField.setSelected(false);
             }
-            refreshDropdownControls(form, category, dateField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
+            refreshDropdownControls(form, category, dateField, textAreaField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
         });
         category.addActionListener(event -> {
             boolean documents = "Documents".equals(category.getSelectedItem());
             heading.setEnabled(!documents);
             dateField.setEnabled(!documents);
+            textAreaField.setEnabled(!documents);
             dropdownField.setEnabled(!documents);
             if (documents) {
                 heading.setSelectedItem("Documents");
                 dateField.setSelected(false);
+                textAreaField.setSelected(false);
                 dropdownField.setSelected(false);
                 variableOption.setSelected(false);
             }
-            refreshDropdownControls(form, category, dateField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
+            refreshDropdownControls(form, category, dateField, textAreaField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
         });
 
         GridBagConstraints gbc = formConstraints();
@@ -1047,6 +1070,12 @@ public class FieldManagementView extends JFrame {
 
         gbc.gridx = 0;
         gbc.gridy = row++;
+        form.add(new JLabel("Text Area"), gbc);
+        gbc.gridx = 1;
+        form.add(textAreaField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = row++;
         form.add(new JLabel("Dropdown"), gbc);
         gbc.gridx = 1;
         form.add(dropdownField, gbc);
@@ -1062,7 +1091,7 @@ public class FieldManagementView extends JFrame {
         form.add(optionsLabel, gbc);
         gbc.gridx = 1;
         form.add(optionEditor, gbc);
-        refreshDropdownControls(form, category, dateField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
+        refreshDropdownControls(form, category, dateField, textAreaField, dropdownField, variableOption, optionEditor, variableLabel, optionsLabel);
 
         while (true) {
             int result = DialogHelper.formOption(
@@ -1083,6 +1112,7 @@ public class FieldManagementView extends JFrame {
                     ? current == null ? "Documents" : current.heading()
                     : headingValue == null ? "" : headingValue.toString().trim();
             boolean useDatePicker = !documentField && dateField.isSelected();
+            boolean useTextArea = !documentField && !useDatePicker && textAreaField.isSelected();
             boolean useDropdown = !documentField && dropdownField.isSelected();
             List<String> options = useDropdown ? optionEditor.values() : List.of();
             String optionsText = String.join("\n", options);
@@ -1105,6 +1135,7 @@ public class FieldManagementView extends JFrame {
                     useDatePicker,
                     useDropdown,
                     useDropdown && variableOption.isSelected(),
+                    useTextArea,
                     optionsText
             );
         }
@@ -1114,6 +1145,7 @@ public class FieldManagementView extends JFrame {
             JPanel form,
             JComboBox<String> category,
             JCheckBox dateField,
+            JCheckBox textAreaField,
             JCheckBox dropdownField,
             JCheckBox variableOption,
             OptionEditorPanel optionEditor,
@@ -1123,7 +1155,11 @@ public class FieldManagementView extends JFrame {
         boolean documents = "Documents".equals(category.getSelectedItem());
         boolean dropdown = !documents && dropdownField.isSelected();
         dateField.setEnabled(!documents);
+        textAreaField.setEnabled(!documents);
         dropdownField.setEnabled(!documents);
+        if (documents || dateField.isSelected() || dropdown) {
+            textAreaField.setSelected(false);
+        }
         variableOption.setVisible(dropdown);
         variableOption.setEnabled(dropdown);
         variableLabel.setVisible(dropdown);
@@ -1211,6 +1247,7 @@ public class FieldManagementView extends JFrame {
             boolean dateField,
             boolean dropdownField,
             boolean variableOptionField,
+            boolean textAreaField,
             String dropdownOptions
     ) {
     }

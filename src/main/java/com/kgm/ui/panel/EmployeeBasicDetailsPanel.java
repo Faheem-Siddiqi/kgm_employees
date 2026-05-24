@@ -3,18 +3,22 @@ package com.kgm.ui.panel;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.DropdownFieldSupport;
+import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.component.UniversalDatePicker;
+import com.kgm.ui.component.UniversalTextArea;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeBasicDetailsPanelHelper;
 import com.kgm.util.CnicFormatter;
+import com.kgm.util.DateDisplayFormatter;
 import com.kgm.util.EmployeeBasicFieldUtil;
+import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.PhoneFormatter;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -22,13 +26,13 @@ import java.util.List;
 import java.util.Map;
 
 public class EmployeeBasicDetailsPanel extends JPanel {
-    private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
+    private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 
     private final List<EmployeeFieldDefinition> definitions = EmployeeBasicFieldUtil.loadBasicDefinitions();
     private final Map<String, JComponent> inputsByColumn = new LinkedHashMap<>();
 
     private JLabel photoPreview;
-    private JLabel uploadLabel;
+    private FileUploadCard photoUploadCard;
     private JLabel infoLabel;
     private File selectedImage;
     private Employee employee;
@@ -76,21 +80,17 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             }
         });
 
-        uploadLabel = new JLabel("Upload");
-        EmployeeBasicDetailsPanelHelper.styleUploadLabel(uploadLabel);
-        uploadLabel.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                if (selectedImageCanChange()) {
-                    chooseImage(photoPreview);
-                }
+        photoUploadCard = new FileUploadCard("Employee Photo", "JPEG only - Max 400KB", "Choose");
+        photoUploadCard.addActionListener(event -> {
+            if (selectedImageCanChange()) {
+                chooseImage(photoPreview);
             }
         });
 
         JPanel bottom = EmployeeBasicDetailsPanelHelper.createPhotoInfoPanel();
-        infoLabel = EmployeeBasicDetailsPanelHelper.createPhotoInfoLabel("JPEG only - Max 400KB");
-        bottom.add(infoLabel);
-        bottom.add(Box.createVerticalStrut(5));
-        bottom.add(uploadLabel);
+        infoLabel = EmployeeBasicDetailsPanelHelper.createPhotoInfoLabel("");
+        infoLabel.setVisible(false);
+        bottom.add(photoUploadCard);
 
         left.add(photoPreview, BorderLayout.CENTER);
         left.add(bottom, BorderLayout.SOUTH);
@@ -107,13 +107,18 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         int row = 0;
         for (int index = 0; index < definitions.size(); index += 2) {
             EmployeeFieldDefinition first = definitions.get(index);
-            if (EmployeeBasicFieldUtil.isMultilineField(first.columnName())) {
+            EmployeeFieldDefinition second = index + 1 < definitions.size() ? definitions.get(index + 1) : null;
+            if (EmployeeBasicFieldUtil.isMultilineField(first)
+                    && (second == null || !EmployeeBasicFieldUtil.isMultilineField(second))) {
                 addFullWidthField(panel, gbc, row++, first);
+                if (second != null) {
+                    addSingleField(panel, gbc, row++, second);
+                }
                 continue;
             }
-
-            EmployeeFieldDefinition second = index + 1 < definitions.size() ? definitions.get(index + 1) : null;
-            if (second != null && EmployeeBasicFieldUtil.isMultilineField(second.columnName())) {
+            if (second != null
+                    && EmployeeBasicFieldUtil.isMultilineField(second)
+                    && !EmployeeBasicFieldUtil.isMultilineField(first)) {
                 addSingleField(panel, gbc, row++, first);
                 addFullWidthField(panel, gbc, row++, second);
                 continue;
@@ -165,16 +170,15 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             JComboBox<String> combo = new JComboBox<>(EmployeeBasicFieldUtil.dropdownOptions(definition, true));
             DropdownFieldSupport.configure(combo, definition.variableOptionField());
             input = combo;
-        } else if (EmployeeBasicFieldUtil.isMultilineField(column)) {
-            JTextArea area = new JTextArea(4, 20);
-            area.setLineWrap(true);
-            area.setWrapStyleWord(true);
-            EmployeeBasicDetailsPanelHelper.styleTextArea(area);
-            input = EmployeeBasicDetailsPanelHelper.createTextAreaScrollPane(area);
+        } else if (EmployeeBasicFieldUtil.isMultilineField(definition)) {
+            input = new UniversalTextArea();
         } else {
             input = new JTextField();
             if ("NID".equalsIgnoreCase(column)) {
                 CnicFormatter.installFormatter((JTextField) input);
+            }
+            if ("EMP_CONTNO".equalsIgnoreCase(column)) {
+                PhoneFormatter.installFormatter((JTextField) input);
             }
         }
 
@@ -213,6 +217,8 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             } else if (combo.getItemCount() > 0) {
                 combo.setSelectedIndex(0);
             }
+        } else if (input instanceof UniversalTextArea area) {
+            area.setText(displayValue(value));
         } else if (input instanceof JScrollPane scrollPane
                 && scrollPane.getViewport().getView() instanceof JTextArea area) {
             area.setText(displayValue(value));
@@ -226,16 +232,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             return null;
         }
 
-        String[] patterns = {"yyyy-MM-dd", "dd-MM-yyyy HH:mm", "dd-MM-yyyy", "yyyy/MM/dd", "dd/MM/yyyy"};
-        for (String pattern : patterns) {
-            try {
-                SimpleDateFormat format = new SimpleDateFormat(pattern);
-                format.setLenient(false);
-                return format.parse(value.trim());
-            } catch (ParseException ignored) {
-            }
-        }
-        return null;
+        return DateDisplayFormatter.parse(value);
     }
 
     private void loadProfileImage() {
@@ -271,7 +268,9 @@ public class EmployeeBasicDetailsPanel extends JPanel {
 
     private void lockProfileImageUpload() {
         photoPreview.setCursor(Cursor.getDefaultCursor());
-        uploadLabel.setVisible(false);
+        if (photoUploadCard != null) {
+            photoUploadCard.setVisible(false);
+        }
         if (infoLabel != null) {
             infoLabel.setVisible(false);
         }
@@ -290,17 +289,18 @@ public class EmployeeBasicDetailsPanel extends JPanel {
     }
 
     private void chooseImage(JLabel target) {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                "JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg"));
-        chooser.setAcceptAllFileFilterUsed(false);
-        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+        File file = FileUploadCard.chooseFile(
+                this,
+                "Upload Employee Photo",
+                FileUploadCard.jpegImages()
+        );
+        if (file == null) {
             return;
         }
 
-        File file = chooser.getSelectedFile();
-        if (file.length() > 400 * 1024) {
-            DialogHelper.warning(this, "File Too Large", "Max 400KB allowed.");
+        String validationMessage = EmployeeDocumentUtil.validateImageFile(file);
+        if (validationMessage != null) {
+            DialogHelper.warning(this, "Invalid Image", validationMessage);
             return;
         }
         try {
@@ -316,7 +316,9 @@ public class EmployeeBasicDetailsPanel extends JPanel {
                     Image.SCALE_SMOOTH);
             target.setIcon(new ImageIcon(scaled));
             target.setText("");
-            uploadLabel.setText("Replace before saving");
+            if (photoUploadCard != null) {
+                photoUploadCard.setStatus(file.getName());
+            }
         } catch (Exception e) {
             DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
         }
@@ -363,6 +365,9 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         }
         if (input instanceof JComboBox<?> combo) {
             return DropdownFieldSupport.value(combo);
+        }
+        if (input instanceof UniversalTextArea area) {
+            return area.getText().trim();
         }
         if (input instanceof JScrollPane scrollPane
                 && scrollPane.getViewport().getView() instanceof JTextArea area) {

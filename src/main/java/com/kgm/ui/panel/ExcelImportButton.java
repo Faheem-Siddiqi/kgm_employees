@@ -9,7 +9,7 @@ public class ExcelImportButton extends JButton {
     private final Color hoverGreen = new Color(85, 170, 105);
 
     public ExcelImportButton(Runnable onClick) {
-        super("Import Excel");
+        super("Excel Services");
 
         // ================= SAP STYLE =================
         setFont(new Font("Segoe UI", Font.PLAIN, 12));
@@ -66,7 +66,6 @@ public class ExcelImportButton extends JButton {
 
     @Override
     protected void paintBorder(Graphics g) {
-        // No border (clean SAP Fiori look)
     }
 
     // ================= OPTIONAL WRAPPER (TOP RIGHT) =================
