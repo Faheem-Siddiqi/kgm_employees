@@ -22,6 +22,8 @@ import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
@@ -30,6 +32,7 @@ public class HomeView extends JFrame {
     private final ExcelExportService excelExportService = new ExcelExportService();
     private EmployeeTablePanel tablePanel;
     private HomeStatsPanel statsPanel;
+    private JScrollPane mainScrollPane;
     private ExcelImportButton excelBtn;
     private JButton refreshBtn;
     private boolean homeDataLoading;
@@ -161,7 +164,8 @@ public class HomeView extends JFrame {
         JPanel mainContent = HomeViewHelper.createMainContentPanel();
         mainContent.add(northContainer, BorderLayout.NORTH);
         mainContent.add(body, BorderLayout.CENTER);
-        add(HomeViewHelper.createMainScrollPane(mainContent), BorderLayout.CENTER);
+        mainScrollPane = HomeViewHelper.createMainScrollPane(mainContent);
+        add(mainScrollPane, BorderLayout.CENTER);
         add(new FooterPanel(), BorderLayout.SOUTH);
 
         setVisible(true);
@@ -183,6 +187,10 @@ public class HomeView extends JFrame {
         if (parts.length < 2) {
             return;
         }
+        if ("MULTI".equalsIgnoreCase(parts[0])) {
+            handleMultiColumnShowInTable(parts);
+            return;
+        }
         String columnName = parts[0];
         String value = parts[1];
         String displayLabel = parts.length >= 3 ? parts[2] : columnName;
@@ -193,6 +201,49 @@ public class HomeView extends JFrame {
         } else {
             tablePanel.filterByColumn(columnName, value, displayLabel);
         }
+        scrollToEmployeeTable();
+    }
+
+    private void handleMultiColumnShowInTable(String[] parts) {
+        if (parts.length < 5) {
+            return;
+        }
+        String displayLabel = parts[1];
+        Map<String, String> criteria = new LinkedHashMap<>();
+        for (int index = 2; index + 1 < parts.length; index += 2) {
+            String column = parts[index];
+            String value = parts[index + 1];
+            if (column == null || column.isBlank() || value == null || value.isBlank()) {
+                continue;
+            }
+            criteria.put(column, value);
+        }
+        if (!criteria.isEmpty()) {
+            tablePanel.filterByColumns(criteria, displayLabel);
+            scrollToEmployeeTable();
+        }
+    }
+
+    private void scrollToEmployeeTable() {
+        SwingUtilities.invokeLater(() -> {
+            if (mainScrollPane == null || tablePanel == null) {
+                return;
+            }
+            Component view = mainScrollPane.getViewport().getView();
+            if (!(view instanceof JComponent viewComponent)) {
+                tablePanel.scrollRectToVisible(new Rectangle(0, 0, tablePanel.getWidth(), tablePanel.getHeight()));
+                return;
+            }
+
+            Rectangle tableBounds = SwingUtilities.convertRectangle(
+                    tablePanel.getParent(),
+                    tablePanel.getBounds(),
+                    viewComponent
+            );
+            tableBounds.y = Math.max(0, tableBounds.y - 12);
+            tableBounds.height = Math.min(Math.max(1, tablePanel.getHeight()), mainScrollPane.getViewport().getHeight());
+            viewComponent.scrollRectToVisible(tableBounds);
+        });
     }
 
     private void searchEmployeeAsync(String employeeCode) {

@@ -1,3 +1,4 @@
 com\kgm\config\DatabaseConfig.class
 com\kgm\config\DatabaseConnection.class
 com\kgm\Main.class
+com\kgm\ui\styling\UniversalDialogHelper$1.class

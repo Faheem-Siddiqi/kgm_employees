@@ -9,8 +9,10 @@ import com.kgm.util.DateDisplayFormatter;
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public class EmployeeTablePanel extends JPanel {
@@ -131,10 +133,16 @@ public class EmployeeTablePanel extends JPanel {
      * Supported columns: DEPARTMENT, GRADE, DESIGNATION, RESIGN_REASON
      */
     public void filterByColumn(String columnName, String value, String filterLabel) {
+        Map<String, String> criteria = new LinkedHashMap<>();
+        criteria.put(columnName, value);
+        filterByColumns(criteria, filterLabel);
+    }
+
+    public void filterByColumns(Map<String, String> criteria, String filterLabel) {
         this.activeFilterLabel = filterLabel;
         displayedEmployees.clear();
         for (Employee emp : loadedEmployees) {
-            if (matchesFilter(emp, columnName, value)) {
+            if (matchesFilters(emp, criteria)) {
                 displayedEmployees.add(emp);
             }
         }
@@ -144,6 +152,18 @@ public class EmployeeTablePanel extends JPanel {
         if (onFilterChanged != null) {
             onFilterChanged.accept(filterLabel);
         }
+    }
+
+    private boolean matchesFilters(Employee emp, Map<String, String> criteria) {
+        if (criteria == null || criteria.isEmpty()) {
+            return true;
+        }
+        for (Map.Entry<String, String> entry : criteria.entrySet()) {
+            if (!matchesFilter(emp, entry.getKey(), entry.getValue())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -169,6 +189,12 @@ public class EmployeeTablePanel extends JPanel {
         switch (columnName.toUpperCase(Locale.ROOT)) {
             case "DEPARTMENT":
                 empValue = emp.getDEPARTMENT();
+                break;
+            case "SECTION":
+                empValue = emp.getSECTION();
+                if (empValue == null || empValue.trim().isEmpty() || empValue.equalsIgnoreCase("N/A")) {
+                    empValue = emp.getDynamicField("SECTION");
+                }
                 break;
             case "GRADE":
                 empValue = emp.getGRADE();

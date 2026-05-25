@@ -11,6 +11,7 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
 import java.awt.geom.Arc2D;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -196,9 +197,9 @@ public class HomeStatsChartsPanel extends JPanel {
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
-        String deptFilterValue = selectedDepartment != null ? selectedDepartment : "ALL";
-        JLabel showInTable = createShowInTableLink("DEPARTMENT", deptFilterValue, "Department");
-        actions.add(showInTable);
+        if (selectedDepartment != null) {
+            actions.add(createShowInTableLink("DEPARTMENT", selectedDepartment, selectedDepartment));
+        }
         actions.add(departmentBack);
         titleRow.add(actions, BorderLayout.EAST);
         return chartCard(titleRow, departmentChart);
@@ -242,9 +243,12 @@ public class HomeStatsChartsPanel extends JPanel {
             departmentTitle.setText("Employees by Department");
             departmentChart.setItems(countItems(stats.employeesByDepartment(), HomeStatsChartHelper.BLUE));
             departmentChart.setClickHandler(item -> {
-                if (stats.sectionsByDepartment().containsKey(item.label())) {
+                if (stats.sectionsByDepartment().containsKey(item.label())
+                        && !stats.sectionsByDepartment().get(item.label()).isEmpty()) {
                     selectedDepartment = item.label();
                     rebuildCharts();
+                } else {
+                    showInTable("DEPARTMENT", item.label(), item.label());
                 }
             });
         } else {
@@ -253,7 +257,11 @@ public class HomeStatsChartsPanel extends JPanel {
                     stats.sectionsByDepartment().getOrDefault(selectedDepartment, List.of()),
                     HomeStatsChartHelper.TEAL
             ));
-            departmentChart.setClickHandler(null);
+            departmentChart.setClickHandler(item -> showInTable(
+                    selectedDepartment + " - " + item.label(),
+                    "DEPARTMENT", selectedDepartment,
+                    "SECTION", item.label()
+            ));
         }
         departmentBack.setVisible(selectedDepartment != null);
     }
@@ -270,6 +278,7 @@ public class HomeStatsChartsPanel extends JPanel {
         if (selectedGrade != null) {
             JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
             actions.setOpaque(false);
+            actions.add(createShowInTableLink("GRADE", selectedGrade, "Grade " + selectedGrade));
             // Back button for grade drill-down
             JButton gradeBack = new JButton("Back");
             gradeBack.addActionListener(event -> {
@@ -279,11 +288,6 @@ public class HomeStatsChartsPanel extends JPanel {
             styleSecondaryButton(gradeBack);
             actions.add(gradeBack);
             titleRow.add(actions, BorderLayout.EAST);
-        } else {
-            JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-            footer.setOpaque(false);
-            footer.add(createShowInTableLink("GRADE", "ALL", "Employees by Grade"));
-            titleRow.add(footer, BorderLayout.EAST);
         }
 
         return chartCard(titleRow, gradeChart);
@@ -298,6 +302,8 @@ public class HomeStatsChartsPanel extends JPanel {
                 if (deptsByGrade.containsKey(item.label()) && !deptsByGrade.get(item.label()).isEmpty()) {
                     selectedGrade = item.label();
                     rebuildCharts();
+                } else {
+                    showInTable("GRADE", item.label(), "Grade " + item.label());
                 }
             });
         } else {
@@ -314,7 +320,11 @@ public class HomeStatsChartsPanel extends JPanel {
                 ));
             }
             gradeChart.setItems(deptItems);
-            gradeChart.setClickHandler(null);
+            gradeChart.setClickHandler(item -> showInTable(
+                    "Grade " + selectedGrade + " / " + item.label(),
+                    "GRADE", selectedGrade,
+                    "DEPARTMENT", item.label()
+            ));
         }
     }
 
@@ -339,9 +349,7 @@ public class HomeStatsChartsPanel extends JPanel {
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
-        if (selectedDesignation == null) {
-            actions.add(createShowInTableLink("DESIGNATION", "ALL", "Employees by Designation"));
-        } else {
+        if (selectedDesignation != null) {
             actions.add(createShowInTableLink("DESIGNATION", selectedDesignation, selectedDesignation));
             JButton designationBack = new JButton("Back");
             designationBack.addActionListener(event -> {
@@ -350,8 +358,8 @@ public class HomeStatsChartsPanel extends JPanel {
             });
             styleSecondaryButton(designationBack);
             actions.add(designationBack);
+            titleRow.add(actions, BorderLayout.EAST);
         }
-        titleRow.add(actions, BorderLayout.EAST);
 
         return chartCard(titleRow, designationChart);
     }
@@ -365,6 +373,8 @@ public class HomeStatsChartsPanel extends JPanel {
                 if (!departments.isEmpty()) {
                     selectedDesignation = item.label();
                     rebuildCharts();
+                } else {
+                    showInTable("DESIGNATION", item.label(), item.label());
                 }
             });
             return;
@@ -386,7 +396,11 @@ public class HomeStatsChartsPanel extends JPanel {
             ));
         }
         designationChart.setItems(departmentItems);
-        designationChart.setClickHandler(null);
+        designationChart.setClickHandler(item -> showInTable(
+                selectedDesignation + " / " + item.label(),
+                "DESIGNATION", selectedDesignation,
+                "DEPARTMENT", item.label()
+        ));
     }
 
     private JLabel createShowInTableLink(String columnName, String value, String displayLabel) {
@@ -402,6 +416,23 @@ public class HomeStatsChartsPanel extends JPanel {
             }
         });
         return link;
+    }
+
+    private void showInTable(String columnName, String value, String displayLabel) {
+        if (showInTableHandler != null) {
+            showInTableHandler.accept(columnName + "::" + value + "::" + displayLabel);
+        }
+    }
+
+    private void showInTable(String displayLabel, String... columnValuePairs) {
+        if (showInTableHandler == null || columnValuePairs == null || columnValuePairs.length < 2) {
+            return;
+        }
+        StringBuilder command = new StringBuilder("MULTI::").append(displayLabel);
+        for (int index = 0; index + 1 < columnValuePairs.length; index += 2) {
+            command.append("::").append(columnValuePairs[index]).append("::").append(columnValuePairs[index + 1]);
+        }
+        showInTableHandler.accept(command.toString());
     }
 
     private JPanel missingDataCard() {
@@ -460,11 +491,11 @@ public class HomeStatsChartsPanel extends JPanel {
         } else if ("Documents".equals(selectedMissingGroup)) {
             missingTitle.setText("Missing Documents");
             missingDocsChart.setItems(missingRequirementItems(stats.missingRequiredDocuments(), HomeStatsChartHelper.RED, "employees missing"));
-            missingDocsChart.setClickHandler(null);
+            missingDocsChart.setClickHandler(item -> openMissingDataView());
         } else {
             missingTitle.setText("Missing Required Fields");
             missingDocsChart.setItems(missingRequirementItems(stats.missingRequiredFields(), HomeStatsChartHelper.PURPLE, "employees missing"));
-            missingDocsChart.setClickHandler(null);
+            missingDocsChart.setClickHandler(item -> openMissingDataView());
         }
         missingBack.setVisible(selectedMissingGroup != null);
     }
@@ -505,11 +536,9 @@ public class HomeStatsChartsPanel extends JPanel {
         label.setForeground(HomeStatsChartHelper.TEXT_PRIMARY);
         topRow.add(label, BorderLayout.WEST);
 
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-        footer.setOpaque(false);
-        footer.add(createShowInTableLink(columnName, "ALL", title));
-        topRow.add(footer, BorderLayout.EAST);
-
+        if ("RESIGN_REASON".equalsIgnoreCase(columnName) && chart instanceof DashboardPieChart pieChart) {
+            pieChart.setClickHandler(item -> showInTable(columnName, item.label(), item.label()));
+        }
         card.add(topRow, BorderLayout.NORTH);
         card.add(chartContainer(chart), BorderLayout.CENTER);
         return card;
@@ -525,6 +554,7 @@ public class HomeStatsChartsPanel extends JPanel {
             panel.add(horizontalChartScrollPane(chart), BorderLayout.CENTER);
         } else {
             chart.setPreferredSize(new Dimension(dashboardChart.chartPreferredWidth(), preferredHeight));
+            installChartWheelForwardingOnce(chart);
             panel.add(chart, BorderLayout.CENTER);
         }
         panel.setPreferredSize(new Dimension(HomeStatsChartHelper.CHART_MIN_WIDTH, preferredHeight));
@@ -543,12 +573,100 @@ public class HomeStatsChartsPanel extends JPanel {
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.setOpaque(false);
         scrollPane.getViewport().setOpaque(false);
+        scrollPane.setWheelScrollingEnabled(false);
+        installChartWheelForwarding(scrollPane, chart);
         scrollPane.getHorizontalScrollBar().setUnitIncrement(HomeStatsChartHelper.CHART_SCROLL_UNIT);
         scrollPane.getHorizontalScrollBar().setBlockIncrement(Math.max(
                 HomeStatsChartHelper.CHART_SCROLL_UNIT,
                 HomeStatsChartHelper.CHART_MIN_WIDTH - HomeStatsChartHelper.CHART_SCROLL_BLOCK_GAP
         ));
         return scrollPane;
+    }
+
+    private void installChartWheelForwarding(JScrollPane chartScrollPane, JComponent chart) {
+        chartScrollPane.addMouseWheelListener(event -> forwardChartWheel(event, chartScrollPane));
+        chartScrollPane.getViewport().addMouseWheelListener(event -> forwardChartWheel(event, chartScrollPane));
+        installChartWheelForwardingOnce(chart);
+    }
+
+    private void installChartWheelForwardingOnce(JComponent chart) {
+        String key = "kgm.chartWheelForwarding";
+        if (Boolean.TRUE.equals(chart.getClientProperty(key))) {
+            return;
+        }
+        chart.putClientProperty(key, true);
+        chart.addMouseWheelListener(event -> forwardChartWheel(event, nearestChartScrollPane(event.getComponent())));
+    }
+
+    private void forwardChartWheel(MouseWheelEvent event, JScrollPane chartScrollPane) {
+        if (event.isConsumed()) {
+            return;
+        }
+        if (chartScrollPane != null && event.isShiftDown() && scrollHorizontalChart(event, chartScrollPane)) {
+            event.consume();
+            return;
+        }
+
+        JScrollPane pageScroll = pageScrollPane(chartScrollPane != null ? chartScrollPane : event.getComponent());
+        if (pageScroll == null) {
+            return;
+        }
+        JScrollBar vertical = pageScroll.getVerticalScrollBar();
+        if (vertical == null || !vertical.isVisible()) {
+            return;
+        }
+
+        int direction = event.getWheelRotation() < 0 ? -1 : 1;
+        int amount = event.getScrollType() == MouseWheelEvent.WHEEL_BLOCK_SCROLL
+                ? event.getWheelRotation() * vertical.getBlockIncrement(direction)
+                : event.getUnitsToScroll() * vertical.getUnitIncrement(direction);
+        int maxValue = vertical.getMaximum() - vertical.getVisibleAmount();
+        int nextValue = Math.max(vertical.getMinimum(), Math.min(maxValue, vertical.getValue() + amount));
+        if (nextValue != vertical.getValue()) {
+            vertical.setValue(nextValue);
+            event.consume();
+        }
+    }
+
+    private boolean scrollHorizontalChart(MouseWheelEvent event, JScrollPane chartScrollPane) {
+        JScrollBar horizontal = chartScrollPane.getHorizontalScrollBar();
+        if (horizontal == null || !horizontal.isVisible()) {
+            return false;
+        }
+        int direction = event.getWheelRotation() < 0 ? -1 : 1;
+        int amount = event.getScrollType() == MouseWheelEvent.WHEEL_BLOCK_SCROLL
+                ? event.getWheelRotation() * horizontal.getBlockIncrement(direction)
+                : event.getUnitsToScroll() * horizontal.getUnitIncrement(direction);
+        int maxValue = horizontal.getMaximum() - horizontal.getVisibleAmount();
+        int nextValue = Math.max(horizontal.getMinimum(), Math.min(maxValue, horizontal.getValue() + amount));
+        if (nextValue == horizontal.getValue()) {
+            return false;
+        }
+        horizontal.setValue(nextValue);
+        return true;
+    }
+
+    private JScrollPane nearestChartScrollPane(Component component) {
+        Container current = component instanceof Container container ? container : component.getParent();
+        while (current != null) {
+            if (current instanceof JScrollPane scrollPane
+                    && scrollPane.getHorizontalScrollBarPolicy() != ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER) {
+                return scrollPane;
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private JScrollPane pageScrollPane(Component component) {
+        Container parent = component == null ? null : component.getParent();
+        while (parent != null) {
+            if (parent instanceof JScrollPane scrollPane) {
+                return scrollPane;
+            }
+            parent = parent.getParent();
+        }
+        return null;
     }
 
     private void addChartCard(

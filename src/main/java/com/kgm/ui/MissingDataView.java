@@ -2,15 +2,16 @@ package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.ui.panel.FooterPanel;
+import com.kgm.ui.panel.GenericRecordTablePanel;
 import com.kgm.ui.panel.HeaderPanel;
-import com.kgm.ui.panel.UniversalTablePanel;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.util.DateDisplayFormatter;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 
 public class MissingDataView extends JFrame {
     private static final int EMPLOYEE_CODE_COLUMN = 0;
@@ -30,11 +31,12 @@ public class MissingDataView extends JFrame {
             "Action"
     };
 
-    private final UniversalTablePanel tablePanel = new UniversalTablePanel(
+    private final GenericRecordTablePanel<EmployeeRecordDao.MissingEmployeeRow> tablePanel = new GenericRecordTablePanel<>(
             COLUMNS,
-            "No missing required employee data"
+            "No missing required employee data",
+            this::toRow
     );
-    private final List<EmployeeRecordDao.MissingEmployeeRow> rows = new ArrayList<>();
+    private SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> loadWorker;
 
     public MissingDataView() {
         setTitle("Missing Required Data");
@@ -50,12 +52,23 @@ public class MissingDataView extends JFrame {
 
         JPanel centerWrapper = EmployeeRegistrationViewHelper.createCenterWrapper();
         centerWrapper.add(createTitleRow(), pageConstraints(0, 0));
-        centerWrapper.add(createTablePanel(), pageConstraints(1, 8));
-        add(EmployeeRegistrationViewHelper.createPageScrollPane(centerWrapper), BorderLayout.CENTER);
+        centerWrapper.add(createTablePanel(), pageConstraints(1, 16));
+
+        JScrollPane pageScroll = EmployeeRegistrationViewHelper.createPageScrollPane(centerWrapper);
+
+        // Allows horizontal scrolling when table content becomes wider than screen.
+        pageScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        pageScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+
+        EmployeeRegistrationViewHelper.installPageWheelForwarding(pageScroll, centerWrapper);
+
+        add(pageScroll, BorderLayout.CENTER);
         add(new FooterPanel(), BorderLayout.SOUTH);
 
-        reload();
+        showLoading("Preparing missing required data...");
         setVisible(true);
+
+        SwingUtilities.invokeLater(this::reloadAsync);
     }
 
     private JPanel createTitleRow() {
@@ -69,9 +82,11 @@ public class MissingDataView extends JFrame {
 
         JLabel title = new JLabel("Employees Missing Required Data");
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+
         JLabel subtitle = new JLabel("Shows employees missing required Field Management values or required document uploads in Graph");
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         subtitle.setForeground(new Color(99, 115, 129));
+
         titleBlock.add(title);
         titleBlock.add(Box.createVerticalStrut(3));
         titleBlock.add(subtitle);
@@ -85,17 +100,21 @@ public class MissingDataView extends JFrame {
 
         row.add(titleBlock, BorderLayout.WEST);
         row.add(dashboard, BorderLayout.EAST);
+
         return row;
     }
 
     private JPanel createTablePanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.WHITE);
-        panel.setBorder(BorderFactory.createEmptyBorder(0, 28, 8, 28));
+
+        // Extra bottom spacing prevents the first/only row from looking cut.
+        panel.setBorder(BorderFactory.createEmptyBorder(0, 28, 28, 28));
 
         tablePanel.setLinkColumn(EMPLOYEE_CODE_COLUMN, this::openEmployeeDetail, true);
         tablePanel.setActionColumn(ACTION_COLUMN, "View", this::openEmployeeDetail);
         tablePanel.setWrappedTextColumn(MISSING_COLUMN);
+
         tablePanel.setColumnAlignment(1, SwingConstants.LEFT);
         tablePanel.setColumnAlignment(2, SwingConstants.LEFT);
         tablePanel.setColumnAlignment(3, SwingConstants.LEFT);
@@ -104,47 +123,113 @@ public class MissingDataView extends JFrame {
         tablePanel.setColumnAlignment(6, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(7, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(8, SwingConstants.CENTER);
-        tablePanel.setPreferredColumnWidthLimit(MISSING_COLUMN, 420);
-        tablePanel.setPreferredColumnWidthLimit(5, 220);
-        tablePanel.setPaginationBottomGap(5);
 
-        panel.add(tablePanel, BorderLayout.NORTH);
+        // Wider important columns so long missing-field text is readable.
+        tablePanel.setPreferredColumnWidthLimit(MISSING_COLUMN, 560);
+        tablePanel.setPreferredColumnWidthLimit(5, 240);
+
+        // More bottom gap under pagination/table area.
+        tablePanel.setPaginationBottomGap(18);
+
+        // Minimum/preferred size gives the table stable height and allows page-level horizontal scroll.
+        tablePanel.setMinimumSize(new Dimension(1250, 180));
+        tablePanel.setPreferredSize(new Dimension(1250, 240));
+
+        // Keep loader and loaded data in same stable area.
+        panel.add(tablePanel, BorderLayout.CENTER);
+
         return panel;
     }
 
-    private void reload() {
-        rows.clear();
-        try (EmployeeRecordDao repo = new EmployeeRecordDao()) {
-            rows.addAll(repo.missingRequiredDataRows());
-        }
-        tablePanel.setRows(toRows(rows));
+    private void showLoading(String message) {
+        tablePanel.setEmptyText(message == null || message.isBlank()
+                ? "Loading missing required data..."
+                : message.trim());
+
+        tablePanel.clearRows();
+        tablePanel.revalidate();
+        tablePanel.repaint();
     }
 
-    private List<Object[]> toRows(List<EmployeeRecordDao.MissingEmployeeRow> missingRows) {
-        List<Object[]> tableRows = new ArrayList<>();
-        for (EmployeeRecordDao.MissingEmployeeRow row : missingRows) {
-            tableRows.add(new Object[]{
-                    row.employeeCode(),
-                    row.name(),
-                    row.missingItems(),
-                    row.designation(),
-                    row.grade(),
-                    formatDepartment(row),
-                    DateDisplayFormatter.format(row.joiningDate()),
-                    DateDisplayFormatter.format(row.resignationDate()),
-                    row.phoneNumber(),
-                    "View"
-            });
+    private void reloadAsync() {
+        if (loadWorker != null && !loadWorker.isDone()) {
+            loadWorker.cancel(true);
         }
-        return tableRows;
+
+        showLoading("Loading employees with missing required data...");
+
+        SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected List<EmployeeRecordDao.MissingEmployeeRow> doInBackground() {
+                try (EmployeeRecordDao repo = new EmployeeRecordDao()) {
+                    return repo.missingRequiredDataRows();
+                }
+            }
+
+            @Override
+            protected void done() {
+                if (isCancelled()) {
+                    return;
+                }
+
+                try {
+                    tablePanel.setEmptyText("No missing required employee data");
+                    tablePanel.setRows(get());
+
+                    tablePanel.revalidate();
+                    tablePanel.repaint();
+                } catch (CancellationException ignored) {
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    showLoadFailed("Missing required data loading was interrupted.");
+                } catch (ExecutionException exception) {
+                    exception.printStackTrace();
+                    showLoadFailed("Missing required data could not be loaded.");
+                } finally {
+                    if (loadWorker == this) {
+                        loadWorker = null;
+                    }
+                }
+            }
+        };
+
+        loadWorker = worker;
+        worker.execute();
+    }
+
+    private void showLoadFailed(String message) {
+        tablePanel.setEmptyText(message == null || message.isBlank()
+                ? "Missing required data could not be loaded."
+                : message.trim());
+
+        tablePanel.clearRows();
+        tablePanel.revalidate();
+        tablePanel.repaint();
+    }
+
+    private Object[] toRow(EmployeeRecordDao.MissingEmployeeRow row) {
+        return new Object[]{
+                row.employeeCode(),
+                row.name(),
+                row.missingItems(),
+                row.designation(),
+                row.grade(),
+                formatDepartment(row),
+                DateDisplayFormatter.format(row.joiningDate()),
+                DateDisplayFormatter.format(row.resignationDate()),
+                row.phoneNumber(),
+                "View"
+        };
     }
 
     private String formatDepartment(EmployeeRecordDao.MissingEmployeeRow row) {
         String department = clean(row.department());
         String section = clean(row.section());
+
         if (department.isBlank()) {
             return "";
         }
+
         return section.isBlank() ? department : department + " - " + section;
     }
 
@@ -152,26 +237,34 @@ public class MissingDataView extends JFrame {
         if (value == null || value.isBlank() || value.equalsIgnoreCase("N/A")) {
             return "";
         }
+
         return value.trim();
     }
 
-    private void openEmployeeDetail(int row) {
-        if (row < 0 || row >= rows.size()) {
+    private void openEmployeeDetail(EmployeeRecordDao.MissingEmployeeRow row) {
+        if (row == null) {
             return;
         }
-        String employeeCode = rows.get(row).employeeCode();
+
+        String employeeCode = row.employeeCode();
+
         new EmployeeDetailView(employeeCode);
         SwingUtilities.invokeLater(this::dispose);
     }
 
     private GridBagConstraints pageConstraints(int y, int bottomGap) {
         GridBagConstraints gbc = new GridBagConstraints();
+
         gbc.gridx = 0;
         gbc.gridy = y;
         gbc.insets = new Insets(0, 0, bottomGap, 0);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.NORTH;
         gbc.weightx = 1.0;
+
+        // Keeps extra vertical space below the table instead of centering loaded data.
+        gbc.weighty = y == 1 ? 1.0 : 0.0;
+
         return gbc;
     }
 }
