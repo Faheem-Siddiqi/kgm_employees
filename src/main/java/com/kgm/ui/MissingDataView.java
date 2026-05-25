@@ -31,11 +31,13 @@ public class MissingDataView extends JFrame {
             "Action"
     };
 
-    private final GenericRecordTablePanel<EmployeeRecordDao.MissingEmployeeRow> tablePanel = new GenericRecordTablePanel<>(
-            COLUMNS,
-            "No missing required employee data",
-            this::toRow
-    );
+    private final GenericRecordTablePanel<EmployeeRecordDao.MissingEmployeeRow> tablePanel =
+            new GenericRecordTablePanel<>(
+                    COLUMNS,
+                    "No missing required employee data",
+                    this::toRow
+            );
+
     private SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> loadWorker;
 
     public MissingDataView() {
@@ -45,25 +47,11 @@ public class MissingDataView extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        JPanel top = new JPanel(new BorderLayout());
-        top.setBackground(Color.WHITE);
-        top.add(new HeaderPanel("Missing Required Data"), BorderLayout.NORTH);
-        add(top, BorderLayout.NORTH);
-
-        JPanel centerWrapper = EmployeeRegistrationViewHelper.createCenterWrapper();
-        centerWrapper.add(createTitleRow(), pageConstraints(0, 0));
-        centerWrapper.add(createTablePanel(), pageConstraints(1, 16));
-
-        JScrollPane pageScroll = EmployeeRegistrationViewHelper.createPageScrollPane(centerWrapper);
-
-        // Allows horizontal scrolling when table content becomes wider than screen.
-        pageScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        pageScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-
-        EmployeeRegistrationViewHelper.installPageWheelForwarding(pageScroll, centerWrapper);
-
-        add(pageScroll, BorderLayout.CENTER);
+        add(createHeader(), BorderLayout.NORTH);
+        add(createMainContent(), BorderLayout.CENTER);
         add(new FooterPanel(), BorderLayout.SOUTH);
+
+        configureTable();
 
         showLoading("Preparing missing required data...");
         setVisible(true);
@@ -71,25 +59,44 @@ public class MissingDataView extends JFrame {
         SwingUtilities.invokeLater(this::reloadAsync);
     }
 
-    private JPanel createTitleRow() {
-        JPanel row = new JPanel(new BorderLayout());
-        row.setBackground(Color.WHITE);
-        row.setBorder(BorderFactory.createEmptyBorder(25, 28, 16, 28));
+    private JPanel createHeader() {
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(Color.WHITE);
+        header.add(new HeaderPanel("Missing Required Data"), BorderLayout.NORTH);
+        return header;
+    }
 
-        JPanel titleBlock = new JPanel();
-        titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
-        titleBlock.setBackground(Color.WHITE);
+    private JPanel createMainContent() {
+        JPanel main = new JPanel(new BorderLayout());
+        main.setBackground(Color.WHITE);
+        main.setBorder(BorderFactory.createEmptyBorder(24, 28, 28, 28));
+
+        main.add(createTitleRow(), BorderLayout.NORTH);
+        main.add(createTableSection(), BorderLayout.CENTER);
+
+        return main;
+    }
+
+    private JPanel createTitleRow() {
+        JPanel row = new JPanel(new BorderLayout(18, 0));
+        row.setBackground(Color.WHITE);
+        row.setBorder(BorderFactory.createEmptyBorder(0, 0, 18, 0));
+
+        JPanel textBlock = new JPanel();
+        textBlock.setLayout(new BoxLayout(textBlock, BoxLayout.Y_AXIS));
+        textBlock.setBackground(Color.WHITE);
 
         JLabel title = new JLabel("Employees Missing Required Data");
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        title.setForeground(new Color(17, 24, 39));
 
-        JLabel subtitle = new JLabel("Shows employees missing required Field Management values or required document uploads in Graph");
+        JLabel subtitle = new JLabel("Review employees with missing required fields or required documents.");
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         subtitle.setForeground(new Color(99, 115, 129));
 
-        titleBlock.add(title);
-        titleBlock.add(Box.createVerticalStrut(3));
-        titleBlock.add(subtitle);
+        textBlock.add(title);
+        textBlock.add(Box.createVerticalStrut(4));
+        textBlock.add(subtitle);
 
         JButton dashboard = new JButton("Dashboard");
         EmployeeRegistrationViewHelper.styleBackButton(dashboard);
@@ -98,19 +105,32 @@ public class MissingDataView extends JFrame {
             dispose();
         });
 
-        row.add(titleBlock, BorderLayout.WEST);
+        row.add(textBlock, BorderLayout.WEST);
         row.add(dashboard, BorderLayout.EAST);
 
         return row;
     }
 
-    private JPanel createTablePanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.WHITE);
+    private JPanel createTableSection() {
+        JPanel section = new JPanel(new BorderLayout());
+        section.setBackground(Color.WHITE);
 
-        // Extra bottom spacing prevents the first/only row from looking cut.
-        panel.setBorder(BorderFactory.createEmptyBorder(0, 28, 28, 28));
+        /*
+         * Main screen has no scroll.
+         * Only this table area can scroll horizontally/vertically if table content needs it.
+         */
+        JScrollPane tableScroll = new JScrollPane(tablePanel);
+        tableScroll.setBorder(BorderFactory.createEmptyBorder());
+        tableScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        tableScroll.getViewport().setBackground(Color.WHITE);
 
+        section.add(tableScroll, BorderLayout.CENTER);
+
+        return section;
+    }
+
+    private void configureTable() {
         tablePanel.setLinkColumn(EMPLOYEE_CODE_COLUMN, this::openEmployeeDetail, true);
         tablePanel.setActionColumn(ACTION_COLUMN, "View", this::openEmployeeDetail);
         tablePanel.setWrappedTextColumn(MISSING_COLUMN);
@@ -124,21 +144,17 @@ public class MissingDataView extends JFrame {
         tablePanel.setColumnAlignment(7, SwingConstants.CENTER);
         tablePanel.setColumnAlignment(8, SwingConstants.CENTER);
 
-        // Wider important columns so long missing-field text is readable.
         tablePanel.setPreferredColumnWidthLimit(MISSING_COLUMN, 560);
         tablePanel.setPreferredColumnWidthLimit(5, 240);
 
-        // More bottom gap under pagination/table area.
         tablePanel.setPaginationBottomGap(18);
 
-        // Minimum/preferred size gives the table stable height and allows page-level horizontal scroll.
-        tablePanel.setMinimumSize(new Dimension(1250, 180));
-        tablePanel.setPreferredSize(new Dimension(1250, 240));
-
-        // Keep loader and loaded data in same stable area.
-        panel.add(tablePanel, BorderLayout.CENTER);
-
-        return panel;
+        /*
+         * Important:
+         * No fixed height.
+         * Width is allowed to be wider than screen so table scroll can show horizontal scrollbar.
+         */
+        tablePanel.setPreferredSize(new Dimension(1250, tablePanel.getPreferredSize().height));
     }
 
     private void showLoading(String message) {
@@ -147,8 +163,7 @@ public class MissingDataView extends JFrame {
                 : message.trim());
 
         tablePanel.clearRows();
-        tablePanel.revalidate();
-        tablePanel.repaint();
+        refreshTable();
     }
 
     private void reloadAsync() {
@@ -175,9 +190,7 @@ public class MissingDataView extends JFrame {
                 try {
                     tablePanel.setEmptyText("No missing required employee data");
                     tablePanel.setRows(get());
-
-                    tablePanel.revalidate();
-                    tablePanel.repaint();
+                    refreshTable();
                 } catch (CancellationException ignored) {
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
@@ -203,6 +216,10 @@ public class MissingDataView extends JFrame {
                 : message.trim());
 
         tablePanel.clearRows();
+        refreshTable();
+    }
+
+    private void refreshTable() {
         tablePanel.revalidate();
         tablePanel.repaint();
     }
@@ -246,25 +263,7 @@ public class MissingDataView extends JFrame {
             return;
         }
 
-        String employeeCode = row.employeeCode();
-
-        new EmployeeDetailView(employeeCode);
+        new EmployeeDetailView(row.employeeCode());
         SwingUtilities.invokeLater(this::dispose);
     }
-
-    private GridBagConstraints pageConstraints(int y, int bottomGap) {
-        GridBagConstraints gbc = new GridBagConstraints();
-
-        gbc.gridx = 0;
-        gbc.gridy = y;
-        gbc.insets = new Insets(0, 0, bottomGap, 0);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.NORTH;
-        gbc.weightx = 1.0;
-
-        // Keeps extra vertical space below the table instead of centering loaded data.
-        gbc.weighty = y == 1 ? 1.0 : 0.0;
-
-        return gbc;
-    }
-}
+}   
