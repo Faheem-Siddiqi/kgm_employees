@@ -311,7 +311,7 @@ public class EmployeeFieldDefinitionDao {
     public List<EmployeeFieldDefinition> listDocumentFields() {
         List<EmployeeFieldDefinition> definitions = new ArrayList<>();
         for (EmployeeFieldDefinition definition : listFields()) {
-            if (definition.documentField() && definition.customField()) {
+            if (definition.documentField()) {
                 definitions.add(definition);
             }
         }
@@ -871,7 +871,8 @@ public class EmployeeFieldDefinitionDao {
             } else {
                 insertMetadataReplace(knownCustom);
             }
-            if (EmployeeAdditionalFieldDefaults.isSeededColumn(column)) {
+            if (EmployeeAdditionalFieldDefaults.isSeededColumn(column)
+                    && shouldApplySeededDefaults(knownCustom, existing == null)) {
                 applyValueDefaultsForType(
                         knownCustom.columnName(),
                         knownCustom.documentField(),
@@ -902,6 +903,28 @@ public class EmployeeFieldDefinitionDao {
                 ps.setString(index + 1, requiredColumns.get(index));
             }
             ps.executeUpdate();
+        }
+    }
+
+    private boolean shouldApplySeededDefaults(
+            EmployeeFieldDefinition definition,
+            boolean metadataWasMissing
+    ) throws SQLException {
+        if (metadataWasMissing) {
+            return true;
+        }
+        if (definition.documentField() || !columnExists(definition.columnName())) {
+            return false;
+        }
+        if (definition.dateField()) {
+            return false;
+        }
+
+        String quoted = quoteIdentifier(definition.columnName());
+        String sql = "SELECT 1 FROM employees WHERE " + quoted + " IS NOT NULL AND TRIM(" + quoted + ") <> '' LIMIT 1";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            return !rs.next();
         }
     }
 

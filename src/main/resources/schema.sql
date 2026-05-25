@@ -216,6 +216,7 @@ CREATE TABLE IF NOT EXISTS employee_field_metadata (
     dropdown_field TINYINT(1) NOT NULL DEFAULT 0,
     variable_option_field TINYINT(1) NOT NULL DEFAULT 0,
     text_area_field TINYINT(1) NOT NULL DEFAULT 0,
+    required_field TINYINT(1) NOT NULL DEFAULT 0,
     dropdown_options TEXT,
     sort_order INT NOT NULL DEFAULT 0,
     PRIMARY KEY (column_name)

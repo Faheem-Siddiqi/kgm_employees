@@ -1,6 +1,8 @@
 package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRecordDao;
+import com.kgm.database.DatabaseInitializer;
+import com.kgm.model.Employee;
 import com.kgm.service.ExcelExportService;
 import com.kgm.service.ExcelImportService;
 import com.kgm.service.ExcelSampleGenerator;
@@ -20,6 +22,7 @@ import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
 public class HomeView extends JFrame {
@@ -373,6 +376,8 @@ public class HomeView extends JFrame {
         SwingWorker<HomeTableData, String> worker = new SwingWorker<>() {
             @Override
             protected HomeTableData doInBackground() {
+                publish("Preparing database and field settings...");
+                DatabaseInitializer.init();
                 publish("Loading employee table...");
                 try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
                     java.util.List<Employee> employees = dao.getEmployeeSummaries();
@@ -405,6 +410,10 @@ public class HomeView extends JFrame {
                     statsPanel.setRepository(null);
                     statsPanel.setStats(null);
                     loadDashboardStatsAsync();
+                } catch (CancellationException exception) {
+                    if (latest) {
+                        tablePanel.showLoadFailed("Dashboard loading was cancelled.");
+                    }
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     if (latest) {
@@ -412,10 +421,37 @@ public class HomeView extends JFrame {
                     }
                     DialogHelper.error(HomeView.this, "Dashboard stopped", "Dashboard loading was interrupted.");
                 } catch (ExecutionException exception) {
+                    exception.printStackTrace();
                     if (latest) {
                         tablePanel.showLoadFailed("Dashboard data could not be loaded.");
                     }
-                    DialogHelper.error(HomeView.this, "Dashboard Load Failed", "Dashboard data could not be loaded.");
+                    DialogHelper.error(
+                            HomeView.this,
+                            "Dashboard Load Failed",
+                            "Dashboard data could not be loaded.\n\n" + rootMessage(exception)
+                    );
+                } catch (RuntimeException exception) {
+                    exception.printStackTrace();
+                    if (latest) {
+                        tablePanel.showLoadFailed("Dashboard display could not be prepared.");
+                    }
+                    DialogHelper.error(
+                            HomeView.this,
+                            "Dashboard Display Failed",
+                            "Employee data was fetched, but the dashboard could not be prepared.\n\n"
+                                    + rootMessage(exception)
+                    );
+                } catch (Throwable throwable) {
+                    throwable.printStackTrace();
+                    if (latest) {
+                        tablePanel.showLoadFailed("Dashboard display could not be prepared.");
+                    }
+                    DialogHelper.error(
+                            HomeView.this,
+                            "Dashboard Display Failed",
+                            "Employee data was fetched, but the dashboard could not be prepared.\n\n"
+                                    + rootMessage(throwable)
+                    );
                 } finally {
                     if (latest) {
                         homeDataLoading = false;
@@ -455,7 +491,10 @@ public class HomeView extends JFrame {
                     dashboardStatsLoading = false;
                     dashboardStatsWorker = null;
                 }
-                if (!latest || isCancelled() || !isDisplayable()) {
+                if (!latest || isCancelled()) {
+                    return;
+                }
+                if (!isDisplayable()) {
                     return;
                 }
                 try {
@@ -464,7 +503,19 @@ public class HomeView extends JFrame {
                     Thread.currentThread().interrupt();
                     DialogHelper.error(HomeView.this, "Dashboard analytics stopped", "Dashboard analytics loading was interrupted.");
                 } catch (ExecutionException exception) {
-                    DialogHelper.error(HomeView.this, "Dashboard Analytics Failed", "Dashboard analytics could not be loaded.");
+                    // Log but don't fail completely - table is already showing
+                    exception.printStackTrace();
+                    DialogHelper.error(HomeView.this, "Dashboard Analytics Failed", 
+                            "Dashboard charts could not be loaded, but employee data is displayed.\n\n" + 
+                            (exception.getCause() != null ? exception.getCause().getMessage() : exception.getMessage()));
+                } catch (RuntimeException exception) {
+                    exception.printStackTrace();
+                    DialogHelper.error(
+                            HomeView.this,
+                            "Dashboard Analytics Failed",
+                            "Dashboard charts could not be displayed, but employee data is displayed.\n\n"
+                                    + rootMessage(exception)
+                    );
                 }
             }
         };
@@ -564,6 +615,8 @@ public class HomeView extends JFrame {
                                     + "\nColumns: " + result.columnCount()
                                     + "\nDynamic columns highlighted: " + result.dynamicColumnCount()
                     );
+                    // Reload home data after successful export to refresh the display
+                    reloadHomeData();
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     DialogHelper.error(HomeView.this, "Excel export stopped", "Export was interrupted.");
@@ -777,6 +830,17 @@ public class HomeView extends JFrame {
 
     private String plural(int count) {
         return count == 1 ? "" : "s";
+    }
+
+    private String rootMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null && current.getCause() != null) {
+            current = current.getCause();
+        }
+        String message = current == null ? null : current.getMessage();
+        return message == null || message.isBlank()
+                ? "No additional details were provided."
+                : message.trim();
     }
 
     private void setImportButtonEnabled(boolean enabled) {

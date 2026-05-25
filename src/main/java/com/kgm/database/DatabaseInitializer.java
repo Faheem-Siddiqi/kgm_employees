@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 public class DatabaseInitializer {
+    private static volatile boolean initialized;
+
     private static final String EMPLOYEES_TABLE = """
             CREATE TABLE IF NOT EXISTS employees (
                 ID INT NOT NULL AUTO_INCREMENT,
@@ -330,7 +332,11 @@ public class DatabaseInitializer {
             "EMP_IMG"
     );
 
-    public static void init() {
+    public static synchronized void init() {
+        if (initialized) {
+            return;
+        }
+
         try {
             createDatabaseIfNeeded();
         } catch (SQLException e) {
@@ -355,6 +361,7 @@ public class DatabaseInitializer {
             ensureReportingIndexes(conn);
 
             System.out.println(exists ? "=> MySQL schema already exists." : "=> MySQL schema created.");
+            initialized = true;
 
         } catch (SQLException e) {
             System.out.println("=> MySQL schema failed!");
