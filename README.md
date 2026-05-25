@@ -53,6 +53,7 @@ The project follows a layered desktop-application architecture:
 | File | Functionality |
 | --- | --- |
 | **schema.sql** | Reference MySQL schema for the `employees` table, document path columns, and employee field metadata. |
+| **employee_field_metadata_default.json** | Bundled factory-default field metadata snapshot used only when a fresh/reset database has no valid external AppData metadata backup. |
 
 ---
 
@@ -187,6 +188,7 @@ The project follows a layered desktop-application architecture:
 | **SessionWatcher.java** | Monitors active session expiry and closes/redirects windows when the session is no longer valid. |
 | **EmployeeBasicFieldUtil.java** | Single source of truth for Core employee field order, required-field rules, date/dropdown defaults, and labels used by Add Employee, Basic Detail, and Excel import/sample generation. |
 | **EmployeeAdditionalFieldDefaults.java** | Seeds the 43 ERP/detail custom fields with database columns, Field Management categories, date/dropdown behavior, and Excel sample values. |
+| **EmployeeFieldMetadataStore.java** | Reads/writes validated metadata JSON snapshots for external AppData backup, backup-copy recovery, bundled factory defaults, and local cache refresh. |
 | **EmployeeDocumentUtil.java** | Shared document metadata, validation, path handling, filename matching, and bulk-upload matching for the 22 required document fields. |
 | **FileUtil.java** | Reserved file utility boundary for shared file handling logic. |
 | **FilterUtil.java** | Reserved filtering utility boundary for reusable search/filter behavior. |
@@ -200,6 +202,8 @@ The project follows a layered desktop-application architecture:
 | --- | --- |
 | **images/** | Static UI images such as logo, header, login background, and login foreground artwork. |
 | **employees/** | Runtime/sample employee file storage for profile images and uploaded documents. |
+| **%APPDATA%/KGM Ex-Employee Management/employee_field_metadata.json** | Latest user-change metadata backup. It is written after the DB update succeeds and is used first after a database drop/reset. |
+| **%LOCALAPPDATA%/KGM Ex-Employee Management/cache/employee_field_metadata.cache.json** | Metadata cache for fast reload only. It is ignored whenever its schema version or DB checksum is not fresh. |
 | **target/** | Maven build output. Generated and ignored by Git. |
 
 ---
@@ -257,6 +261,8 @@ The primary table is defined in `src/main/resources/schema.sql` and initialized 
 The app keeps `employees` as the canonical employee row for Excel import/export, reports, and updates, but it no longer treats every screen as a `SELECT *` workflow. `EmployeeRecordDao` exposes header, Basic tab, Others tab, and Documents tab projections so each screen fetches only the columns it needs. Physical mini tables are kept for data that truly has a separate lifecycle, such as `employee_field_metadata`; this avoids unnecessary joins and complex migrations while still improving runtime performance.
 
 Startup also ensures indexes for employee-code lookup and dashboard/reporting group fields (`DEPARTMENT`, `SECTION`, `GRADE`, `DESIGNATION`, and `RESIGN_REASON`) so home statistics and navigation filters stay responsive as the employee table grows.
+
+Field metadata has layered durability. The database remains the active source while the app is running. Every Field Management add/edit/delete, required flag, category, dropdown, label, order, visibility, date, or text-area change writes the DB first, then atomically refreshes `%APPDATA%/KGM Ex-Employee Management/employee_field_metadata.json` and the local cache with schema version, timestamp, checksum, and a backup copy. On startup, the cache is used only when its DB checksum is fresh. If the metadata table is empty after a new setup, reset, or database drop, the initializer restores the latest valid AppData JSON first and recreates missing custom employee columns; it falls back to bundled `employee_field_metadata_default.json` only when the external backup is missing, corrupt, or from an unsupported schema version.
 
 Key schema areas:
 

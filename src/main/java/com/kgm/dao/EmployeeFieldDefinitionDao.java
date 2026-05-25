@@ -4,7 +4,9 @@ import com.kgm.config.DatabaseConnection;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.EmployeeAdditionalFieldDefaults;
 import com.kgm.util.EmployeeBasicFieldUtil;
+import com.kgm.util.EmployeeFieldMetadataStore;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -186,6 +188,83 @@ public class EmployeeFieldDefinitionDao {
         this.conn = conn;
     }
 
+    public static List<EmployeeFieldDefinition> factoryDefaultDefinitions() {
+        List<EmployeeFieldDefinition> definitions = new ArrayList<>();
+        List<EmployeeFieldDefinition> seeded = new ArrayList<>(BUILT_IN_FIELDS);
+        seeded.addAll(EmployeeAdditionalFieldDefaults.definitions());
+        for (EmployeeFieldDefinition builtIn : seeded) {
+            definitions.add(factoryDefaultDefinition(builtIn));
+        }
+        definitions.sort(fieldOrder());
+        return List.copyOf(definitions);
+    }
+
+    private static EmployeeFieldDefinition factoryDefaultDefinition(EmployeeFieldDefinition builtIn) {
+        String column = builtIn.columnName().toUpperCase(Locale.ROOT);
+        boolean core = EmployeeBasicFieldUtil.isBasicField(column);
+        boolean document = builtIn.documentField();
+        boolean internal = "ID".equalsIgnoreCase(column);
+        if (!core && !document && !internal) {
+            return factoryDefaultCustomDefinition(builtIn);
+        }
+
+        boolean defaultDateField = EmployeeBasicFieldUtil.DATE_COLUMNS.contains(column);
+        boolean defaultDropdownField = isDefaultDropdownColumn(column);
+        boolean dateField = !document && defaultDateField;
+        boolean dropdownField = !document && defaultDropdownField;
+        String dropdownOptions = dropdownField ? defaultDropdownOptions(column) : "";
+        boolean textAreaField = !document && !dateField && !dropdownField && defaultTextAreaField(column);
+
+        return new EmployeeFieldDefinition(
+                builtIn.columnName(),
+                builtIn.label(),
+                isFundamentalsHeading(builtIn.heading())
+                        ? EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING
+                        : builtIn.heading(),
+                document,
+                false,
+                true,
+                !document && !core && !internal && builtIn.detailField(),
+                dateField,
+                builtIn.sortOrder(),
+                core,
+                dropdownField,
+                dropdownField && defaultDropdownField,
+                textAreaField,
+                dropdownOptions,
+                defaultRequiredField(builtIn)
+        );
+    }
+
+    private static EmployeeFieldDefinition factoryDefaultCustomDefinition(EmployeeFieldDefinition builtIn) {
+        String heading = isFundamentalsHeading(builtIn.heading())
+                ? EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING
+                : builtIn.heading();
+        boolean fundamentalsField = isFundamentalsHeading(heading);
+        boolean dateField = builtIn.dateField();
+        boolean dropdownField = !dateField && builtIn.dropdownField();
+        boolean textAreaField = !dateField && !dropdownField
+                && (builtIn.textAreaField() || defaultTextAreaField(builtIn.columnName()));
+
+        return new EmployeeFieldDefinition(
+                builtIn.columnName(),
+                builtIn.label(),
+                heading,
+                false,
+                !fundamentalsField,
+                fundamentalsField,
+                !fundamentalsField,
+                dateField,
+                builtIn.sortOrder(),
+                fundamentalsField,
+                dropdownField,
+                dropdownField && builtIn.variableOptionField(),
+                textAreaField,
+                dropdownField ? normalizeOptions(builtIn.dropdownOptions()) : "",
+                false
+        );
+    }
+
     public void ensureMetadata() throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("""
@@ -223,6 +302,9 @@ public class EmployeeFieldDefinitionDao {
                 "TINYINT(1) NOT NULL DEFAULT 0"
         );
 
+        if (metadataRowCount() == 0) {
+            restoreMetadataSnapshot();
+        }
         removeRetiredFields();
         syncBuiltInMetadata();
         if (textAreaFieldColumnAdded) {
@@ -277,7 +359,16 @@ public class EmployeeFieldDefinitionDao {
     public List<EmployeeFieldDefinition> listFields() {
         try {
             syncMetadataWithDatabase();
-            return new ArrayList<>(metadataByColumn().values());
+            List<EmployeeFieldDefinition> dbDefinitions = new ArrayList<>(metadataByColumn().values());
+            String dbChecksum = EmployeeFieldMetadataStore.metadataChecksum(dbDefinitions);
+            repairMetadataBackupIfNeeded(dbDefinitions, dbChecksum);
+
+            return EmployeeFieldMetadataStore.loadFreshCache(dbChecksum)
+                    .<List<EmployeeFieldDefinition>>map(snapshot -> new ArrayList<>(snapshot.definitions()))
+                    .orElseGet(() -> {
+                        writeMetadataCacheSnapshot(dbDefinitions, dbChecksum);
+                        return dbDefinitions;
+                    });
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to load employee field settings.", exception);
         }
@@ -386,6 +477,7 @@ public class EmployeeFieldDefinitionDao {
                     fundamentalsField
             );
             insertMetadataReplace(definition);
+            writeMetadataBackupSnapshot();
             return definition;
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to add employee field: " + exception.getMessage(), exception);
@@ -438,6 +530,7 @@ public class EmployeeFieldDefinitionDao {
             );
             insertMetadataReplace(renamed);
             applyValueDefaultsForType(newColumn, renamed.documentField(), effectiveDateField, renamed.dropdownField());
+            writeMetadataBackupSnapshot();
             return renamed;
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to rename employee field: " + exception.getMessage(), exception);
@@ -529,6 +622,12 @@ public class EmployeeFieldDefinitionDao {
             throw new IllegalStateException("Unable to update employee field defaults: " + exception.getMessage(), exception);
         }
 
+        try {
+            writeMetadataBackupSnapshot();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to save employee field defaults: " + exception.getMessage(), exception);
+        }
+
         return new EmployeeFieldDefinition(
                 current.columnName(),
                 cleanLabel,
@@ -563,6 +662,11 @@ public class EmployeeFieldDefinitionDao {
             ps.executeUpdate();
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to update required field setting: " + exception.getMessage(), exception);
+        }
+        try {
+            writeMetadataBackupSnapshot();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to save required field defaults: " + exception.getMessage(), exception);
         }
         return new EmployeeFieldDefinition(
                 current.columnName(),
@@ -601,6 +705,7 @@ public class EmployeeFieldDefinitionDao {
             if (isFundamentalsHeading(cleanHeading)) {
                 promoteFundamentalsFields();
             }
+            writeMetadataBackupSnapshot();
             return updated;
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to rename category: " + exception.getMessage(), exception);
@@ -651,6 +756,12 @@ public class EmployeeFieldDefinitionDao {
                 ps.executeUpdate();
             }
         }
+
+        List<EmployeeFieldDefinition> dbDefinitions = new ArrayList<>(metadataByColumn().values());
+        repairMetadataBackupIfNeeded(
+                dbDefinitions,
+                EmployeeFieldMetadataStore.metadataChecksum(dbDefinitions)
+        );
     }
 
     private static boolean isRetiredFieldKey(String value) {
@@ -695,7 +806,9 @@ public class EmployeeFieldDefinitionDao {
         try (PreparedStatement ps = conn.prepareStatement(
                 "DELETE FROM employee_field_metadata WHERE UPPER(heading) = UPPER(?)")) {
             ps.setString(1, cleanHeading);
-            return ps.executeUpdate();
+            int deleted = ps.executeUpdate();
+            writeMetadataBackupSnapshot();
+            return deleted;
         } catch (SQLException exception) {
             throw new IllegalStateException("Category columns were deleted, but metadata could not be removed.", exception);
         }
@@ -713,6 +826,7 @@ public class EmployeeFieldDefinitionDao {
                 "DELETE FROM employee_field_metadata WHERE column_name = ?")) {
             ps.setString(1, definition.columnName());
             ps.executeUpdate();
+            writeMetadataBackupSnapshot();
         } catch (SQLException exception) {
             throw new IllegalStateException("Field column was deleted, but its metadata could not be removed.", exception);
         }
@@ -738,6 +852,7 @@ public class EmployeeFieldDefinitionDao {
             ps.setString(3, definition.columnName());
             ps.executeUpdate();
             applyValueDefaultsForType(definition.columnName(), definition.documentField(), effectiveDateField);
+            writeMetadataBackupSnapshot();
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to update date field setting: " + exception.getMessage(), exception);
         }
@@ -838,6 +953,128 @@ public class EmployeeFieldDefinitionDao {
             }
         }
         return fields;
+    }
+
+    private int metadataRowCount() throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM employee_field_metadata");
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+
+    public void saveMetadataBackupSnapshot() {
+        try {
+            writeMetadataBackupSnapshot();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to save employee field metadata backup.", exception);
+        }
+    }
+
+    @Deprecated
+    public void saveMetadataSeedSnapshot() {
+        saveMetadataBackupSnapshot();
+    }
+
+    private void restoreMetadataSnapshot() throws SQLException {
+        List<EmployeeFieldDefinition> definitions;
+        try {
+            definitions = EmployeeFieldMetadataStore.loadRestoreSnapshot().definitions();
+        } catch (IOException | RuntimeException exception) {
+            definitions = factoryDefaultDefinitions();
+        }
+        if (definitions.isEmpty()) {
+            return;
+        }
+
+        for (EmployeeFieldDefinition definition : definitions) {
+            restoreMetadataSnapshotField(definition);
+        }
+    }
+
+    private void restoreMetadataSnapshotField(EmployeeFieldDefinition definition) throws SQLException {
+        String column = definition.normalizedColumnName();
+        if (!validColumnName(column)) {
+            return;
+        }
+
+        boolean addedColumn = false;
+        if (!columnExists(column)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("ALTER TABLE employees ADD COLUMN " + quoteIdentifier(column) + " TEXT");
+            }
+            addedColumn = true;
+        }
+
+        EmployeeFieldDefinition normalized = normalizeRestoredDefinition(definition);
+        insertMetadataReplace(normalized);
+        if (addedColumn) {
+            applyValueDefaultsForType(
+                    normalized.columnName(),
+                    normalized.documentField(),
+                    normalized.dateField(),
+                    normalized.dropdownField()
+            );
+        }
+    }
+
+    private EmployeeFieldDefinition normalizeRestoredDefinition(EmployeeFieldDefinition definition) {
+        boolean documentField = definition.documentField();
+        boolean dateField = !documentField && definition.dateField();
+        boolean dropdownField = !documentField && !dateField && definition.dropdownField();
+        boolean variableOptionField = dropdownField && definition.variableOptionField();
+        boolean textAreaField = !documentField && !dateField && !dropdownField && definition.textAreaField();
+
+        return new EmployeeFieldDefinition(
+                definition.normalizedColumnName(),
+                isBlank(definition.label()) ? titleFromColumn(definition.columnName()) : definition.label().trim(),
+                isBlank(definition.heading())
+                        ? documentField ? "Documents" : "Additional Details"
+                        : definition.heading().trim(),
+                documentField,
+                definition.customField(),
+                definition.protectedField(),
+                !documentField && definition.detailField(),
+                dateField,
+                definition.sortOrder(),
+                !documentField && definition.coreField(),
+                dropdownField,
+                variableOptionField,
+                textAreaField,
+                dropdownField ? normalizeOptions(definition.dropdownOptions()) : "",
+                definition.requiredField()
+        );
+    }
+
+    private void writeMetadataBackupSnapshot() throws SQLException {
+        List<EmployeeFieldDefinition> definitions = new ArrayList<>(metadataByColumn().values());
+        String dbChecksum = EmployeeFieldMetadataStore.metadataChecksum(definitions);
+        try {
+            EmployeeFieldMetadataStore.saveExternalAndCache(definitions, dbChecksum);
+        } catch (IOException | RuntimeException exception) {
+            throw new SQLException("Unable to save employee field metadata backup file.", exception);
+        }
+    }
+
+    private void writeMetadataCacheSnapshot(
+            List<EmployeeFieldDefinition> definitions,
+            String dbChecksum
+    ) {
+        try {
+            EmployeeFieldMetadataStore.saveCache(definitions, dbChecksum);
+        } catch (IOException | RuntimeException exception) {
+            // Cache is an optimization only; DB data can still be returned safely.
+        }
+    }
+
+    private void repairMetadataBackupIfNeeded(
+            List<EmployeeFieldDefinition> definitions,
+            String dbChecksum
+    ) {
+        try {
+            EmployeeFieldMetadataStore.repairExternalAndCacheIfNeeded(definitions, dbChecksum);
+        } catch (IOException | RuntimeException exception) {
+            // DB metadata is still authoritative; startup/listing must not fail because backup repair is unavailable.
+        }
     }
 
     private void syncBuiltInMetadata() throws SQLException {
@@ -944,30 +1181,29 @@ public class EmployeeFieldDefinitionDao {
             EmployeeFieldDefinition builtIn,
             EmployeeFieldDefinition existing
     ) {
-        String column = builtIn.columnName().toUpperCase(Locale.ROOT);
-        boolean seededAdditional = EmployeeAdditionalFieldDefaults.isSeededColumn(column);
-        String label = seededAdditional || existing == null || isBlank(existing.label())
+        String label = existing == null || isBlank(existing.label())
                 ? builtIn.label()
                 : existing.label();
-        String heading = seededAdditional || existing == null || isBlank(existing.heading())
+        String heading = existing == null || isBlank(existing.heading())
                 ? builtIn.heading()
                 : existing.heading();
         if (isFundamentalsHeading(heading)) {
             heading = EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING;
         }
         boolean fundamentalsField = isFundamentalsHeading(heading);
-        boolean dateField = builtIn.dateField() || (existing != null && existing.dateField());
-        boolean dropdownField = !dateField && (builtIn.dropdownField() || (existing != null && existing.dropdownField()));
+        boolean dateField = existing == null ? builtIn.dateField() : existing.dateField();
+        boolean dropdownField = !dateField && (existing == null ? builtIn.dropdownField() : existing.dropdownField());
         boolean variableOptionField = dropdownField
-                && (builtIn.variableOptionField() || (existing != null && existing.variableOptionField()));
+                && (existing == null ? builtIn.variableOptionField() : existing.variableOptionField());
         boolean textAreaField = !dateField && !dropdownField && (
-                builtIn.textAreaField()
-                        || (existing != null ? existing.textAreaField() : defaultTextAreaField(builtIn.columnName()))
+                existing == null
+                        ? builtIn.textAreaField() || defaultTextAreaField(builtIn.columnName())
+                        : existing.textAreaField()
         );
         String dropdownOptions = dropdownField
-                ? !isBlank(builtIn.dropdownOptions())
-                        ? normalizeOptions(builtIn.dropdownOptions())
-                        : existing == null ? "" : normalizeOptions(existing.dropdownOptions())
+                ? existing != null && !isBlank(existing.dropdownOptions())
+                        ? normalizeOptions(existing.dropdownOptions())
+                        : normalizeOptions(builtIn.dropdownOptions())
                 : "";
 
         return new EmployeeFieldDefinition(
@@ -979,7 +1215,7 @@ public class EmployeeFieldDefinitionDao {
                 fundamentalsField,
                 !fundamentalsField,
                 dateField,
-                builtIn.sortOrder(),
+                existing == null ? builtIn.sortOrder() : existing.sortOrder(),
                 fundamentalsField,
                 dropdownField,
                 variableOptionField,
@@ -1096,7 +1332,7 @@ public class EmployeeFieldDefinitionDao {
         return current;
     }
 
-    private boolean defaultRequiredField(EmployeeFieldDefinition builtIn) {
+    private static boolean defaultRequiredField(EmployeeFieldDefinition builtIn) {
         String column = builtIn.columnName().toUpperCase(Locale.ROOT);
         if (builtIn.documentField()) {
             return DEFAULT_REQUIRED_DOCUMENT_COLUMNS.contains(column);
@@ -1156,15 +1392,15 @@ public class EmployeeFieldDefinitionDao {
         return "ID".equalsIgnoreCase(column);
     }
 
-    private boolean isDefaultDropdownColumn(String column) {
+    private static boolean isDefaultDropdownColumn(String column) {
         return "GENDER".equalsIgnoreCase(column) || "RESIGN_REASON".equalsIgnoreCase(column);
     }
 
-    private boolean defaultTextAreaField(String column) {
+    private static boolean defaultTextAreaField(String column) {
         return "CURRENT_ADR".equalsIgnoreCase(column) || "PERMANENT_ADR".equalsIgnoreCase(column);
     }
 
-    private String defaultDropdownOptions(String column) {
+    private static String defaultDropdownOptions(String column) {
         if ("GENDER".equalsIgnoreCase(column)) {
             return "Male\nFemale\nOther";
         }
@@ -1431,6 +1667,10 @@ public class EmployeeFieldDefinitionDao {
 
     private static String normalizeIdentity(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+    private static boolean validColumnName(String columnName) {
+        return columnName != null && columnName.matches("[A-Z][A-Z0-9_]{0,63}");
     }
 
     private static String toColumnName(String label) {

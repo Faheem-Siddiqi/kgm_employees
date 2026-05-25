@@ -357,6 +357,7 @@ public class DatabaseInitializer {
             EmployeeFieldDefinitionDao fieldDefinitionDao = new EmployeeFieldDefinitionDao(conn);
             fieldDefinitionDao.ensureMetadata();
             fieldDefinitionDao.syncMetadataWithDatabase();
+            EmployeeDocumentUtil.refreshDocumentTypes();
             ensureSearchIndexes(conn);
             ensureReportingIndexes(conn);
 
