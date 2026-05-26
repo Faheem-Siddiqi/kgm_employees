@@ -8,8 +8,12 @@ import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 
 public class LoadingOverlay extends JPanel {
+    private static final int CARD_WIDTH = 460;
+    private static final int CONTENT_WIDTH = 386;
+    private static final int PROGRESS_HEIGHT = 18;
+
     private final JLabel titleLabel;
-    private final JLabel messageLabel;
+    private final JTextArea messageArea;
     private final JProgressBar progressBar;
 
     private LoadingOverlay(String title, String message) {
@@ -29,7 +33,14 @@ public class LoadingOverlay extends JPanel {
         addKeyListener(new KeyAdapter() {
         });
 
-        JPanel card = new JPanel();
+        JPanel card = new JPanel() {
+            @Override
+            public Dimension getPreferredSize() {
+                Dimension size = super.getPreferredSize();
+                size.width = Math.max(CARD_WIDTH, size.width);
+                return size;
+            }
+        };
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBackground(Color.WHITE);
         card.setBorder(BorderFactory.createCompoundBorder(
@@ -41,22 +52,32 @@ public class LoadingOverlay extends JPanel {
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         titleLabel.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 17));
         titleLabel.setForeground(new Color(17, 24, 39));
+        titleLabel.setMaximumSize(new Dimension(CONTENT_WIDTH, titleLabel.getPreferredSize().height));
 
-        messageLabel = new JLabel(blankToDefault(message, "Please wait..."));
-        messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        messageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        messageLabel.setForeground(new Color(100, 116, 139));
+        messageArea = new JTextArea(blankToDefault(message, "Please wait..."));
+        messageArea.setAlignmentX(Component.CENTER_ALIGNMENT);
+        messageArea.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        messageArea.setForeground(new Color(100, 116, 139));
+        messageArea.setEditable(false);
+        messageArea.setFocusable(false);
+        messageArea.setOpaque(false);
+        messageArea.setLineWrap(true);
+        messageArea.setWrapStyleWord(true);
+        messageArea.setBorder(BorderFactory.createEmptyBorder());
+        messageArea.setRows(messageRows(messageArea.getText()));
+        messageArea.setMaximumSize(new Dimension(CONTENT_WIDTH, textAreaHeight(messageArea)));
+        messageArea.setPreferredSize(new Dimension(CONTENT_WIDTH, textAreaHeight(messageArea)));
 
         progressBar = new JProgressBar();
         progressBar.setIndeterminate(true);
         progressBar.setBorderPainted(false);
-        progressBar.setPreferredSize(new Dimension(280, 8));
-        progressBar.setMaximumSize(new Dimension(280, 8));
+        progressBar.setPreferredSize(new Dimension(CONTENT_WIDTH, PROGRESS_HEIGHT));
+        progressBar.setMaximumSize(new Dimension(CONTENT_WIDTH, PROGRESS_HEIGHT));
         progressBar.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         card.add(titleLabel);
-        card.add(Box.createVerticalStrut(6));
-        card.add(messageLabel);
+        card.add(Box.createVerticalStrut(8));
+        card.add(messageArea);
         card.add(Box.createVerticalStrut(18));
         card.add(progressBar);
         add(card, new GridBagConstraints());
@@ -81,7 +102,11 @@ public class LoadingOverlay extends JPanel {
     }
 
     private void setMessageText(String message) {
-        messageLabel.setText(blankToDefault(message, "Please wait..."));
+        messageArea.setText(blankToDefault(message, "Please wait..."));
+        messageArea.setRows(messageRows(messageArea.getText()));
+        Dimension messageSize = new Dimension(CONTENT_WIDTH, textAreaHeight(messageArea));
+        messageArea.setPreferredSize(messageSize);
+        messageArea.setMaximumSize(messageSize);
         revalidate();
         repaint();
     }
@@ -109,6 +134,18 @@ public class LoadingOverlay extends JPanel {
 
     private static String blankToDefault(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static int messageRows(String message) {
+        String text = blankToDefault(message, "");
+        int explicitLines = text.split("\\R", -1).length;
+        int wrappedLines = (int) Math.ceil(text.length() / 58.0);
+        return Math.max(2, Math.min(4, Math.max(explicitLines, wrappedLines)));
+    }
+
+    private static int textAreaHeight(JTextArea textArea) {
+        FontMetrics metrics = textArea.getFontMetrics(textArea.getFont());
+        return metrics.getHeight() * textArea.getRows() + 4;
     }
 
     public static final class Handle implements AutoCloseable {

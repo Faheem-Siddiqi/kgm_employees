@@ -371,7 +371,8 @@ public class HomeView extends JFrame {
         );
         SwingWorker<ExcelImportService.ImportResult, Void> worker = new SwingWorker<>() {
             protected ExcelImportService.ImportResult doInBackground() throws Exception {
-                return excelImportService.importEmployees(file, importType);
+                return excelImportService.importEmployees(file, importType, (message, completedRows, totalRows, percent) ->
+                        updateExcelLoader(loader, message, percent));
             }
 
             protected void done() {
@@ -650,7 +651,8 @@ public class HomeView extends JFrame {
         );
         SwingWorker<ExcelExportService.ExportResult, Void> worker = new SwingWorker<>() {
             protected ExcelExportService.ExportResult doInBackground() throws Exception {
-                return excelExportService.exportEmployees(target);
+                return excelExportService.exportEmployees(target, (message, completedRows, totalRows, percent) ->
+                        updateExcelLoader(loader, message, percent));
             }
 
             protected void done() {
@@ -881,6 +883,14 @@ public class HomeView extends JFrame {
 
     private String plural(int count) {
         return count == 1 ? "" : "s";
+    }
+
+    private void updateExcelLoader(LoadingOverlay.Handle loader, String message, int percent) {
+        if (loader == null) {
+            return;
+        }
+        loader.setMessage(message);
+        loader.setProgress(percent);
     }
 
     private String rootMessage(Throwable throwable) {

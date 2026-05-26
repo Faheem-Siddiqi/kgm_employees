@@ -79,6 +79,18 @@ public class GenericRecordTablePanel<T> extends JPanel {
         tablePanel.setPaginationBottomGap(paginationBottomGap);
     }
 
+    public void setPaginationEnabled(boolean paginationEnabled) {
+        tablePanel.setPaginationEnabled(paginationEnabled);
+    }
+
+    public void setHugRows(boolean hugRows) {
+        tablePanel.setHugRows(hugRows);
+    }
+
+    public void setMinimumViewportRows(int minimumViewportRows) {
+        tablePanel.setMinimumViewportRows(minimumViewportRows);
+    }
+
     private T recordAt(int row) {
         return row >= 0 && row < records.size() ? records.get(row) : null;
     }

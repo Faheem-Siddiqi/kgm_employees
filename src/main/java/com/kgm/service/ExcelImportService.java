@@ -84,6 +84,11 @@ public class ExcelImportService {
     );
     private static final Map<String, List<String>> EXTRA_ALIASES = aliases();
 
+    @FunctionalInterface
+    public interface ProgressListener {
+        void onProgress(String message, int completedRows, int totalRows, int percent);
+    }
+
     public enum ImportType {
         STANDARD("Import New / Standard Employee Data"),
         LEGACY("Import Legacy / Old Employee Data");
@@ -104,6 +109,14 @@ public class ExcelImportService {
     }
 
     public ImportResult importEmployees(File file, ImportType importType) throws IOException {
+        return importEmployees(file, importType, null);
+    }
+
+    public ImportResult importEmployees(
+            File file,
+            ImportType importType,
+            ProgressListener progressListener
+    ) throws IOException {
         if (!isExcelFile(file)) {
             throw new IllegalArgumentException("Only Excel workbooks can be imported.");
         }
@@ -114,11 +127,13 @@ public class ExcelImportService {
 
         try (Workbook workbook = openWorkbook(file);
              Connection connection = DatabaseConnection.getConnection()) {
+            reportProgress(progressListener, "Opening workbook...", 0, 0, 1);
             Sheet sheet = workbook.getNumberOfSheets() == 0 ? null : workbook.getSheetAt(0);
             if (sheet == null) {
                 throw new IllegalArgumentException("Excel file has no sheet to import.");
             }
 
+            reportProgress(progressListener, "Reading headers...", 0, 0, 3);
             EmployeeFieldDefinitionDao fieldDao = new EmployeeFieldDefinitionDao(connection);
             FieldCatalog catalog = loadFieldCatalog(fieldDao);
             DataFormatter formatter = new DataFormatter();
@@ -131,14 +146,28 @@ public class ExcelImportService {
                     selectedType
             );
 
+            reportProgress(progressListener, "Counting workbook rows...", 0, 0, 5);
+            int totalRows = countDataRows(sheet, formatter, evaluator);
+            if (totalRows == 0) {
+                throw new IllegalArgumentException("No employee rows found. Add employee records below the header row before importing.");
+            }
+
             EmployeeRegistrationDao registrationDao = new EmployeeRegistrationDao(connection);
-            boolean hasRows = false;
+            int scannedRows = 0;
+            reportRowProgress(progressListener, "Scanning", 0, totalRows, 5);
             for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
                 Row row = sheet.getRow(rowIndex);
                 if (isBlankRow(row, formatter, evaluator)) {
                     continue;
                 }
-                hasRows = true;
+                scannedRows++;
+                reportRowProgress(
+                        progressListener,
+                        "Scanning",
+                        scannedRows,
+                        totalRows,
+                        scaledProgress(scannedRows, totalRows, 5, 55)
+                );
 
                 try {
                     RowData rowData = employeeFromRow(row, headers, formatter, evaluator);
@@ -150,12 +179,13 @@ public class ExcelImportService {
                     addSkippedRow(skippedRows, rowIndex + 1, friendlyRuntimeMessage(exception));
                 }
             }
-            if (!hasRows) {
-                throw new IllegalArgumentException("No employee rows found. Add employee records below the header row before importing.");
-            }
 
+            reportProgress(progressListener, "Scanning complete. Validating rows for import...", scannedRows, totalRows, 56);
+            reportProgress(progressListener, "Checking duplicate Employee IDs in workbook and database...", scannedRows, totalRows, 60);
             rejectDuplicateEmployees(connection, pendingRows, skippedRows);
-            int imported = savePendingRows(registrationDao, pendingRows, skippedRows);
+            reportProgress(progressListener, "Preparing database update for valid rows...", pendingRows.size(), pendingRows.size(), 63);
+            int imported = savePendingRows(registrationDao, pendingRows, skippedRows, progressListener);
+            reportProgress(progressListener, "Import finished.", imported, pendingRows.size(), 100);
             return new ImportResult(imported, skippedRows);
         } catch (SQLException exception) {
             throw new IOException("Database error while importing Excel: " + exception.getMessage(), exception);
@@ -463,23 +493,23 @@ public class ExcelImportService {
             }
 
             String normalized = normalizeHeader(headerText);
-            if (catalog.ignoredHeaderAliases().contains(normalized)) {
+
+            EmployeeFieldDefinition definition = catalog.byAlias().get(normalized);
+            if (definition != null) {
+                String column = definition.columnName().toUpperCase(Locale.ROOT);
+                headers.putIfAbsent(column, new HeaderBinding(definition, cellIndex));
                 continue;
             }
 
+            if (catalog.ignoredHeaderAliases().contains(normalized)) {
+                continue;
+            }
             if (catalog.documentAliases().contains(normalized)) {
                 unknownHeaders.add(headerText);
                 continue;
             }
 
-            EmployeeFieldDefinition definition = catalog.byAlias().get(normalized);
-            if (definition == null) {
-                unknownHeaders.add(headerText);
-                continue;
-            }
-
-            String column = definition.columnName().toUpperCase(Locale.ROOT);
-            headers.putIfAbsent(column, new HeaderBinding(definition, cellIndex));
+            unknownHeaders.add(headerText);
         }
 
         validateHeaders(headers, unknownHeaders, importType, catalog);
@@ -546,8 +576,15 @@ public class ExcelImportService {
             if (importType == ImportType.LEGACY && missing.isEmpty()) {
                 return;
             }
+            List<String> details = new ArrayList<>();
+            if (!missing.isEmpty()) {
+                details.add("Missing: " + String.join(", ", missing));
+            }
+            if (!unknownHeaders.isEmpty()) {
+                details.add("Unsupported: " + String.join(", ", unknownHeaders));
+            }
             throw new HeaderImportException(
-                    "Row 1 has missing or unsupported headers."
+                    "Row 1 has missing or unsupported headers. " + String.join(" ", details)
             );
         }
     }
@@ -645,9 +682,11 @@ public class ExcelImportService {
     private int savePendingRows(
             EmployeeRegistrationDao registrationDao,
             List<PendingImportRow> pendingRows,
-            List<String> skippedRows
+            List<String> skippedRows,
+            ProgressListener progressListener
     ) {
         if (pendingRows.isEmpty()) {
+            reportProgress(progressListener, "No valid rows to save.", 0, 0, 100);
             return 0;
         }
 
@@ -658,10 +697,17 @@ public class ExcelImportService {
             importColumns.add(pendingRow.rowData().importColumns());
         }
 
+        int totalRows = pendingRows.size();
+        reportRowProgress(progressListener, "Saving", 0, totalRows, 65);
         try {
-            return registrationDao.insertEmployees(employees, importColumns);
+            int imported = registrationDao.insertEmployees(employees, importColumns, (message, completedRows, total) ->
+                    reportSaveProgress(progressListener, message, completedRows, total));
+            reportRowProgress(progressListener, "Saving", imported, totalRows, 95);
+            return imported;
         } catch (RuntimeException batchException) {
             int imported = 0;
+            int processed = 0;
+            reportProgress(progressListener, "Retrying save row by row...", 0, totalRows, 65);
             for (PendingImportRow pendingRow : pendingRows) {
                 try {
                     registrationDao.insertEmployee(
@@ -672,9 +718,36 @@ public class ExcelImportService {
                 } catch (RuntimeException rowException) {
                     addSkippedRow(skippedRows, pendingRow.rowNumber(), friendlyRuntimeMessage(rowException));
                 }
+                processed++;
+                reportRowProgress(
+                        progressListener,
+                        "Saving",
+                        processed,
+                        totalRows,
+                        scaledProgress(processed, totalRows, 65, 95)
+                );
             }
             return imported;
         }
+    }
+
+    private void reportSaveProgress(
+            ProgressListener progressListener,
+            String message,
+            int completedRows,
+            int totalRows
+    ) {
+        String cleanMessage = message == null || message.isBlank()
+                ? "Saving employee rows..."
+                : message.trim();
+        int percent = saveProgressPercent(cleanMessage, completedRows, totalRows);
+        reportProgress(
+                progressListener,
+                rowAwareMessage(cleanMessage, completedRows, totalRows),
+                completedRows,
+                totalRows,
+                percent
+        );
     }
 
     private static boolean isPhoneNumber(String value) {
@@ -705,6 +778,16 @@ public class ExcelImportService {
             }
         }
         return true;
+    }
+
+    private int countDataRows(Sheet sheet, DataFormatter formatter, FormulaEvaluator evaluator) {
+        int rows = 0;
+        for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+            if (!isBlankRow(sheet.getRow(rowIndex), formatter, evaluator)) {
+                rows++;
+            }
+        }
+        return rows;
     }
 
     private Date dateValue(Cell cell, DataFormatter formatter, FormulaEvaluator evaluator) {
@@ -827,6 +910,38 @@ public class ExcelImportService {
         skippedRows.add("Row " + rowNumber + ": " + reason);
     }
 
+    private void reportRowProgress(
+            ProgressListener progressListener,
+            String action,
+            int completedRows,
+            int totalRows,
+            int percent
+    ) {
+        reportProgress(
+                progressListener,
+                action + " " + formattedRowProgress(completedRows, totalRows) + " rows...",
+                completedRows,
+                totalRows,
+                percent
+        );
+    }
+
+    private void reportProgress(
+            ProgressListener progressListener,
+            String message,
+            int completedRows,
+            int totalRows,
+            int percent
+    ) {
+        if (progressListener == null) {
+            return;
+        }
+        try {
+            progressListener.onProgress(message, completedRows, totalRows, percent);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
     private static void addAlias(Map<String, EmployeeFieldDefinition> aliases, String alias, EmployeeFieldDefinition definition) {
         String normalized = normalizeHeader(alias);
         if (!normalized.isBlank()) {
@@ -890,6 +1005,43 @@ public class ExcelImportService {
 
     private static String placeholders(int count) {
         return String.join(",", java.util.Collections.nCopies(count, "?"));
+    }
+
+    private static int saveProgressPercent(String message, int completedRows, int totalRows) {
+        String state = message == null ? "" : message.toLowerCase(Locale.ROOT);
+        if (state.contains("preparing")) {
+            return scaledProgress(completedRows, totalRows, 65, 80);
+        }
+        if (state.contains("writing")) {
+            return 84;
+        }
+        if (state.contains("defaults")) {
+            return 90;
+        }
+        if (state.contains("finalizing")) {
+            return 94;
+        }
+        return scaledProgress(completedRows, totalRows, 65, 95);
+    }
+
+    private static int scaledProgress(int completedRows, int totalRows, int start, int end) {
+        if (totalRows <= 0) {
+            return start;
+        }
+        int progress = start + (int) Math.round((end - start) * (completedRows / (double) totalRows));
+        return Math.max(start, Math.min(end, progress));
+    }
+
+    private static String rowAwareMessage(String message, int completedRows, int totalRows) {
+        if (totalRows <= 0) {
+            return message;
+        }
+        return message + " (" + formattedRowProgress(completedRows, totalRows) + " rows)";
+    }
+
+    private static String formattedRowProgress(int completedRows, int totalRows) {
+        int width = Math.max(2, String.valueOf(Math.max(0, totalRows)).length());
+        return String.format(Locale.ROOT, "%0" + width + "d/%d", Math.max(0, completedRows), Math.max(0, totalRows));
     }
 
     private static String titleFromColumn(String column) {

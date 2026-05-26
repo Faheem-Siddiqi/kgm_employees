@@ -189,6 +189,11 @@ public final class ExcelExportService {
     );
     private static final Map<String, String> SOURCE_ALIASES = sourceAliases();
 
+    @FunctionalInterface
+    public interface ProgressListener {
+        void onProgress(String message, int completedRows, int totalRows, int percent);
+    }
+
     static List<String> fixedHeaders() {
         return FIXED_HEADERS;
     }
@@ -198,6 +203,10 @@ public final class ExcelExportService {
     }
 
     public ExportResult exportEmployees(File file) throws IOException {
+        return exportEmployees(file, null);
+    }
+
+    public ExportResult exportEmployees(File file, ProgressListener progressListener) throws IOException {
         Path target = file.toPath();
         Path parent = target.toAbsolutePath().getParent();
         
@@ -210,15 +219,19 @@ public final class ExcelExportService {
 
         try {
             ExportResult result;
+            reportProgress(progressListener, "Preparing export workbook...", 0, 0, 1);
             try (Connection connection = DatabaseConnection.getConnection()) {
-                result = writeWorkbook(connection, temporaryFile.toFile(), tempExtension);
+                result = writeWorkbook(connection, temporaryFile.toFile(), tempExtension, progressListener);
             } catch (SQLException exception) {
                 throw new IOException("Database error while exporting Excel: " + exception.getMessage(), exception);
             }
+            reportProgress(progressListener, "Replacing exported file...", result.employeeCount(), result.employeeCount(), 96);
             makeEditableFile(target);
             Files.move(temporaryFile, target, StandardCopyOption.REPLACE_EXISTING);
             makeEditableFile(target);
+            reportProgress(progressListener, "Checking saved workbook...", result.employeeCount(), result.employeeCount(), 98);
             validateGeneratedWorkbook(target);
+            reportProgress(progressListener, "Export finished.", result.employeeCount(), result.employeeCount(), 100);
             return result;
         } catch (FileSystemException exception) {
             throw new IOException(
@@ -231,11 +244,17 @@ public final class ExcelExportService {
         }
     }
 
-    private ExportResult writeWorkbook(Connection connection, File temporaryFile, String fileExtension) throws SQLException, IOException {
+    private ExportResult writeWorkbook(
+            Connection connection,
+            File temporaryFile,
+            String fileExtension,
+            ProgressListener progressListener
+    ) throws SQLException, IOException {
         Map<String, String> dbColumns = employeeColumns(connection);
         Set<String> documentColumns = documentColumns(connection);
         List<ExportColumn> columns = exportColumns(dbColumns, documentColumns);
         int[] widths = initialWidths(columns);
+        int totalRows = employeeCount(connection);
 
         try (Workbook workbook = createWorkbook(fileExtension);
              FileOutputStream output = new FileOutputStream(temporaryFile)) {
@@ -254,6 +273,12 @@ public final class ExcelExportService {
             }
 
             int rowCount = 0;
+            if (totalRows == 0) {
+                reportProgress(progressListener, "No employee rows to export yet; writing headers...", 0, 0, 12);
+            } else {
+                reportRowProgress(progressListener, "Exporting", 0, totalRows, 12);
+            }
+            reportProgress(progressListener, "Fetching employee rows from database...", 0, totalRows, 14);
             try (Statement stmt = connection.createStatement();
                  ResultSet rs = stmt.executeQuery("SELECT * FROM " + quoteIdentifier(EMPLOYEE_TABLE) + " ORDER BY ID DESC")) {
                 ResultSetMetaData metaData = rs.getMetaData();
@@ -266,13 +291,23 @@ public final class ExcelExportService {
                         updateWidth(widths, index, value);
                         textCell(row, index, value, column.dynamic() ? dynamicCellStyle : normalCellStyle);
                     }
+                    reportRowProgress(
+                            progressListener,
+                            "Exporting",
+                            rowCount,
+                            totalRows,
+                            scaledProgress(rowCount, totalRows, 12, 88)
+                    );
                 }
             }
 
+            reportProgress(progressListener, "Employee rows fetched. Preparing workbook layout...", rowCount, totalRows, 89);
+            reportProgress(progressListener, "Sizing columns...", rowCount, totalRows, 90);
             for (int index = 0; index < columns.size(); index++) {
                 sheet.setColumnWidth(index, widths[index]);
             }
 
+            reportProgress(progressListener, "Writing workbook file...", rowCount, totalRows, 94);
             workbook.write(output);
             output.flush();
             return new ExportResult(rowCount, columns.size(), dynamicColumnCount(columns));
@@ -336,6 +371,13 @@ public final class ExcelExportService {
             }
         }
         return columns;
+    }
+
+    private int employeeCount(Connection connection) throws SQLException {
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM " + quoteIdentifier(EMPLOYEE_TABLE))) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
     }
 
     private Set<String> documentColumns(Connection connection) {
@@ -443,6 +485,51 @@ public final class ExcelExportService {
 
     private static String normalizeColumn(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void reportRowProgress(
+            ProgressListener progressListener,
+            String action,
+            int completedRows,
+            int totalRows,
+            int percent
+    ) {
+        reportProgress(
+                progressListener,
+                action + " " + formattedRowProgress(completedRows, totalRows) + " rows...",
+                completedRows,
+                totalRows,
+                percent
+        );
+    }
+
+    private void reportProgress(
+            ProgressListener progressListener,
+            String message,
+            int completedRows,
+            int totalRows,
+            int percent
+    ) {
+        if (progressListener == null) {
+            return;
+        }
+        try {
+            progressListener.onProgress(message, completedRows, totalRows, percent);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private static int scaledProgress(int completedRows, int totalRows, int start, int end) {
+        if (totalRows <= 0) {
+            return start;
+        }
+        int progress = start + (int) Math.round((end - start) * (completedRows / (double) totalRows));
+        return Math.max(start, Math.min(end, progress));
+    }
+
+    private static String formattedRowProgress(int completedRows, int totalRows) {
+        int width = Math.max(2, String.valueOf(Math.max(0, totalRows)).length());
+        return String.format(Locale.ROOT, "%0" + width + "d/%d", Math.max(0, completedRows), Math.max(0, totalRows));
     }
 
     private static boolean isBlankExportValue(String value) {

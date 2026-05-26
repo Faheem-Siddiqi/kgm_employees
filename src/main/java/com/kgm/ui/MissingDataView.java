@@ -5,11 +5,16 @@ import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.GenericRecordTablePanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
+import com.kgm.ui.styling.HomeViewHelper;
 import com.kgm.util.DateDisplayFormatter;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
@@ -38,6 +43,10 @@ public class MissingDataView extends JFrame {
                     this::toRow
             );
 
+    private final List<EmployeeRecordDao.MissingEmployeeRow> allRows = new ArrayList<>();
+    private JTextField employeeCodeSearchField;
+    private JButton clearSearchButton;
+    private JLabel filterStatusLabel;
     private SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> loadWorker;
 
     public MissingDataView() {
@@ -66,15 +75,26 @@ public class MissingDataView extends JFrame {
         return header;
     }
 
-    private JPanel createMainContent() {
-        JPanel main = new JPanel(new BorderLayout());
+    private JComponent createMainContent() {
+        JPanel main = new PageContentPanel();
         main.setBackground(Color.WHITE);
         main.setBorder(BorderFactory.createEmptyBorder(24, 28, 28, 28));
 
-        main.add(createTitleRow(), BorderLayout.NORTH);
+        JPanel topSection = new JPanel(new BorderLayout());
+        topSection.setOpaque(false);
+        topSection.add(createTitleRow(), BorderLayout.NORTH);
+        topSection.add(createSearchRow(), BorderLayout.CENTER);
+
+        main.add(topSection, BorderLayout.NORTH);
         main.add(createTableSection(), BorderLayout.CENTER);
 
-        return main;
+        JScrollPane pageScroll = new JScrollPane(main);
+        pageScroll.setBorder(BorderFactory.createEmptyBorder());
+        pageScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        pageScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        pageScroll.getVerticalScrollBar().setUnitIncrement(18);
+        pageScroll.getViewport().setBackground(Color.WHITE);
+        return pageScroll;
     }
 
     private JPanel createTitleRow() {
@@ -111,22 +131,77 @@ public class MissingDataView extends JFrame {
         return row;
     }
 
+    private JPanel createSearchRow() {
+        JPanel row = new JPanel(new BorderLayout(14, 0));
+        row.setBackground(Color.WHITE);
+        row.setBorder(BorderFactory.createEmptyBorder(0, 0, 18, 0));
+
+        JPanel searchBox = new JPanel(new BorderLayout(8, 0));
+        searchBox.setBackground(Color.WHITE);
+        searchBox.setPreferredSize(new Dimension(430, 36));
+        searchBox.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(0, 10, 0, 4)
+        ));
+
+        employeeCodeSearchField = HomeViewHelper.createSearchField("Search Employee ID");
+        employeeCodeSearchField.setBorder(null);
+        employeeCodeSearchField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        employeeCodeSearchField.setForeground(new Color(35, 43, 54));
+        employeeCodeSearchField.setBackground(Color.WHITE);
+        employeeCodeSearchField.addActionListener(event -> applyEmployeeCodeFilter());
+
+        clearSearchButton = new JButton("Clear");
+        HomeViewHelper.styleClearButton(clearSearchButton);
+        HomeViewHelper.setTextButtonEnabled(clearSearchButton, false);
+        clearSearchButton.addActionListener(event -> {
+            employeeCodeSearchField.setText("");
+            employeeCodeSearchField.requestFocusInWindow();
+        });
+
+        employeeCodeSearchField.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent event) {
+                searchChanged();
+            }
+
+            public void removeUpdate(DocumentEvent event) {
+                searchChanged();
+            }
+
+            public void changedUpdate(DocumentEvent event) {
+                searchChanged();
+            }
+        });
+
+        searchBox.add(employeeCodeSearchField, BorderLayout.CENTER);
+        searchBox.add(clearSearchButton, BorderLayout.EAST);
+
+        JButton searchButton = new JButton("Search");
+        HomeViewHelper.styleSearchButton(searchButton);
+        searchButton.addActionListener(event -> applyEmployeeCodeFilter());
+
+        JPanel controls = new JPanel(new BorderLayout(10, 0));
+        controls.setOpaque(false);
+        controls.add(searchBox, BorderLayout.CENTER);
+        controls.add(searchButton, BorderLayout.EAST);
+
+        JPanel controlsWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        controlsWrapper.setOpaque(false);
+        controlsWrapper.add(controls);
+
+        filterStatusLabel = new JLabel(" ");
+        filterStatusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        filterStatusLabel.setForeground(new Color(99, 115, 129));
+
+        row.add(controlsWrapper, BorderLayout.WEST);
+        row.add(filterStatusLabel, BorderLayout.CENTER);
+        return row;
+    }
+
     private JPanel createTableSection() {
         JPanel section = new JPanel(new BorderLayout());
         section.setBackground(Color.WHITE);
-
-        /*
-         * Main screen has no scroll.
-         * Only this table area can scroll horizontally/vertically if table content needs it.
-         */
-        JScrollPane tableScroll = new JScrollPane(tablePanel);
-        tableScroll.setBorder(BorderFactory.createEmptyBorder());
-        tableScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        tableScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        tableScroll.getViewport().setBackground(Color.WHITE);
-
-        section.add(tableScroll, BorderLayout.CENTER);
-
+        section.add(tablePanel, BorderLayout.NORTH);
         return section;
     }
 
@@ -147,22 +222,20 @@ public class MissingDataView extends JFrame {
         tablePanel.setPreferredColumnWidthLimit(MISSING_COLUMN, 560);
         tablePanel.setPreferredColumnWidthLimit(5, 240);
 
+        tablePanel.setPaginationEnabled(false);
+        tablePanel.setHugRows(true);
+        tablePanel.setMinimumViewportRows(0);
         tablePanel.setPaginationBottomGap(18);
-
-        /*
-         * Important:
-         * No fixed height.
-         * Width is allowed to be wider than screen so table scroll can show horizontal scrollbar.
-         */
-        tablePanel.setPreferredSize(new Dimension(1250, tablePanel.getPreferredSize().height));
     }
 
     private void showLoading(String message) {
+        allRows.clear();
         tablePanel.setEmptyText(message == null || message.isBlank()
                 ? "Loading missing required data..."
                 : message.trim());
 
         tablePanel.clearRows();
+        updateSearchStatus(0, 0, "");
         refreshTable();
     }
 
@@ -188,8 +261,9 @@ public class MissingDataView extends JFrame {
                 }
 
                 try {
-                    tablePanel.setEmptyText("No missing required employee data");
-                    tablePanel.setRows(get());
+                    allRows.clear();
+                    allRows.addAll(get());
+                    applyEmployeeCodeFilter();
                     refreshTable();
                 } catch (CancellationException ignored) {
                 } catch (InterruptedException exception) {
@@ -211,12 +285,72 @@ public class MissingDataView extends JFrame {
     }
 
     private void showLoadFailed(String message) {
+        allRows.clear();
         tablePanel.setEmptyText(message == null || message.isBlank()
                 ? "Missing required data could not be loaded."
                 : message.trim());
 
         tablePanel.clearRows();
+        updateSearchStatus(0, 0, "");
         refreshTable();
+    }
+
+    private void searchChanged() {
+        String query = searchQuery();
+        HomeViewHelper.setTextButtonEnabled(clearSearchButton, !query.isBlank());
+        applyEmployeeCodeFilter();
+    }
+
+    private void applyEmployeeCodeFilter() {
+        String query = searchQuery();
+        List<EmployeeRecordDao.MissingEmployeeRow> visibleRows = new ArrayList<>();
+        if (query.isBlank()) {
+            visibleRows.addAll(allRows);
+        } else {
+            for (EmployeeRecordDao.MissingEmployeeRow row : allRows) {
+                if (normalized(row.employeeCode()).contains(query)) {
+                    visibleRows.add(row);
+                }
+            }
+        }
+
+        tablePanel.setEmptyText(emptyTableText(query));
+        tablePanel.setRows(visibleRows);
+        updateSearchStatus(visibleRows.size(), allRows.size(), query);
+        refreshTable();
+    }
+
+    private String searchQuery() {
+        return normalized(employeeCodeSearchField == null ? "" : employeeCodeSearchField.getText());
+    }
+
+    private String normalized(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String emptyTableText(String query) {
+        return query.isBlank()
+                ? "No missing required employee data"
+                : "No missing required employee data matches this Employee ID";
+    }
+
+    private void updateSearchStatus(int visibleRows, int totalRows, String query) {
+        if (filterStatusLabel == null) {
+            return;
+        }
+        if (totalRows <= 0) {
+            filterStatusLabel.setText(" ");
+            return;
+        }
+        if (query == null || query.isBlank()) {
+            filterStatusLabel.setText("Showing " + totalRows + " missing record" + plural(totalRows));
+            return;
+        }
+        filterStatusLabel.setText("Showing " + visibleRows + " of " + totalRows + " matching Employee ID");
+    }
+
+    private String plural(int count) {
+        return count == 1 ? "" : "s";
     }
 
     private void refreshTable() {
@@ -266,4 +400,30 @@ public class MissingDataView extends JFrame {
         new EmployeeDetailView(row.employeeCode());
         SwingUtilities.invokeLater(this::dispose);
     }
-}   
+
+    private static class PageContentPanel extends JPanel implements Scrollable {
+        private PageContentPanel() {
+            super(new BorderLayout());
+        }
+
+        public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return 18;
+        }
+
+        public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return Math.max(90, visibleRect.height - 90);
+        }
+
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
+        }
+    }
+}

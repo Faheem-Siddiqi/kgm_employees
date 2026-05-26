@@ -13,6 +13,11 @@ import java.util.List;
 import java.util.StringJoiner;
 
 public class EmployeeRegistrationDao {
+    @FunctionalInterface
+    public interface BatchProgressListener {
+        void onProgress(String message, int completedRows, int totalRows);
+    }
+
     private static final List<String> BASE_INSERT_COLUMNS = List.of(
             "NID",
             "EMP_NAME",
@@ -62,6 +67,14 @@ public class EmployeeRegistrationDao {
     }
 
     public int insertEmployees(List<Employee> employees, List<List<String>> extraColumnsByEmployee) {
+        return insertEmployees(employees, extraColumnsByEmployee, null);
+    }
+
+    public int insertEmployees(
+            List<Employee> employees,
+            List<List<String>> extraColumnsByEmployee,
+            BatchProgressListener progressListener
+    ) {
         if (employees == null || employees.isEmpty()) {
             return 0;
         }
@@ -90,6 +103,7 @@ public class EmployeeRegistrationDao {
             conn.setAutoCommit(false);
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 List<String> employeeCodes = new ArrayList<>();
+                notifyProgress(progressListener, "Preparing rows for database insert...", 0, employees.size());
                 for (int employeeIndex = 0; employeeIndex < employees.size(); employeeIndex++) {
                     Employee employee = employees.get(employeeIndex);
                     employeeCodes.add(safe(readField(employee, "EMPLOYEE_CODE")));
@@ -97,12 +111,17 @@ public class EmployeeRegistrationDao {
                         ps.setString(columnIndex + 1, safe(readField(employee, columns.get(columnIndex))));
                     }
                     ps.addBatch();
+                    notifyProgress(progressListener, "Preparing rows for database insert...", employeeIndex + 1, employees.size());
                     if ((employeeIndex + 1) % 500 == 0) {
+                        notifyProgress(progressListener, "Writing employee batch to database...", employeeIndex + 1, employees.size());
                         ps.executeBatch();
                     }
                 }
+                notifyProgress(progressListener, "Writing employee batch to database...", employees.size(), employees.size());
                 ps.executeBatch();
+                notifyProgress(progressListener, "Applying field defaults...", employees.size(), employees.size());
                 new EmployeeFieldDefinitionDao(conn).applyCustomFieldDefaultsForEmployees(employeeCodes);
+                notifyProgress(progressListener, "Finalizing import transaction...", employees.size(), employees.size());
                 conn.commit();
                 return employees.size();
             }
@@ -114,6 +133,21 @@ public class EmployeeRegistrationDao {
                 conn.setAutoCommit(originalAutoCommit);
             } catch (SQLException ignored) {
             }
+        }
+    }
+
+    private void notifyProgress(
+            BatchProgressListener progressListener,
+            String message,
+            int completedRows,
+            int totalRows
+    ) {
+        if (progressListener == null) {
+            return;
+        }
+        try {
+            progressListener.onProgress(message, completedRows, totalRows);
+        } catch (RuntimeException ignored) {
         }
     }
 

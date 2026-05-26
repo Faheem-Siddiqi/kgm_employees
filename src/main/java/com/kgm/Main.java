@@ -38,7 +38,7 @@ public class Main {
                 @Override
                 protected void done() {
                     loader.close();
-                    System.out.println("App started");
+                    System.out.println("Employee Management App started");
                 }
             };
             worker.execute();
