@@ -8,11 +8,12 @@ import com.kgm.service.ExcelImportService;
 import com.kgm.service.ExcelSampleGenerator;
 import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.component.LoadingOverlay;
+import com.kgm.ui.panel.ChartsPanel;
 import com.kgm.ui.panel.EmployeeTablePanel;
 import com.kgm.ui.panel.ExcelImportButton;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
-import com.kgm.ui.panel.HomeStatsPanel;
+import com.kgm.ui.panel.KPIRowsPanel;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.HomeViewHelper;
 
@@ -31,7 +32,8 @@ public class HomeView extends JFrame {
     private final ExcelImportService excelImportService = new ExcelImportService();
     private final ExcelExportService excelExportService = new ExcelExportService();
     private EmployeeTablePanel tablePanel;
-    private HomeStatsPanel statsPanel;
+    private KPIRowsPanel kpiPanel;
+    private ChartsPanel chartsPanel;
     private JScrollPane mainScrollPane;
     private ExcelImportButton excelBtn;
     private JButton refreshBtn;
@@ -46,10 +48,11 @@ public class HomeView extends JFrame {
         HomeViewHelper.applyFrame(this);
 
         tablePanel = new EmployeeTablePanel(null);
-        statsPanel = new HomeStatsPanel(null);
+        kpiPanel = new KPIRowsPanel(null);
+        chartsPanel = new ChartsPanel(null);
 
         // Wire "Show in Table" from chart cards to the table filtering
-        statsPanel.setShowInTableHandler(this::handleShowInTable);
+        chartsPanel.setShowInTableHandler(this::handleShowInTable);
 
         // Wire table filter callback to toggle Refresh / Clear Filter button text
         tablePanel.setOnFilterChanged(filterLabel -> {
@@ -119,10 +122,6 @@ public class HomeView extends JFrame {
 
         HomeViewHelper.addSearchControls(searchRow, searchField, searchBtn, clearBtn);
 
-        JPanel northContainer = HomeViewHelper.createNorthContainer();
-        northContainer.add(top, BorderLayout.NORTH);
-        northContainer.add(searchRow, BorderLayout.CENTER);
-
         JPanel btnRow = HomeViewHelper.createButtonRow();
         excelBtn = new ExcelImportButton(this::showExcelImportActions);
 
@@ -155,15 +154,38 @@ public class HomeView extends JFrame {
         btnRow.add(addBtn);
         btnRow.add(settingsBtn);
         btnRow.add(refreshBtn);
-        northContainer.add(btnRow, BorderLayout.SOUTH);
 
-        JPanel body = HomeViewHelper.createBodyPanel();
-        body.add(tablePanel, BorderLayout.NORTH);
-        body.add(statsPanel, BorderLayout.CENTER);
+        // Build layout: Header > KPIs > Search > Buttons > Table > Charts
+        JPanel mainContent = new JPanel();
+        mainContent.setLayout(new BoxLayout(mainContent, BoxLayout.Y_AXIS));
+        mainContent.setOpaque(false);
+        
+        mainContent.add(top);
+        
+        // Wrap KPI panel with left/right margins (28px) to match filter
+        JPanel kpiWrapper = new JPanel(new BorderLayout());
+        kpiWrapper.setOpaque(false);
+        kpiWrapper.setBorder(BorderFactory.createEmptyBorder(24, 28, 0, 28));
+        kpiWrapper.add(kpiPanel, BorderLayout.CENTER);
+        mainContent.add(kpiWrapper);
+        
+        mainContent.add(searchRow);
+        mainContent.add(btnRow);
+        
+        // Wrap table panel with left/right margins (28px) to match filter
+        JPanel tableWrapper = new JPanel(new BorderLayout());
+        tableWrapper.setOpaque(false);
+        tableWrapper.setBorder(BorderFactory.createEmptyBorder(20, 28, 0, 28));
+        tableWrapper.add(tablePanel, BorderLayout.CENTER);
+        mainContent.add(tableWrapper);
+        
+        // Wrap charts panel with left/right margins (28px) to match filter
+        JPanel chartsWrapper = new JPanel(new BorderLayout());
+        chartsWrapper.setOpaque(false);
+        chartsWrapper.setBorder(BorderFactory.createEmptyBorder(20, 28, 0, 28));
+        chartsWrapper.add(chartsPanel, BorderLayout.CENTER);
+        mainContent.add(chartsWrapper);
 
-        JPanel mainContent = HomeViewHelper.createMainContentPanel();
-        mainContent.add(northContainer, BorderLayout.NORTH);
-        mainContent.add(body, BorderLayout.CENTER);
         mainScrollPane = HomeViewHelper.createMainScrollPane(mainContent);
         add(mainScrollPane, BorderLayout.CENTER);
         add(new FooterPanel(), BorderLayout.SOUTH);
@@ -419,7 +441,7 @@ public class HomeView extends JFrame {
         int token = ++homeLoadToken;
         homeDataLoading = true;
         tablePanel.showLoading(message);
-        statsPanel.setStats(null);
+        chartsPanel.setStats(null);
         if (refreshBtn != null) {
             refreshBtn.setText("Loading...");
             refreshBtn.setEnabled(true);
@@ -459,8 +481,10 @@ public class HomeView extends JFrame {
                     }
                     tablePanel.setRepository(null);
                     tablePanel.setEmployees(data.employees(), data.rows());
-                    statsPanel.setRepository(null);
-                    statsPanel.setStats(null);
+                    kpiPanel.setRepository(null);
+                    kpiPanel.setStats(null);
+                    chartsPanel.setRepository(null);
+                    chartsPanel.setStats(null);
                     loadDashboardStatsAsync();
                 } catch (CancellationException exception) {
                     if (latest) {
@@ -550,7 +574,8 @@ public class HomeView extends JFrame {
                     return;
                 }
                 try {
-                    statsPanel.setStats(get());
+                    kpiPanel.setStats(get());
+                    chartsPanel.setStats(get());
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     DialogHelper.error(HomeView.this, "Dashboard analytics stopped", "Dashboard analytics loading was interrupted.");
