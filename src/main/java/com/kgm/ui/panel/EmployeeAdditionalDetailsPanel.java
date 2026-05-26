@@ -9,6 +9,7 @@ import com.kgm.ui.component.UniversalTextArea;
 import com.kgm.ui.styling.EmployeeAdditionalDetailsPanelHelper;
 import com.kgm.util.DateDisplayFormatter;
 import com.kgm.util.EmployeeBasicFieldUtil;
+import com.kgm.util.EmployeeFieldDefinitionCache;
 
 import javax.swing.*;
 import java.awt.*;
@@ -22,6 +23,7 @@ import java.util.Map;
 
 public class EmployeeAdditionalDetailsPanel extends JPanel {
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+    private static final int DROPDOWN_SEARCH_DEBOUNCE_MS = 350;
 
     private final Employee data;
     private final List<EmployeeFieldDefinition> definitions;
@@ -80,7 +82,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
 
     private static List<EmployeeFieldDefinition> loadDefaultDefinitions() {
         try {
-            return new EmployeeFieldDefinitionDao().listDetailFields();
+            return EmployeeFieldDefinitionCache.detailFields();
         } catch (RuntimeException exception) {
             exception.printStackTrace();
             return List.of();
@@ -223,6 +225,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
                     value == null || value.trim().isEmpty() ? "" : value,
                     definition.variableOptionField()
             );
+            installDynamicDropdownSearch(definition, combo);
             dropdownFieldMap.put(definition.columnName(), combo);
             field = combo;
         } else if (EmployeeBasicFieldUtil.isMultilineField(definition)) {
@@ -239,6 +242,21 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
         panel.add(label, BorderLayout.NORTH);
         panel.add(field, BorderLayout.CENTER);
         return panel;
+    }
+
+    private void installDynamicDropdownSearch(EmployeeFieldDefinition definition, JComboBox<String> combo) {
+        if (!definition.variableOptionField()) {
+            return;
+        }
+        DropdownFieldSupport.installAsyncSearch(
+                combo,
+                query -> new EmployeeFieldDefinitionDao().searchDistinctEmployeeValues(
+                        definition.columnName(),
+                        query,
+                        25
+                ),
+                DROPDOWN_SEARCH_DEBOUNCE_MS
+        );
     }
 
     public Employee getUpdatedOtherDetails() {

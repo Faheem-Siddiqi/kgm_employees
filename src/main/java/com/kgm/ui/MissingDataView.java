@@ -4,6 +4,7 @@ import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.GenericRecordTablePanel;
 import com.kgm.ui.panel.HeaderPanel;
+import com.kgm.ui.styling.AppWindowStateHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.ui.styling.HomeViewHelper;
 import com.kgm.util.DateDisplayFormatter;
@@ -51,7 +52,7 @@ public class MissingDataView extends JFrame {
 
     public MissingDataView() {
         setTitle("Missing Required Data");
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
+        AppWindowStateHelper.lockFullSize(this);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());

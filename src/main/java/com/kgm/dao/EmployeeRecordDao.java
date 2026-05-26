@@ -5,6 +5,7 @@ import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.EmployeeFieldDefinitionCache;
 import java.sql.*;
 import java.util.HashSet;
 import java.util.ArrayList;
@@ -467,7 +468,7 @@ public class EmployeeRecordDao implements AutoCloseable {
     private List<EmployeeFieldDefinition> requiredDefinitions() {
         List<EmployeeFieldDefinition> required = new ArrayList<>();
         try {
-            for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao(con).listFields()) {
+            for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.fields()) {
                 if ("ID".equalsIgnoreCase(definition.columnName())) {
                     continue;
                 }
@@ -488,7 +489,7 @@ public class EmployeeRecordDao implements AutoCloseable {
     private List<EmployeeFieldDefinition> requiredDefinitions(boolean documentField) {
         List<EmployeeFieldDefinition> required = new ArrayList<>();
         try {
-            for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao(con).listFields()) {
+            for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.fields()) {
                 if ("ID".equalsIgnoreCase(definition.columnName())) {
                     continue;
                 }

@@ -3,6 +3,8 @@ import com.kgm.config.DatabaseConfig;
 import com.kgm.database.DatabaseInitializer;
 import com.kgm.ui.LoginView;
 import com.kgm.ui.component.LoadingOverlay;
+import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.EmployeeFieldDefinitionCache;
 import javax.swing.SwingWorker;
 import javax.swing.SwingUtilities;
 
@@ -39,9 +41,27 @@ public class Main {
                 protected void done() {
                     loader.close();
                     System.out.println("Employee Management App started");
+                    warmFieldMetadataCacheAsync();
                 }
             };
             worker.execute();
         });
+    }
+
+    private static void warmFieldMetadataCacheAsync() {
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() {
+                try {
+                    EmployeeFieldDefinitionCache.refreshFromDatabase();
+                    EmployeeDocumentUtil.documentTypes();
+                    EmployeeDocumentUtil.requiredDocumentFlags();
+                } catch (RuntimeException exception) {
+                    System.out.println("Field metadata cache warm-up skipped: " + exception.getMessage());
+                }
+                return null;
+            }
+        };
+        worker.execute();
     }
 }

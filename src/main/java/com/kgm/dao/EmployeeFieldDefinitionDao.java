@@ -4,6 +4,7 @@ import com.kgm.config.DatabaseConnection;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.EmployeeAdditionalFieldDefaults;
 import com.kgm.util.EmployeeBasicFieldUtil;
+import com.kgm.util.EmployeeFieldDefinitionCache;
 import com.kgm.util.EmployeeFieldMetadataStore;
 
 import java.io.IOException;
@@ -423,6 +424,64 @@ public class EmployeeFieldDefinitionDao {
         headings.add(EmployeeBasicFieldUtil.FUNDAMENTALS_HEADING);
         headings.add("Additional Details");
         return new ArrayList<>(headings);
+    }
+
+    public List<String> searchDistinctEmployeeValues(String columnName, String query, int limit) {
+        String cleanColumn = requireText(columnName, "Field column is required.").toUpperCase(Locale.ROOT);
+        String cleanQuery = normalizeSearchValue(query);
+        if (cleanQuery.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            if (!employeeColumns().containsKey(cleanColumn)) {
+                return List.of();
+            }
+
+            String quoted = quoteIdentifier(cleanColumn);
+            String normalizedColumn = "LOWER(REPLACE(REPLACE(TRIM(" + quoted + "), '-', ''), ' ', ''))";
+            String sql = """
+                    SELECT TRIM(%s) AS field_value,
+                           MIN(CASE WHEN %s LIKE ? THEN 0 ELSE 1 END) AS match_rank
+                    FROM employees
+                    WHERE %s IS NOT NULL
+                      AND TRIM(%s) <> ''
+                      AND UPPER(TRIM(%s)) NOT IN ('N/A', 'NA', 'NULL')
+                      AND TRIM(%s) <> '-'
+                      AND %s LIKE ?
+                    GROUP BY TRIM(%s)
+                    ORDER BY match_rank, field_value
+                    LIMIT ?
+                    """.formatted(
+                    quoted,
+                    normalizedColumn,
+                    quoted,
+                    quoted,
+                    quoted,
+                    quoted,
+                    normalizedColumn,
+                    quoted
+            );
+
+            int effectiveLimit = Math.max(1, Math.min(limit, 50));
+            List<String> values = new ArrayList<>();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, cleanQuery + "%");
+                ps.setString(2, "%" + cleanQuery + "%");
+                ps.setInt(3, effectiveLimit);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String value = rs.getString("field_value");
+                        if (value != null && !value.isBlank() && !containsIgnoreCase(values, value.trim())) {
+                            values.add(value.trim());
+                        }
+                    }
+                }
+            }
+            return values;
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to load employee values for " + cleanColumn + ".", exception);
+        }
     }
 
     public EmployeeFieldDefinition addField(String label, String heading, boolean documentField, boolean dateField) {
@@ -1050,6 +1109,7 @@ public class EmployeeFieldDefinitionDao {
         String dbChecksum = EmployeeFieldMetadataStore.metadataChecksum(definitions);
         try {
             EmployeeFieldMetadataStore.saveExternalAndCache(definitions, dbChecksum);
+            EmployeeFieldDefinitionCache.invalidate();
         } catch (IOException | RuntimeException exception) {
             throw new SQLException("Unable to save employee field metadata backup file.", exception);
         }
@@ -1131,7 +1191,7 @@ public class EmployeeFieldDefinitionDao {
 
     private void seedDefaultRequiredFields() throws SQLException {
         List<String> requiredColumns = new ArrayList<>();
-        requiredColumns.addAll(EmployeeBasicFieldUtil.BASIC_COLUMNS);
+        requiredColumns.addAll(EmployeeBasicFieldUtil.REQUIRED_COLUMNS);
         requiredColumns.addAll(DEFAULT_REQUIRED_DOCUMENT_COLUMNS);
         String sql = "UPDATE employee_field_metadata SET required_field = 1 WHERE UPPER(column_name) IN ("
                 + placeholders(requiredColumns.size()) + ")";
@@ -1337,7 +1397,10 @@ public class EmployeeFieldDefinitionDao {
         if (builtIn.documentField()) {
             return DEFAULT_REQUIRED_DOCUMENT_COLUMNS.contains(column);
         }
-        return EmployeeBasicFieldUtil.BASIC_COLUMNS.contains(column)
+        if ("PERSONAL_EMAIL".equals(column)) {
+            return false;
+        }
+        return EmployeeBasicFieldUtil.REQUIRED_COLUMNS.contains(column)
                 || isFundamentalsHeading(builtIn.heading());
     }
 
@@ -1393,7 +1456,9 @@ public class EmployeeFieldDefinitionDao {
     }
 
     private static boolean isDefaultDropdownColumn(String column) {
-        return "GENDER".equalsIgnoreCase(column) || "RESIGN_REASON".equalsIgnoreCase(column);
+        return "GENDER".equalsIgnoreCase(column)
+                || "RESIGN_REASON".equalsIgnoreCase(column)
+                || "SECTION".equalsIgnoreCase(column);
     }
 
     private static boolean defaultTextAreaField(String column) {
@@ -1408,6 +1473,12 @@ public class EmployeeFieldDefinitionDao {
             return "Layoff\nRetirement\nOther";
         }
         return "";
+    }
+
+    private static String normalizeSearchValue(String value) {
+        return value == null
+                ? ""
+                : value.toLowerCase(Locale.ROOT).replaceAll("[\\s-]+", "").trim();
     }
 
     private Map<String, Integer> employeeColumns() throws SQLException {

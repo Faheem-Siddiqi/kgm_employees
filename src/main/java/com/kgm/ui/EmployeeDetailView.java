@@ -1,7 +1,6 @@
 package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRecordDao;
-import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.FileUploadCard;
@@ -16,6 +15,7 @@ import com.kgm.service.EmployeeReportService;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDetailViewHelper;
 import com.kgm.util.EmployeeBasicFieldUtil;
+import com.kgm.util.EmployeeFieldDefinitionCache;
 
 import javax.swing.*;
 import java.awt.*;
@@ -670,7 +670,7 @@ public class EmployeeDetailView extends JFrame {
 
     private List<EmployeeFieldDefinition> loadDetailDefinitions() {
         try {
-            return new EmployeeFieldDefinitionDao().listDetailFields();
+            return EmployeeFieldDefinitionCache.detailFields();
         } catch (RuntimeException exception) {
             exception.printStackTrace();
             return List.of();

@@ -25,7 +25,7 @@ public final class HomeViewHelper {
 
     public static void applyFrame(JFrame frame) {
         frame.setTitle("Home");
-        frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        AppWindowStateHelper.lockFullSize(frame);
         frame.setLocationRelativeTo(null);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());

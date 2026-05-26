@@ -29,6 +29,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
     private DefaultTableModel model;
     private File[] files;
     private String[] filePaths;
+    private boolean[] requiredDocuments;
     private JTextField searchField;
     private JButton clearSearchButton;
     private JScrollPane documentScrollPane;
@@ -39,6 +40,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
 
         files = new File[EmployeeDocumentUtil.documentCount()];
         filePaths = new String[EmployeeDocumentUtil.documentCount()];
+        requiredDocuments = EmployeeDocumentUtil.requiredDocumentFlags();
 
         JPanel topPanel = EmployeeDocumentUploadPanelHelper.createTopPanel();
 
@@ -163,12 +165,13 @@ public class EmployeeDocumentUploadPanel extends JPanel {
 
     private void addDocumentRow(int documentIndex) {
         File file = files[documentIndex];
+        boolean required = isRequiredDocument(documentIndex);
         String fileText = file == null ? "-" : file.getName();
         String statusText = file == null
-                ? "Not Uploaded"
+                ? required ? "Missing required" : "Not Uploaded"
                 : "Uploaded (" + EmployeeDocumentUtil.formatSize(file.length()) + ")";
         model.addRow(new Object[]{
-                EmployeeDocumentUtil.documentType(documentIndex).label(),
+                documentLabel(documentIndex),
                 fileText,
                 statusText,
                 "",
@@ -216,6 +219,18 @@ public class EmployeeDocumentUploadPanel extends JPanel {
             }
         }
         return bestScore;
+    }
+
+    private String documentLabel(int documentIndex) {
+        String label = EmployeeDocumentUtil.documentType(documentIndex).label();
+        return isRequiredDocument(documentIndex) ? label + " *" : label;
+    }
+
+    private boolean isRequiredDocument(int documentIndex) {
+        return requiredDocuments != null
+                && documentIndex >= 0
+                && documentIndex < requiredDocuments.length
+                && requiredDocuments[documentIndex];
     }
 
     private void updateCount() {
@@ -420,6 +435,15 @@ public class EmployeeDocumentUploadPanel extends JPanel {
 
     public String[] getAllDocumentPaths() {
         return filePaths;
+    }
+
+    public List<String> missingRequiredDocumentLabels() {
+        return EmployeeDocumentUtil.missingRequiredDocumentLabels(filePaths);
+    }
+
+    public void reloadDocumentRequirements() {
+        requiredDocuments = EmployeeDocumentUtil.requiredDocumentFlags();
+        refreshDocumentRows();
     }
 
     public void clearDocuments() {

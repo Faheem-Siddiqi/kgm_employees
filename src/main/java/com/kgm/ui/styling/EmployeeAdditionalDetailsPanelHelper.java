@@ -5,6 +5,7 @@ import javax.swing.border.AbstractBorder;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import com.kgm.ui.component.DropdownFieldSupport;
+import com.kgm.util.EmployeeBasicFieldUtil;
 import java.awt.*;
 import java.util.Date;
 
@@ -127,6 +128,7 @@ public final class EmployeeAdditionalDetailsPanelHelper {
     public static JComboBox<String> createDropdownField(String[] options, String value, boolean allowCustomValue) {
         JComboBox<String> combo = new JComboBox<>(options);
         DropdownFieldSupport.configure(combo, allowCustomValue);
+        DropdownFieldSupport.setPlaceholder(combo, EmployeeBasicFieldUtil.dropdownPlaceholder(allowCustomValue));
         EmployeeRegistrationFormPanelHelper.styleInput(combo);
         if (value != null && !value.isBlank()) {
             DropdownFieldSupport.setValue(combo, value);

@@ -1,6 +1,5 @@
 package com.kgm.util;
 
-import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 
@@ -17,6 +16,18 @@ import java.util.Set;
 public final class EmployeeDocumentUtil {
     public static final long MAX_SIZE = 400 * 1024;
     private static volatile List<DocumentType> cachedDocumentTypes;
+    private static volatile Set<String> cachedRequiredDocumentColumns;
+    private static final Set<String> DEFAULT_REQUIRED_DOCUMENT_COLUMNS = Set.of(
+            "CNIC_FRONT",
+            "CNIC_BACK",
+            "FINAL_SETTLEMENT",
+            "APPOINTMENT_LETTER_FRONT",
+            "APPOINTMENT_LETTER_BACK",
+            "APPLICATION_FRONT",
+            "APPLICATION_BACK",
+            "CLEARANCE_CERTIFICATE",
+            "EMP_IMG"
+    );
 
     private static final List<DocumentType> DOCUMENT_TYPES = List.of(
             new DocumentType("CNIC Front", "CNIC_FRONT", "CNIC_FRONT.jpg", "CNIC_Front"),
@@ -62,14 +73,68 @@ public final class EmployeeDocumentUtil {
     public static void refreshDocumentTypes() {
         synchronized (EmployeeDocumentUtil.class) {
             cachedDocumentTypes = null;
+            cachedRequiredDocumentColumns = null;
         }
+    }
+
+    public static boolean[] requiredDocumentFlags() {
+        Set<String> requiredColumns = requiredDocumentColumns();
+        List<DocumentType> types = documentTypes();
+        boolean[] flags = new boolean[types.size()];
+        for (int index = 0; index < types.size(); index++) {
+            flags[index] = requiredColumns.contains(types.get(index).employeeFieldName().toUpperCase(Locale.ROOT));
+        }
+        return flags;
+    }
+
+    public static boolean isProfileImageRequired() {
+        return requiredDocumentColumns().contains("EMP_IMG");
+    }
+
+    public static List<String> missingRequiredDocumentLabels(String[] documentPaths) {
+        boolean[] required = requiredDocumentFlags();
+        List<String> missing = new ArrayList<>();
+        for (int index = 0; index < required.length; index++) {
+            String path = documentPaths != null && index < documentPaths.length ? documentPaths[index] : null;
+            if (required[index] && !hasStoredPath(path)) {
+                missing.add(cleanDocumentLabel(index));
+            }
+        }
+        return missing;
+    }
+
+    private static Set<String> requiredDocumentColumns() {
+        Set<String> cached = cachedRequiredDocumentColumns;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (EmployeeDocumentUtil.class) {
+            if (cachedRequiredDocumentColumns == null) {
+                cachedRequiredDocumentColumns = loadRequiredDocumentColumns();
+            }
+            return cachedRequiredDocumentColumns;
+        }
+    }
+
+    private static Set<String> loadRequiredDocumentColumns() {
+        Set<String> columns = new HashSet<>();
+        try {
+            for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.documentFields()) {
+                if (definition.requiredField()) {
+                    columns.add(definition.columnName().toUpperCase(Locale.ROOT));
+                }
+            }
+        } catch (RuntimeException exception) {
+            columns.addAll(DEFAULT_REQUIRED_DOCUMENT_COLUMNS);
+        }
+        return Set.copyOf(columns);
     }
 
     private static List<DocumentType> loadDocumentTypes() {
         List<DocumentType> types = new ArrayList<>();
         try {
             Map<String, EmployeeFieldDefinition> metadata = new LinkedHashMap<>();
-            for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao().listFields()) {
+            for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.fields()) {
                 if (definition.documentField() && !isProfileImageColumn(definition.columnName())) {
                     metadata.put(definition.columnName().toUpperCase(Locale.ROOT), definition);
                 }

@@ -6,6 +6,7 @@ import com.kgm.service.AuthService;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.UniversalTablePanel;
+import com.kgm.ui.styling.AppWindowStateHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.util.EmployeeDocumentUtil;
@@ -65,12 +66,13 @@ public class FieldManagementView extends JFrame {
     private UniversalTablePanel categoryTable;
     private UniversalTablePanel requiredTable;
     private JTextField searchField;
+    private JTextField requiredSearchField;
     private JComboBox<String> originFilter;
     private String selectedCategoryHeading;
 
     public FieldManagementView() {
         setTitle("Field Management");
-        setExtendedState(JFrame.MAXIMIZED_BOTH);
+        AppWindowStateHelper.lockFullSize(this);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
@@ -362,6 +364,7 @@ public class FieldManagementView extends JFrame {
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         actions.setBackground(Color.WHITE);
         actions.add(refresh);
+        row.add(createRequiredSearchBox(), BorderLayout.WEST);
         row.add(actions, BorderLayout.EAST);
         return row;
     }
@@ -448,6 +451,60 @@ public class FieldManagementView extends JFrame {
         return panel;
     }
 
+    private JPanel createRequiredSearchBox() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        panel.setBackground(Color.WHITE);
+
+        requiredSearchField = new PlaceholderTextField("Search", 28);
+        requiredSearchField.setToolTipText("Search by field label, DB column, heading, category, or required status");
+        requiredSearchField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        requiredSearchField.setBorder(null);
+
+        JButton clear = new JButton("X");
+        clear.setToolTipText("Clear search");
+        clear.setFocusPainted(false);
+        clear.setBorderPainted(false);
+        clear.setContentAreaFilled(false);
+        clear.setMargin(new Insets(0, 0, 0, 0));
+        clear.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        clear.setForeground(new Color(99, 115, 129));
+        clear.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        clear.setPreferredSize(new Dimension(28, 28));
+        setClearButtonActive(clear, false);
+        clear.addActionListener(event -> {
+            if (!requiredSearchField.getText().isEmpty()) {
+                requiredSearchField.setText("");
+                requiredSearchField.requestFocusInWindow();
+            }
+        });
+
+        JPanel searchBox = new JPanel(new BorderLayout(6, 0));
+        searchBox.setBackground(Color.WHITE);
+        searchBox.setPreferredSize(new Dimension(320, 34));
+        searchBox.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(6, 8, 6, 8)));
+        searchBox.add(requiredSearchField, BorderLayout.CENTER);
+        searchBox.add(clear, BorderLayout.EAST);
+
+        requiredSearchField.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent event) {
+                updateRequiredSearch(clear);
+            }
+
+            public void removeUpdate(DocumentEvent event) {
+                updateRequiredSearch(clear);
+            }
+
+            public void changedUpdate(DocumentEvent event) {
+                updateRequiredSearch(clear);
+            }
+        });
+
+        panel.add(searchBox);
+        return panel;
+    }
+
     private JComponent createOriginFilter() {
         originFilter = new JComboBox<>(new String[]{"All Fields", "Built-in", "Custom"});
         originFilter.setFont(new Font("Segoe UI", Font.PLAIN, 13));
@@ -461,6 +518,11 @@ public class FieldManagementView extends JFrame {
     private void updateSearch(JButton clear) {
         setClearButtonActive(clear, searchField != null && !searchField.getText().isEmpty());
         applyFieldSearch();
+    }
+
+    private void updateRequiredSearch(JButton clear) {
+        setClearButtonActive(clear, requiredSearchField != null && !requiredSearchField.getText().isEmpty());
+        refreshRequiredTable();
     }
 
     private void setClearButtonActive(JButton clear, boolean active) {
@@ -566,7 +628,26 @@ public class FieldManagementView extends JFrame {
         if (requiredTable == null) {
             return;
         }
-        requiredTable.setRows(toRequiredRows(allFields));
+        String query = requiredSearchField == null
+                ? ""
+                : requiredSearchField.getText().trim().toLowerCase(Locale.ROOT);
+        List<EmployeeFieldDefinition> filtered = new ArrayList<>();
+        for (EmployeeFieldDefinition definition : allFields) {
+            if (query.isEmpty() || matchesRequiredSearch(definition, query)) {
+                filtered.add(definition);
+            }
+        }
+        requiredTable.setRows(toRequiredRows(filtered));
+    }
+
+    private boolean matchesRequiredSearch(EmployeeFieldDefinition definition, String query) {
+        String category = definition.documentField() ? "Documents" : "Fields";
+        String required = definition.requiredField() ? "True" : "False";
+        return contains(definition.label(), query)
+                || contains(definition.columnName(), query)
+                || contains(definition.heading(), query)
+                || contains(category, query)
+                || contains(required, query);
     }
 
     private List<Object[]> toRequiredRows(List<EmployeeFieldDefinition> definitions) {

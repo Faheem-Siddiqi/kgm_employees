@@ -1,9 +1,9 @@
 package com.kgm.service;
 
 import com.kgm.config.DatabaseConnection;
-import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.EmployeeFieldDefinitionCache;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -387,7 +387,7 @@ public final class ExcelExportService {
             columns.add(normalizeColumn(type.employeeFieldName()));
         }
         try {
-            for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao(connection).listFields()) {
+            for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.fields()) {
                 if (definition.documentField()) {
                     columns.add(normalizeColumn(definition.columnName()));
                 }

@@ -1,5 +1,6 @@
 package com.kgm.ui.panel;
 
+import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.DropdownFieldSupport;
@@ -23,10 +24,17 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class EmployeeBasicDetailsPanel extends JPanel {
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+    private static final int DROPDOWN_SEARCH_DEBOUNCE_MS = 350;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final List<EmployeeFieldDefinition> definitions;
     private final Map<String, JComponent> inputsByColumn = new LinkedHashMap<>();
@@ -178,6 +186,11 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         } else if (EmployeeBasicFieldUtil.isDropdownField(definition)) {
             JComboBox<String> combo = new JComboBox<>(EmployeeBasicFieldUtil.dropdownOptions(definition, true));
             DropdownFieldSupport.configure(combo, definition.variableOptionField());
+            DropdownFieldSupport.setPlaceholder(
+                    combo,
+                    EmployeeBasicFieldUtil.dropdownPlaceholder(definition.variableOptionField())
+            );
+            installDynamicDropdownSearch(definition, combo);
             input = combo;
         } else if (EmployeeBasicFieldUtil.isMultilineField(definition)) {
             input = new UniversalTextArea();
@@ -200,6 +213,21 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         EmployeeBasicDetailsPanelHelper.styleInput(input);
         inputsByColumn.put(column, input);
         return input;
+    }
+
+    private void installDynamicDropdownSearch(EmployeeFieldDefinition definition, JComboBox<String> combo) {
+        if (!definition.variableOptionField()) {
+            return;
+        }
+        DropdownFieldSupport.installAsyncSearch(
+                combo,
+                query -> new EmployeeFieldDefinitionDao().searchDistinctEmployeeValues(
+                        definition.columnName(),
+                        query,
+                        25
+                ),
+                DROPDOWN_SEARCH_DEBOUNCE_MS
+        );
     }
 
     private void loadEmployeeData() {
@@ -347,6 +375,9 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             if ("NID".equalsIgnoreCase(column)) {
                 value = CnicFormatter.format(value);
             }
+            if ("GRADE".equalsIgnoreCase(column)) {
+                value = value.toUpperCase(Locale.ROOT);
+            }
             EmployeeBasicFieldUtil.writeValue(updated, column, value);
         }
         return updated;
@@ -356,6 +387,11 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         String cnic = valueFor("NID");
         if (!cnic.isBlank() && !CnicFormatter.isValid(cnic)) {
             return "CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".";
+        }
+
+        String email = valueFor("PERSONAL_EMAIL");
+        if (!email.isBlank() && !EMAIL_PATTERN.matcher(email).matches()) {
+            return "Enter a valid email address.";
         }
 
         Date joining = dateFor("JOINING_DATE");

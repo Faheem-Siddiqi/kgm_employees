@@ -24,7 +24,7 @@ import java.util.Locale;
 
 public final class ExcelSampleGenerator {
     private static final int SAMPLE_ROW_COUNT = 5;
-    private static final String[] SAMPLE_EMPLOYEE_CODES = {"EMP-1001", "EMP-1002", "EMP-1003", "EMP-1004", "EMP-1005"};
+    private static final String[] SAMPLE_EMPLOYEE_CODES = {"00050", "00123", "000272", "000273", "000274"};
     private static final String[] SAMPLE_NAMES = {"Ali Khan", "Sana Malik", "Bilal Ahmed", "Ayesha Noor", "Usman Raza"};
     private static final String[] SAMPLE_FATHER_NAMES = {"Ahmed Khan", "Tariq Malik", "Naveed Ahmed", "Imran Noor", "Raza Ali"};
     private static final String[] SAMPLE_CNICS = {
@@ -275,6 +275,7 @@ public final class ExcelSampleGenerator {
     private static CellStyle unlockedStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
         style.setLocked(false);
+        style.setDataFormat(workbook.createDataFormat().getFormat("@"));
         return style;
     }
 

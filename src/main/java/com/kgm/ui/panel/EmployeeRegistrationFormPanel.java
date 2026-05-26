@@ -1,5 +1,6 @@
 package com.kgm.ui.panel;
 
+import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.DropdownFieldSupport;
@@ -22,25 +23,49 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 public class EmployeeRegistrationFormPanel extends JPanel {
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final int DROPDOWN_SEARCH_DEBOUNCE_MS = 350;
 
-    private List<EmployeeFieldDefinition> definitions = EmployeeBasicFieldUtil.loadBasicDefinitions();
+    private List<EmployeeFieldDefinition> definitions;
     private final Map<String, JComponent> inputsByColumn = new LinkedHashMap<>();
+    private boolean profileImageRequired;
 
     private JLabel photoPreview;
     private FileUploadCard photoUploadCard;
     private File selectedImage;
 
     public EmployeeRegistrationFormPanel() {
+        this(EmployeeBasicFieldUtil.loadBasicDefinitions(), EmployeeDocumentUtil.isProfileImageRequired());
+    }
+
+    public EmployeeRegistrationFormPanel(
+            List<EmployeeFieldDefinition> definitions,
+            boolean profileImageRequired
+    ) {
+        this.definitions = definitions == null || definitions.isEmpty()
+                ? EmployeeBasicFieldUtil.fallbackDefinitions()
+                : List.copyOf(definitions);
+        this.profileImageRequired = profileImageRequired;
         EmployeeRegistrationFormPanelHelper.stylePanel(this);
         add(EmployeeRegistrationFormPanelHelper.createFormContent(buildForm()), BorderLayout.NORTH);
     }
 
     public void reloadFields() {
         definitions = EmployeeBasicFieldUtil.loadBasicDefinitions();
+        profileImageRequired = EmployeeDocumentUtil.isProfileImageRequired();
         inputsByColumn.clear();
         selectedImage = null;
         removeAll();
@@ -75,14 +100,14 @@ public class EmployeeRegistrationFormPanel extends JPanel {
     private JPanel buildLeftPanel() {
         JPanel left = EmployeeRegistrationFormPanelHelper.createPhotoPanel();
 
-        photoPreview = EmployeeRegistrationFormPanelHelper.createPhotoPreview("Photo");
+        photoPreview = EmployeeRegistrationFormPanelHelper.createPhotoPreview(photoPreviewText());
         photoPreview.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 chooseImage(photoPreview);
             }
         });
 
-        photoUploadCard = new FileUploadCard("Employee Photo", "JPEG only - Max 400KB", "Choose");
+        photoUploadCard = new FileUploadCard(requiredLabel("Employee Photo"), "JPEG only - Max 400KB", "Choose");
         photoUploadCard.addActionListener(event -> chooseImage(photoPreview));
 
         JPanel bottom = EmployeeRegistrationFormPanelHelper.createPhotoInfoPanel();
@@ -130,13 +155,13 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         gbc.gridy = y;
         gbc.gridx = 0;
         gbc.gridwidth = 1;
-        panel.add(new FormField(first.label(), inputFor(first)), gbc);
+        panel.add(new FormField(first, inputFor(first)), gbc);
 
         gbc.gridx = 1;
         if (second == null) {
             panel.add(Box.createHorizontalStrut(1), gbc);
         } else {
-            panel.add(new FormField(second.label(), inputFor(second)), gbc);
+            panel.add(new FormField(second, inputFor(second)), gbc);
         }
     }
 
@@ -144,7 +169,7 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         gbc.gridy = y;
         gbc.gridx = 0;
         gbc.gridwidth = 1;
-        panel.add(new FormField(definition.label(), inputFor(definition)), gbc);
+        panel.add(new FormField(definition, inputFor(definition)), gbc);
         gbc.gridx = 1;
         panel.add(Box.createHorizontalStrut(1), gbc);
     }
@@ -153,7 +178,7 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         gbc.gridy = y;
         gbc.gridx = 0;
         gbc.gridwidth = 2;
-        panel.add(new FormField(definition.label(), inputFor(definition)), gbc);
+        panel.add(new FormField(definition, inputFor(definition)), gbc);
         gbc.gridwidth = 1;
     }
 
@@ -168,6 +193,7 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             // Set placeholder text for value() to treat as empty
             String placeholder = EmployeeBasicFieldUtil.dropdownPlaceholder(definition.variableOptionField());
             DropdownFieldSupport.setPlaceholder(combo, placeholder);
+            installDynamicDropdownSearch(definition, combo);
             input = combo;
         } else if (EmployeeBasicFieldUtil.isMultilineField(definition)) {
             input = new UniversalTextArea();
@@ -179,12 +205,31 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             if ("EMP_CONTNO".equalsIgnoreCase(column)) {
                 PhoneFormatter.installFormatter((JTextField) input);
             }
+            if ("EMPLOYEE_CODE".equalsIgnoreCase(column)) {
+                installDigitsOnlyFilter((JTextField) input);
+                input.setToolTipText("Employee ID must contain numbers only.");
+            }
         }
 
         EmployeeRegistrationFormPanelHelper.styleInput(input);
         applyDefaultValue(column, input);
         inputsByColumn.put(column, input);
         return input;
+    }
+
+    private void installDynamicDropdownSearch(EmployeeFieldDefinition definition, JComboBox<String> combo) {
+        if (!definition.variableOptionField()) {
+            return;
+        }
+        DropdownFieldSupport.installAsyncSearch(
+                combo,
+                query -> new EmployeeFieldDefinitionDao().searchDistinctEmployeeValues(
+                        definition.columnName(),
+                        query,
+                        25
+                ),
+                DROPDOWN_SEARCH_DEBOUNCE_MS
+        );
     }
 
     private void applyDefaultValue(String column, JComponent input) {
@@ -202,9 +247,6 @@ public class EmployeeRegistrationFormPanel extends JPanel {
     private String defaultValue(String column) {
         if ("DESCR".equalsIgnoreCase(column)) {
             return "KGM";
-        }
-        if ("SECTION".equalsIgnoreCase(column)) {
-            return "N/A";
         }
         return "";
     }
@@ -257,6 +299,9 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             if ("NID".equalsIgnoreCase(column)) {
                 value = CnicFormatter.format(value);
             }
+            if ("GRADE".equalsIgnoreCase(column)) {
+                value = value.toUpperCase(Locale.ROOT);
+            }
             EmployeeBasicFieldUtil.writeValue(employee, column, value);
         }
         return employee;
@@ -265,9 +310,19 @@ public class EmployeeRegistrationFormPanel extends JPanel {
     public String validationMessage() {
         for (EmployeeFieldDefinition definition : definitions) {
             String column = definition.columnName();
-            if (EmployeeBasicFieldUtil.isRequired(definition) && isEmpty(valueFor(column))) {
+            if (isRequiredForRegistration(definition) && isEmpty(valueFor(column))) {
                 return definition.label() + " is required.";
             }
+        }
+
+        String employeeId = valueFor("EMPLOYEE_CODE");
+        if (!employeeId.isBlank() && !employeeId.matches("\\d+")) {
+            return "Employee ID must contain numbers only.";
+        }
+
+        String email = valueFor("PERSONAL_EMAIL");
+        if (!email.isBlank() && !EMAIL_PATTERN.matcher(email).matches()) {
+            return "Enter a valid email address.";
         }
 
         String cnic = valueFor("NID");
@@ -314,8 +369,18 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         return value == null || value.trim().isEmpty();
     }
 
+    private boolean isRequiredForRegistration(EmployeeFieldDefinition definition) {
+        return definition != null
+                && definition.requiredField()
+                && EmployeeBasicFieldUtil.isFundamentalsHeading(definition.heading());
+    }
+
     public File getSelectedImage() {
         return selectedImage;
+    }
+
+    public boolean isRequiredProfileImageMissing() {
+        return profileImageRequired && selectedImage == null;
     }
 
     public void clearForm() {
@@ -344,7 +409,7 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             photoUploadCard.setStatus("");
         }
         photoPreview.setIcon(null);
-        photoPreview.setText("Photo");
+        photoPreview.setText(photoPreviewText());
         requestInitialFocus();
         revalidate();
         repaint();
@@ -363,10 +428,58 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         }
     }
 
+    private String photoPreviewText() {
+        return profileImageRequired ? requiredLabel("Photo") : "Photo";
+    }
+
+    private String requiredLabel(String text) {
+        return profileImageRequired
+                ? "<html>" + text + " <font color='#d93025'>*</font></html>"
+                : text;
+    }
+
+    private void installDigitsOnlyFilter(JTextField field) {
+        if (field == null || !(field.getDocument() instanceof AbstractDocument document)) {
+            return;
+        }
+        document.setDocumentFilter(new DigitsOnlyDocumentFilter());
+    }
+
+    private static class DigitsOnlyDocumentFilter extends DocumentFilter {
+        @Override
+        public void insertString(FilterBypass fb, int offset, String text, AttributeSet attrs)
+                throws BadLocationException {
+            replace(fb, offset, 0, text, attrs);
+        }
+
+        @Override
+        public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs)
+                throws BadLocationException {
+            String digits = text == null ? "" : text.replaceAll("\\D", "");
+            fb.replace(offset, length, digits, attrs);
+        }
+    }
+
+    private String labelText(EmployeeFieldDefinition definition) {
+        String label = definition == null ? "" : definition.label();
+        if (!isRequiredForRegistration(definition)) {
+            return label;
+        }
+        return "<html>" + htmlEscape(label) + " <font color='#d93025'>*</font></html>";
+    }
+
+    private String htmlEscape(String value) {
+        return value == null
+                ? ""
+                : value.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;");
+    }
+
     private class FormField extends JPanel {
-        FormField(String text, JComponent input) {
+        FormField(EmployeeFieldDefinition definition, JComponent input) {
             EmployeeRegistrationFormPanelHelper.styleFormField(this);
-            add(EmployeeRegistrationFormPanelHelper.createFieldLabel(text), BorderLayout.NORTH);
+            add(EmployeeRegistrationFormPanelHelper.createFieldLabel(labelText(definition)), BorderLayout.NORTH);
             add(input, BorderLayout.CENTER);
         }
     }

@@ -129,7 +129,7 @@ public class HomeView extends JFrame {
         JButton addBtn = new JButton("Add Employee");
         HomeViewHelper.styleAddButton(addBtn);
         addBtn.addActionListener(e -> {
-            new EmployeeRegistrationView().setVisible(true);
+            new EmployeeRegistrationView();
             dispose();
         });
 

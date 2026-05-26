@@ -1361,8 +1361,8 @@
       "dateField": false,
       "sortOrder": 225,
       "coreField": true,
-      "dropdownField": false,
-      "variableOptionField": false,
+      "dropdownField": true,
+      "variableOptionField": true,
       "textAreaField": false,
       "dropdownOptions": "",
       "requiredField": true
@@ -1518,7 +1518,7 @@
       "variableOptionField": false,
       "textAreaField": false,
       "dropdownOptions": "",
-      "requiredField": true
+      "requiredField": false
     },
     {
       "columnName": "USER_ID",

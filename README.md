@@ -158,6 +158,7 @@ The project follows a layered desktop-application architecture:
 
 | File | Functionality |
 | --- | --- |
+| **AppWindowStateHelper.java** | Keeps application screens full-size/maximized while still allowing users to minimize them. Login, native file dialogs, and modal dialogs are not routed through this helper. |
 | **HomeViewHelper.java** | Styling and layout helper for the Home dashboard. |
 | **LoginViewHelper.java** | Styling and component factory methods for the login screen, including background image panel, form layout, placeholder fields, and primary button. |
 | **EmployeeRegistrationViewHelper.java** | Layout and style helper for the employee registration window, page header, tabs, action rows, buttons, and scroll behavior. |
@@ -188,6 +189,7 @@ The project follows a layered desktop-application architecture:
 | **SessionWatcher.java** | Monitors active session expiry and closes/redirects windows when the session is no longer valid. |
 | **EmployeeBasicFieldUtil.java** | Single source of truth for Core employee field order, required-field rules, date/dropdown defaults, and labels used by Add Employee, Basic Detail, and Excel import/sample generation. |
 | **EmployeeAdditionalFieldDefaults.java** | Seeds the 43 ERP/detail custom fields with database columns, Field Management categories, date/dropdown behavior, and Excel sample values. |
+| **EmployeeFieldDefinitionCache.java** | Keeps field metadata in memory for the current app session so screens reuse one loaded catalog. It is refreshed only at startup warm-up or after Field Management changes. |
 | **EmployeeFieldMetadataStore.java** | Reads/writes validated metadata JSON snapshots for external AppData backup, backup-copy recovery, bundled factory defaults, and local cache refresh. |
 | **EmployeeDocumentUtil.java** | Shared document metadata, validation, path handling, filename matching, and bulk-upload matching for the 22 required document fields. |
 | **FileUtil.java** | Reserved file utility boundary for shared file handling logic. |
@@ -263,6 +265,8 @@ The app keeps `employees` as the canonical employee row for Excel import/export,
 Startup also ensures indexes for employee-code lookup and dashboard/reporting group fields (`DEPARTMENT`, `SECTION`, `GRADE`, `DESIGNATION`, and `RESIGN_REASON`) so home statistics and navigation filters stay responsive as the employee table grows.
 
 Field metadata has layered durability. The database remains the active source while the app is running. Every Field Management add/edit/delete, required flag, category, dropdown, label, order, visibility, date, or text-area change writes the DB first, then atomically refreshes `%APPDATA%/KGM Ex-Employee Management/employee_field_metadata.json` and the local cache with schema version, timestamp, checksum, and a backup copy. On startup, the cache is used only when its DB checksum is fresh. If the metadata table is empty after a new setup, reset, or database drop, the initializer restores the latest valid AppData JSON first and recreates missing custom employee columns; it falls back to bundled `employee_field_metadata_default.json` only when the external backup is missing, corrupt, or from an unsupported schema version.
+
+During a normal app session, field metadata is loaded into `EmployeeFieldDefinitionCache` once and reused by Add Employee, Employee Detail, document requirements, Excel import/export, reports, and missing-data checks. Field Management changes invalidate this in-memory cache after the DB and AppData JSON backup are saved, so the next screen refresh gets the latest metadata without every screen repeatedly querying DB or rereading JSON.
 
 Key schema areas:
 
@@ -411,6 +415,12 @@ com.kgm.Main
 
 The application initializes the configured database and employee schema automatically on startup.
 At startup, the console also prints `MySQL Server Running On` with the configured host and port.
+
+### Field Metadata Backup and DB Drop Behavior
+
+Yes. Field Management changes are dynamic and are saved outside the database after each successful metadata operation. The app writes the DB change first, then refreshes `%APPDATA%/KGM Ex-Employee Management/employee_field_metadata.json` plus a local cache/backup copy.
+
+If the MySQL database is dropped or recreated, startup restores the latest valid AppData metadata backup first and recreates missing custom employee columns. The bundled `employee_field_metadata_default.json` is used only as a fallback when no valid local backup exists. Do not delete the AppData metadata file if the latest field setup must be restored after a DB reset.
 
 Default application login:
 

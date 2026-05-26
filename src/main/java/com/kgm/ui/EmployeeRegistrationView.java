@@ -3,6 +3,7 @@ package com.kgm.ui;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.dao.EmployeeRegistrationDao;
 import com.kgm.model.Employee;
+import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.EmployeeDocumentUploadPanel;
 import com.kgm.ui.panel.FooterPanel;
@@ -10,6 +11,7 @@ import com.kgm.ui.panel.EmployeeRegistrationFormPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
+import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
 
 import javax.swing.*;
@@ -17,14 +19,20 @@ import java.awt.*;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 
 public class EmployeeRegistrationView extends JFrame {
     private EmployeeRegistrationFormPanel formPanel;
+    private EmployeeDocumentUploadPanel documentPanel;
+    private JPanel centerWrapper;
+    private JScrollPane pageScroll;
+    private Runnable onBack;
 
     public EmployeeRegistrationView() {
         EmployeeRegistrationViewHelper.applyFrame(this);
 
-        Runnable onBack = () -> {
+        onBack = () -> {
             new HomeView();
             this.dispose();
         };
@@ -33,12 +41,71 @@ public class EmployeeRegistrationView extends JFrame {
         topContainer.add(new HeaderPanel("Employee Registration"), BorderLayout.NORTH);
         add(topContainer, BorderLayout.NORTH);
 
-        JPanel centerWrapper = EmployeeRegistrationViewHelper.createCenterWrapper();
+        centerWrapper = EmployeeRegistrationViewHelper.createCenterWrapper();
+        centerWrapper.add(EmployeeRegistrationViewHelper.screenHeader(onBack), EmployeeRegistrationViewHelper.pageConstraints(0));
+        centerWrapper.add(createLoadingPanel(), EmployeeRegistrationViewHelper.pageConstraints(1));
+
+        pageScroll = EmployeeRegistrationViewHelper.createPageScrollPane(centerWrapper);
+        EmployeeRegistrationViewHelper.installPageWheelForwarding(pageScroll, centerWrapper);
+        add(pageScroll, BorderLayout.CENTER);
+        add(new FooterPanel(), BorderLayout.SOUTH);
+        setVisible(true);
+
+        SwingUtilities.invokeLater(this::loadRegistrationContentAsync);
+    }
+
+    private JComponent createLoadingPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createEmptyBorder(28, 28, 28, 28));
+
+        JLabel label = new JLabel("Preparing employee form...");
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        label.setForeground(new Color(99, 115, 129));
+        panel.add(label, BorderLayout.NORTH);
+        return panel;
+    }
+
+    private void loadRegistrationContentAsync() {
+        SwingWorker<RegistrationMetadata, Void> worker = new SwingWorker<>() {
+            @Override
+            protected RegistrationMetadata doInBackground() {
+                List<EmployeeFieldDefinition> definitions = EmployeeBasicFieldUtil.loadBasicDefinitions();
+                EmployeeDocumentUtil.documentTypes();
+                EmployeeDocumentUtil.requiredDocumentFlags();
+                return new RegistrationMetadata(definitions, EmployeeDocumentUtil.isProfileImageRequired());
+            }
+
+            @Override
+            protected void done() {
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    showRegistrationContent(get());
+                } catch (Exception exception) {
+                    showRegistrationContent(new RegistrationMetadata(
+                            EmployeeBasicFieldUtil.fallbackDefinitions(),
+                            false
+                    ));
+                    DialogHelper.warning(
+                            EmployeeRegistrationView.this,
+                            "Employee Form",
+                            "Unable to load latest field settings. Default fields are shown."
+                    );
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void showRegistrationContent(RegistrationMetadata metadata) {
+        centerWrapper.removeAll();
         centerWrapper.add(EmployeeRegistrationViewHelper.screenHeader(onBack), EmployeeRegistrationViewHelper.pageConstraints(0));
 
         JTabbedPane tabs = new HugHeightTabbedPane();
-        formPanel = new EmployeeRegistrationFormPanel();
-        EmployeeDocumentUploadPanel documentPanel = new EmployeeDocumentUploadPanel();
+        formPanel = new EmployeeRegistrationFormPanel(metadata.definitions(), metadata.profileImageRequired());
+        documentPanel = new EmployeeDocumentUploadPanel();
 
         JButton backButton = new JButton("Back");
         JButton submitButton = new JButton("Submit");
@@ -65,22 +132,30 @@ public class EmployeeRegistrationView extends JFrame {
 
         centerWrapper.add(tabs, EmployeeRegistrationViewHelper.pageConstraints(1));
 
-        JScrollPane pageScroll = EmployeeRegistrationViewHelper.createPageScrollPane(centerWrapper);
         tabs.addChangeListener(event -> SwingUtilities.invokeLater(() -> {
             centerWrapper.revalidate();
             centerWrapper.repaint();
             pageScroll.getVerticalScrollBar().setValue(0);
         }));
         EmployeeRegistrationViewHelper.installPageWheelForwarding(pageScroll, centerWrapper);
-        add(pageScroll, BorderLayout.CENTER);
-        add(new FooterPanel(), BorderLayout.SOUTH);
-
         backButton.addActionListener(e -> tabs.setSelectedIndex(0));
 
         submitButton.addActionListener(e -> {
             String validationMessage = formPanel.validationMessage();
             if (validationMessage != null) {
                 DialogHelper.warning(this, "Check Employee Details", validationMessage);
+                return;
+            }
+
+            List<String> missingRequiredUploads = missingRequiredUploads(documentPanel);
+            if (!missingRequiredUploads.isEmpty()) {
+                DialogHelper.errorSections(
+                        this,
+                        "Upload Required Documents",
+                        "Mandatory uploads\nUpload these mandatory documents before saving the employee record.",
+                        "Missing documents\n" + bulletList(missingRequiredUploads)
+                );
+                tabs.setSelectedIndex(formPanel.isRequiredProfileImageMissing() ? 0 : 1);
                 return;
             }
 
@@ -125,7 +200,9 @@ public class EmployeeRegistrationView extends JFrame {
             };
             worker.execute();
         });
-        setVisible(true);
+        centerWrapper.revalidate();
+        centerWrapper.repaint();
+        pageScroll.getVerticalScrollBar().setValue(0);
     }
 
     private void saveEmployeeRecord(
@@ -169,8 +246,37 @@ public class EmployeeRegistrationView extends JFrame {
         if (formPanel != null) {
             formPanel.reloadFields();
         }
+        if (documentPanel != null) {
+            documentPanel.reloadDocumentRequirements();
+        }
         revalidate();
         repaint();
+    }
+
+    private List<String> missingRequiredUploads(EmployeeDocumentUploadPanel documentPanel) {
+        List<String> missing = new ArrayList<>();
+        if (formPanel.isRequiredProfileImageMissing()) {
+            missing.add("Employee Photo");
+        }
+        missing.addAll(documentPanel.missingRequiredDocumentLabels());
+        return missing;
+    }
+
+    private String bulletList(List<String> values) {
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (builder.length() > 0) {
+                builder.append('\n');
+            }
+            builder.append("- ").append(value);
+        }
+        return builder.toString();
+    }
+
+    private record RegistrationMetadata(
+            List<EmployeeFieldDefinition> definitions,
+            boolean profileImageRequired
+    ) {
     }
 
     private static class HugHeightTabbedPane extends JTabbedPane {

@@ -186,7 +186,7 @@ public final class EmployeeDocumentUploadPanelHelper {
     }
 
     public static void stylePreviewFrame(JFrame frame, Component relativeTo) {
-        frame.setSize(850, 650);
+        AppWindowStateHelper.lockFullSize(frame);
         frame.setLocationRelativeTo(relativeTo);
     }
 }

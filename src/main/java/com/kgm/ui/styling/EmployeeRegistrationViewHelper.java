@@ -28,7 +28,7 @@ public final class EmployeeRegistrationViewHelper {
 
     public static void applyFrame(JFrame frame) {
         frame.setTitle("Employee Form");
-        frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        AppWindowStateHelper.lockFullSize(frame);
         frame.setLocationRelativeTo(null);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());

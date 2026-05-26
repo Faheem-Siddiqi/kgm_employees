@@ -1,13 +1,13 @@
 package com.kgm.service;
 
 import com.kgm.config.DatabaseConnection;
-import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.dao.EmployeeRegistrationDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.CnicFormatter;
 import com.kgm.util.EmployeeAdditionalFieldDefaults;
 import com.kgm.util.EmployeeBasicFieldUtil;
+import com.kgm.util.EmployeeFieldDefinitionCache;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -134,8 +134,7 @@ public class ExcelImportService {
             }
 
             reportProgress(progressListener, "Reading headers...", 0, 0, 3);
-            EmployeeFieldDefinitionDao fieldDao = new EmployeeFieldDefinitionDao(connection);
-            FieldCatalog catalog = loadFieldCatalog(fieldDao);
+            FieldCatalog catalog = loadFieldCatalog();
             DataFormatter formatter = new DataFormatter();
             FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
             Map<String, HeaderBinding> headers = readHeaders(
@@ -202,7 +201,7 @@ public class ExcelImportService {
 
     public static List<TemplateColumn> templateColumns() {
         try {
-            return templateColumns(new EmployeeFieldDefinitionDao().listFields());
+            return templateColumns(EmployeeFieldDefinitionCache.fields());
         } catch (RuntimeException exception) {
             return fallbackTemplateColumns();
         }
@@ -381,7 +380,7 @@ public class ExcelImportService {
             return dropdownOptions.get(0);
         }
         return switch (column) {
-            case "EMPLOYEE_CODE" -> "EMP-1001";
+            case "EMPLOYEE_CODE" -> "00050";
             case "UNT_CODE" -> "KGM";
             case "DESCR" -> "KGM";
             case "EMP_NAME" -> "Ali Khan";
@@ -418,14 +417,14 @@ public class ExcelImportService {
         }
     }
 
-    private FieldCatalog loadFieldCatalog(EmployeeFieldDefinitionDao fieldDao) {
+    private FieldCatalog loadFieldCatalog() {
         Map<String, EmployeeFieldDefinition> byColumn = new LinkedHashMap<>();
         Map<String, EmployeeFieldDefinition> byAlias = new HashMap<>();
         Set<String> documentAliases = new LinkedHashSet<>();
         Set<String> standardRequiredColumns = new LinkedHashSet<>();
         Set<String> ignoredHeaderAliases = new LinkedHashSet<>();
 
-        for (EmployeeFieldDefinition definition : fieldDao.listFields()) {
+        for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.fields()) {
             String column = definition.columnName().toUpperCase(Locale.ROOT);
             if ("ID".equals(column)) {
                 continue;
@@ -542,6 +541,8 @@ public class ExcelImportService {
                 value = date == null ? "" : DB_DATE_FORMAT.format(date);
             } else if ("NID".equals(column)) {
                 value = cnicValue(cell, formatter, evaluator);
+            } else if ("EMPLOYEE_CODE".equals(column)) {
+                value = employeeCodeValue(cell, formatter, evaluator);
             } else {
                 value = cellText(cell, formatter, evaluator);
             }
@@ -850,6 +851,10 @@ public class ExcelImportService {
             return "";
         }
         return formatter.formatCellValue(cell, evaluator).trim();
+    }
+
+    private String employeeCodeValue(Cell cell, DataFormatter formatter, FormulaEvaluator evaluator) {
+        return cellText(cell, formatter, evaluator);
     }
 
     private String cnicValue(Cell cell, DataFormatter formatter, FormulaEvaluator evaluator) {

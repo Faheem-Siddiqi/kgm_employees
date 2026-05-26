@@ -1,13 +1,13 @@
 package com.kgm.service;
 
 import com.kgm.dao.EmployeeRecordDao;
-import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.util.CnicFormatter;
 import com.kgm.util.DateDisplayFormatter;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.EmployeeFieldDefinitionCache;
 
 import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
@@ -482,7 +482,7 @@ public class EmployeeReportService {
     private Map<String, List<String[]>> customReportRows(Employee employee) {
         Map<String, List<String[]>> rows = new LinkedHashMap<>();
         try {
-            for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao().listDetailFields()) {
+            for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.detailFields()) {
                 if (!definition.customField()) {
                     continue;
                 }

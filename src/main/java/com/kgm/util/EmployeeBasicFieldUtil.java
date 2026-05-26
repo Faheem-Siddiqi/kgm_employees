@@ -1,6 +1,5 @@
 package com.kgm.util;
 
-import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 
@@ -40,16 +39,22 @@ public final class EmployeeBasicFieldUtil {
             "PERMANENT_ADR"
     );
     public static final Set<String> DATE_COLUMNS = Set.of("DOB", "JOINING_DATE", "RESIGN_DATE");
-    public static final Set<String> REQUIRED_COLUMNS = Set.copyOf(BASIC_COLUMNS);
+    public static final Set<String> REQUIRED_COLUMNS = defaultRequiredColumns();
 
     private static final Map<String, String> DEFAULT_LABELS = defaultLabels();
 
     private EmployeeBasicFieldUtil() {
     }
 
+    private static Set<String> defaultRequiredColumns() {
+        Set<String> required = new LinkedHashSet<>(BASIC_COLUMNS);
+        required.remove("PERSONAL_EMAIL");
+        return Set.copyOf(required);
+    }
+
     public static List<EmployeeFieldDefinition> loadBasicDefinitions() {
         try {
-            return basicDefinitions(new EmployeeFieldDefinitionDao().listFields());
+            return basicDefinitions(EmployeeFieldDefinitionCache.fields());
         } catch (RuntimeException exception) {
             return fallbackDefinitions();
         }
@@ -223,7 +228,7 @@ public final class EmployeeBasicFieldUtil {
         return DEFAULT_LABELS.getOrDefault(column, titleFromColumn(column));
     }
 
-    private static List<EmployeeFieldDefinition> fallbackDefinitions() {
+    public static List<EmployeeFieldDefinition> fallbackDefinitions() {
         List<EmployeeFieldDefinition> definitions = new ArrayList<>();
         for (int index = 0; index < BASIC_COLUMNS.size(); index++) {
             definitions.add(fallbackDefinition(BASIC_COLUMNS.get(index), index));
