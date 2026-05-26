@@ -1,6 +1,7 @@
 package com.kgm.service;
 
 import com.kgm.util.CnicFormatter;
+import com.kgm.util.PhoneFormatter;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -137,7 +138,7 @@ public final class ExcelSampleGenerator {
         textCell(sheet.createRow(rowIndex++), 0, "Rules", headerStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Only .xlsx or .xls files can be imported.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ", including both hyphens.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Phone must use format 0307-5011252, including the hyphen.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "Phone must use format " + PhoneFormatter.FORMAT_EXAMPLE + ", including the hyphen.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Date of Joining must be before Date of Resignation.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Date format: " + ExcelImportService.DATE_FORMAT_HINT + " (example: 8/23/2010 00:00:00).", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Document fields are not part of Excel import.", textStyle);
@@ -155,7 +156,7 @@ public final class ExcelSampleGenerator {
         rowIndex++;
         textCell(sheet.createRow(rowIndex++), 0, "Common Reasons", headerStyle);
         textCell(sheet.createRow(rowIndex++), 0, "Layoff", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Retirement", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "Resignation", textStyle);
         textCell(sheet.createRow(rowIndex), 0, "Other", textStyle);
 
         for (int index = 0; index < headers.length; index++) {
@@ -185,7 +186,7 @@ public final class ExcelSampleGenerator {
             case "JOINING_DATE" -> SAMPLE_JOINING_DATES[sampleIndex];
             case "RESIGN_DATE" -> SAMPLE_RESIGN_DATES[sampleIndex];
             case "GENDER" -> sampleFrom(new String[]{"Male", "Female", "Male", "Female", "Male"}, sampleIndex);
-            case "RESIGN_REASON" -> sampleFrom(new String[]{"Retirement", "Layoff", "Other", "Retirement", "Other"}, sampleIndex);
+            case "RESIGN_REASON" -> sampleFrom(new String[]{"Resignation", "Layoff", "Other", "Resignation", "Other"}, sampleIndex);
             case "PERMANENT_ADR", "CURRENT_ADR" -> "House " + (sampleIndex + 1) + ", Lahore";
             default -> fallbackSampleValue(column, sampleIndex);
         };
@@ -217,7 +218,7 @@ public final class ExcelSampleGenerator {
             return column.dropdownOptions().isBlank() ? "Male, Female, Other" : column.dropdownOptions();
         }
         if ("RESIGN_REASON".equalsIgnoreCase(column.dbColumn())) {
-            return column.dropdownOptions().isBlank() ? "Layoff, Retirement, Other" : column.dropdownOptions();
+            return column.dropdownOptions().isBlank() ? "Layoff, Resignation, Other" : column.dropdownOptions();
         }
         if (!column.dropdownOptions().isBlank()) {
             return column.dropdownOptions();
@@ -238,7 +239,7 @@ public final class ExcelSampleGenerator {
             return "Use CNIC format " + CnicFormatter.FORMAT_EXAMPLE + ", including both hyphens.";
         }
         if ("EMP_CONTNO".equalsIgnoreCase(dbColumn) || "EMERGENCY_NO".equalsIgnoreCase(dbColumn)) {
-            return "Use phone format 0307-5011252, including the hyphen.";
+            return "Use phone format " + PhoneFormatter.FORMAT_EXAMPLE + ", including the hyphen.";
         }
         if ("JOINING_DATE".equalsIgnoreCase(dbColumn)) {
             return "Use " + ExcelImportService.DATE_FORMAT_HINT

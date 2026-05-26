@@ -1,6 +1,7 @@
 package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRecordDao;
+import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.GenericRecordTablePanel;
 import com.kgm.ui.panel.HeaderPanel;
@@ -37,6 +38,21 @@ public class MissingDataView extends JFrame {
             "Action"
     };
 
+    private enum MissingDataType {
+        FIELDS("Fields", "field", "fields"),
+        DOCUMENTS("Documents", "document", "documents");
+
+        private final String title;
+        private final String singular;
+        private final String plural;
+
+        MissingDataType(String title, String singular, String plural) {
+            this.title = title;
+            this.singular = singular;
+            this.plural = plural;
+        }
+    }
+
     private final GenericRecordTablePanel<EmployeeRecordDao.MissingEmployeeRow> tablePanel =
             new GenericRecordTablePanel<>(
                     COLUMNS,
@@ -48,9 +64,16 @@ public class MissingDataView extends JFrame {
     private JTextField employeeCodeSearchField;
     private JButton clearSearchButton;
     private JLabel filterStatusLabel;
+    private JTabbedPane missingTypeTabs;
+    private MissingDataType activeMissingType = MissingDataType.FIELDS;
     private SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> loadWorker;
 
     public MissingDataView() {
+        this(false);
+    }
+
+    public MissingDataView(boolean showDocumentsTab) {
+        activeMissingType = showDocumentsTab ? MissingDataType.DOCUMENTS : MissingDataType.FIELDS;
         setTitle("Missing Required Data");
         AppWindowStateHelper.lockFullSize(this);
         setLocationRelativeTo(null);
@@ -84,7 +107,7 @@ public class MissingDataView extends JFrame {
         JPanel topSection = new JPanel(new BorderLayout());
         topSection.setOpaque(false);
         topSection.add(createTitleRow(), BorderLayout.NORTH);
-        topSection.add(createSearchRow(), BorderLayout.CENTER);
+        topSection.add(createControlsStack(), BorderLayout.CENTER);
 
         main.add(topSection, BorderLayout.NORTH);
         main.add(createTableSection(), BorderLayout.CENTER);
@@ -129,6 +152,55 @@ public class MissingDataView extends JFrame {
         row.add(textBlock, BorderLayout.WEST);
         row.add(dashboard, BorderLayout.EAST);
 
+        return row;
+    }
+
+    private JPanel createControlsStack() {
+        JPanel stack = new JPanel();
+        stack.setLayout(new BoxLayout(stack, BoxLayout.Y_AXIS));
+        stack.setBackground(Color.WHITE);
+        stack.add(createMissingTypeTabsRow());
+        stack.add(createSearchRow());
+        return stack;
+    }
+
+    private JPanel createMissingTypeTabsRow() {
+        JPanel row = new JPanel(new BorderLayout());
+        row.setBackground(Color.WHITE);
+        row.setBorder(BorderFactory.createEmptyBorder(0, 0, 14, 0));
+
+        missingTypeTabs = new FilterTabbedPane();
+        missingTypeTabs.addTab(MissingDataType.FIELDS.title, new JPanel());
+        missingTypeTabs.addTab(MissingDataType.DOCUMENTS.title, new JPanel());
+        missingTypeTabs.setSelectedIndex(activeMissingType == MissingDataType.DOCUMENTS ? 1 : 0);
+        EmployeeRegistrationViewHelper.styleTabs(
+                missingTypeTabs,
+                new Insets(0, 0, 2, 0),
+                new Insets(0, 0, 0, 0),
+                new Insets(4, 12, 4, 12),
+                3
+        );
+        missingTypeTabs.addChangeListener(event -> {
+            MissingDataType nextType = missingTypeTabs.getSelectedIndex() == 1
+                    ? MissingDataType.DOCUMENTS
+                    : MissingDataType.FIELDS;
+            if (activeMissingType != nextType) {
+                activeMissingType = nextType;
+                applyEmployeeCodeFilter();
+            }
+        });
+        missingTypeTabs.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent event) {
+                int tabIndex = missingTypeTabs.indexAtLocation(event.getX(), event.getY());
+                if (tabIndex >= 0 && missingTypeTabs.isEnabledAt(tabIndex)) {
+                    missingTypeTabs.setSelectedIndex(tabIndex);
+                    missingTypeTabs.revalidate();
+                    missingTypeTabs.repaint();
+                }
+            }
+        });
+
+        row.add(missingTypeTabs, BorderLayout.CENTER);
         return row;
     }
 
@@ -246,6 +318,11 @@ public class MissingDataView extends JFrame {
         }
 
         showLoading("Loading employees with missing required data...");
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Loading Missing Data",
+                "Reading field settings cache and employee rows..."
+        );
 
         SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> worker = new SwingWorker<>() {
             @Override
@@ -257,6 +334,7 @@ public class MissingDataView extends JFrame {
 
             @Override
             protected void done() {
+                loader.close();
                 if (isCancelled()) {
                     return;
                 }
@@ -305,20 +383,30 @@ public class MissingDataView extends JFrame {
     private void applyEmployeeCodeFilter() {
         String query = searchQuery();
         List<EmployeeRecordDao.MissingEmployeeRow> visibleRows = new ArrayList<>();
-        if (query.isBlank()) {
-            visibleRows.addAll(allRows);
-        } else {
-            for (EmployeeRecordDao.MissingEmployeeRow row : allRows) {
-                if (normalized(row.employeeCode()).contains(query)) {
-                    visibleRows.add(row);
-                }
+        int totalRowsForType = 0;
+        for (EmployeeRecordDao.MissingEmployeeRow row : allRows) {
+            if (!matchesActiveMissingType(row)) {
+                continue;
+            }
+            totalRowsForType++;
+            if (query.isBlank() || normalized(row.employeeCode()).contains(query)) {
+                visibleRows.add(row);
             }
         }
 
         tablePanel.setEmptyText(emptyTableText(query));
         tablePanel.setRows(visibleRows);
-        updateSearchStatus(visibleRows.size(), allRows.size(), query);
+        updateSearchStatus(visibleRows.size(), totalRowsForType, query);
         refreshTable();
+    }
+
+    private boolean matchesActiveMissingType(EmployeeRecordDao.MissingEmployeeRow row) {
+        if (row == null) {
+            return false;
+        }
+        return activeMissingType == MissingDataType.DOCUMENTS
+                ? row.hasMissingDocuments()
+                : row.hasMissingFields();
     }
 
     private String searchQuery() {
@@ -330,9 +418,10 @@ public class MissingDataView extends JFrame {
     }
 
     private String emptyTableText(String query) {
+        String typeLabel = activeMissingType == null ? "data" : activeMissingType.plural;
         return query.isBlank()
-                ? "No missing required employee data"
-                : "No missing required employee data matches this Employee ID";
+                ? "No employees with missing required " + typeLabel
+                : "No missing required " + typeLabel + " match this Employee ID";
     }
 
     private void updateSearchStatus(int visibleRows, int totalRows, String query) {
@@ -344,10 +433,12 @@ public class MissingDataView extends JFrame {
             return;
         }
         if (query == null || query.isBlank()) {
-            filterStatusLabel.setText("Showing " + totalRows + " missing record" + plural(totalRows));
+            filterStatusLabel.setText("Showing " + totalRows + " missing "
+                    + activeMissingType.singular + " record" + plural(totalRows));
             return;
         }
-        filterStatusLabel.setText("Showing " + visibleRows + " of " + totalRows + " matching Employee ID");
+        filterStatusLabel.setText("Showing " + visibleRows + " of " + totalRows + " matching "
+                + activeMissingType.singular + " record" + plural(totalRows));
     }
 
     private String plural(int count) {
@@ -363,7 +454,7 @@ public class MissingDataView extends JFrame {
         return new Object[]{
                 row.employeeCode(),
                 row.name(),
-                row.missingItems(),
+                missingItemsForActiveType(row),
                 row.designation(),
                 row.grade(),
                 formatDepartment(row),
@@ -372,6 +463,16 @@ public class MissingDataView extends JFrame {
                 row.phoneNumber(),
                 "View"
         };
+    }
+
+    private String missingItemsForActiveType(EmployeeRecordDao.MissingEmployeeRow row) {
+        if (row == null) {
+            return "";
+        }
+        String missingItems = activeMissingType == MissingDataType.DOCUMENTS
+                ? row.missingDocumentItems()
+                : row.missingFieldItems();
+        return missingItems == null || missingItems.isBlank() ? row.missingItems() : missingItems;
     }
 
     private String formatDepartment(EmployeeRecordDao.MissingEmployeeRow row) {
@@ -425,6 +526,13 @@ public class MissingDataView extends JFrame {
 
         public boolean getScrollableTracksViewportHeight() {
             return false;
+        }
+    }
+
+    private static class FilterTabbedPane extends JTabbedPane {
+        public Dimension getPreferredSize() {
+            Dimension preferred = super.getPreferredSize();
+            return new Dimension(preferred.width, Math.min(Math.max(38, preferred.height), 46));
         }
     }
 }

@@ -28,6 +28,7 @@ D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\FieldManagementView.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\HomeView.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\LoginView.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\MissingDataView.java
+D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\ChartsPanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\DocumentImagePreviewPanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\EmployeeAdditionalDetailsPanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\EmployeeBasicDetailsPanel.java
@@ -42,7 +43,9 @@ D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\HeaderPanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\HomeStatsChartsPanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\HomeStatsKPIPanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\HomeStatsPanel.java
+D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\KPIRowsPanel.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\panel\UniversalTablePanel.java
+D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\AppWindowStateHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\DialogHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\EmployeeAdditionalDetailsPanelHelper.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\ui\styling\EmployeeBasicDetailsPanelHelper.java
@@ -66,6 +69,7 @@ D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\DateDisplayFormatter.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\EmployeeAdditionalFieldDefaults.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\EmployeeBasicFieldUtil.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\EmployeeDocumentUtil.java
+D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\EmployeeFieldDefinitionCache.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\EmployeeFieldMetadataStore.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\FileUtil.java
 D:\KGM_Ex_Employees-main\src\main\java\com\kgm\util\FilterUtil.java

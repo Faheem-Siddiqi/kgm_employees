@@ -195,6 +195,9 @@ public class EmployeeTablePanel extends JPanel {
                 if (empValue == null || empValue.trim().isEmpty() || empValue.equalsIgnoreCase("N/A")) {
                     empValue = emp.getDynamicField("SECTION");
                 }
+                if ("Unassigned".equalsIgnoreCase(value)) {
+                    return isMissingFilterValue(empValue);
+                }
                 break;
             case "GRADE":
                 empValue = emp.getGRADE();
@@ -209,36 +212,55 @@ public class EmployeeTablePanel extends JPanel {
                 return true;
         }
 
-        if (empValue == null || empValue.trim().isEmpty() || empValue.equalsIgnoreCase("N/A")) {
-            return false;
+        if ("RESIGN_REASON".equalsIgnoreCase(columnName)) {
+            return resignReasonMatches(empValue, value);
         }
 
-        if ("RESIGN_REASON".equalsIgnoreCase(columnName)) {
-            return exitBucketMatches(empValue, value);
+        if (empValue == null || empValue.trim().isEmpty() || empValue.equalsIgnoreCase("N/A")) {
+            return false;
         }
 
         return empValue.trim().equalsIgnoreCase(value.trim());
     }
 
-    private boolean exitBucketMatches(String reason, String bucket) {
-        String text = reason == null ? "" : reason.toLowerCase(Locale.ROOT);
-        switch (bucket.toLowerCase(Locale.ROOT)) {
-            case "layoffs":
-                return text.contains("lay");
-            case "resignations":
-                return text.contains("resign")
-                        || text.contains("retire")
-                        || text.contains("left")
-                        || text.contains("quit");
-            case "other exits":
-                return !text.contains("lay")
-                        && !text.contains("resign")
-                        && !text.contains("retire")
-                        && !text.contains("left")
-                        && !text.contains("quit");
-            default:
-                return true;
+    private boolean isMissingFilterValue(String value) {
+        if (value == null) {
+            return true;
         }
+        String text = value.trim();
+        return text.isEmpty()
+                || text.equalsIgnoreCase("N/A")
+                || text.equalsIgnoreCase("NA")
+                || text.equalsIgnoreCase("NULL")
+                || text.equals("-");
+    }
+
+    private boolean resignReasonMatches(String reason, String filterValue) {
+        if (reason == null || filterValue == null) {
+            return false;
+        }
+
+        String employeeReason = reason.trim();
+        String filter = normalizedResignReasonFilter(filterValue);
+        if ("Others".equalsIgnoreCase(filter)) {
+            return !employeeReason.equalsIgnoreCase("Layoff")
+                    && !employeeReason.equalsIgnoreCase("Resignation");
+        }
+        return employeeReason.equalsIgnoreCase(filter);
+    }
+
+    private String normalizedResignReasonFilter(String value) {
+        String text = value == null ? "" : value.trim();
+        if ("Layoffs".equalsIgnoreCase(text)) {
+            return "Layoff";
+        }
+        if ("Resignations".equalsIgnoreCase(text)) {
+            return "Resignation";
+        }
+        if ("Others".equalsIgnoreCase(text) || "Other Exits".equalsIgnoreCase(text)) {
+            return "Others";
+        }
+        return text;
     }
 
     public void showSingleEmployee(Employee employee) {

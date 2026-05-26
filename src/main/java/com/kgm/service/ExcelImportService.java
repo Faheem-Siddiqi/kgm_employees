@@ -8,6 +8,7 @@ import com.kgm.util.CnicFormatter;
 import com.kgm.util.EmployeeAdditionalFieldDefaults;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeFieldDefinitionCache;
+import com.kgm.util.PhoneFormatter;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -53,8 +54,6 @@ import java.util.Set;
 public class ExcelImportService {
     public static final String DATE_FORMAT_HINT = "M/d/yyyy HH:mm:ss";
     private static final String INTERNAL_DATE_FORMAT = "dd/MM/yyyy HH:mm:ss";
-    private static final String PHONE_FORMAT_EXAMPLE = "0307-5011252";
-
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat(INTERNAL_DATE_FORMAT);
     private static final List<String> FALLBACK_CORE_COLUMN_ORDER = EmployeeBasicFieldUtil.BASIC_COLUMNS;
     private static final Set<String> FALLBACK_REQUIRED_STANDARD_COLUMNS = EmployeeBasicFieldUtil.REQUIRED_COLUMNS;
@@ -386,7 +385,7 @@ public class ExcelImportService {
             case "EMP_NAME" -> "Ali Khan";
             case "FATHER_NAME" -> "Ahmed Khan";
             case "NID" -> CnicFormatter.FORMAT_EXAMPLE;
-            case "EMP_CONTNO" -> PHONE_FORMAT_EXAMPLE;
+            case "EMP_CONTNO" -> PhoneFormatter.FORMAT_EXAMPLE;
             case "PERSONAL_EMAIL" -> "ali.khan@example.com";
             case "DEPARTMENT" -> "HR";
             case "DESIGNATION" -> "Officer";
@@ -395,7 +394,7 @@ public class ExcelImportService {
             case "SHIFT" -> "Morning";
             case "DOB" -> "3/8/1984 00:00:00";
             case "GENDER" -> "Male";
-            case "RESIGN_REASON" -> "Retirement";
+            case "RESIGN_REASON" -> "Resignation";
             case "JOINING_DATE" -> "8/23/2010 00:00:00";
             case "RESIGN_DATE" -> "1/1/2024 00:00:00";
             case "CURRENT_ADR" -> "House 1, Lahore";
@@ -752,14 +751,14 @@ public class ExcelImportService {
     }
 
     private static boolean isPhoneNumber(String value) {
-        return value != null && value.trim().matches("03\\d{2}-\\d{7}");
+        return PhoneFormatter.isValid(value);
     }
 
     private void validatePhone(RowData rowData, FieldCatalog catalog, String column) throws RowImportException {
         String phone = rowData.values().get(column);
         if (!isBlankValue(phone) && !isPhoneNumber(phone)) {
             throw new RowImportException(templateHeader(column, catalog.byColumn().get(column))
-                    + " must use format " + PHONE_FORMAT_EXAMPLE + ".");
+                    + " must use format " + PhoneFormatter.FORMAT_EXAMPLE + ".");
         }
     }
 

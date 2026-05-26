@@ -218,7 +218,7 @@ public class EmployeeRegistrationFormPanel extends JPanel {
     }
 
     private void installDynamicDropdownSearch(EmployeeFieldDefinition definition, JComboBox<String> combo) {
-        if (!definition.variableOptionField()) {
+        if (!definition.variableOptionField() || "SECTION".equalsIgnoreCase(definition.columnName())) {
             return;
         }
         DropdownFieldSupport.installAsyncSearch(
@@ -299,6 +299,9 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             if ("NID".equalsIgnoreCase(column)) {
                 value = CnicFormatter.format(value);
             }
+            if ("EMP_CONTNO".equalsIgnoreCase(column)) {
+                value = PhoneFormatter.format(value);
+            }
             if ("GRADE".equalsIgnoreCase(column)) {
                 value = value.toUpperCase(Locale.ROOT);
             }
@@ -326,8 +329,13 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         }
 
         String cnic = valueFor("NID");
-        if (!CnicFormatter.isValid(cnic)) {
+        if (!cnic.isBlank() && !CnicFormatter.isValid(cnic)) {
             return "CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".";
+        }
+
+        String phone = valueFor("EMP_CONTNO");
+        if (!phone.isBlank() && !PhoneFormatter.isValid(phone)) {
+            return "Phone must use format " + PhoneFormatter.FORMAT_EXAMPLE + ".";
         }
 
         Date joining = dateFor("JOINING_DATE");

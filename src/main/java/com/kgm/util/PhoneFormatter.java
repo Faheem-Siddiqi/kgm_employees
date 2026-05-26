@@ -7,11 +7,11 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.DocumentFilter;
 
 /**
- * Phone number formatter that auto-formats as nnnn-nnnnnn (4 digits, dash, 6 digits).
+ * Phone number formatter that auto-formats as 03nn-nnnnnnn.
  */
 public final class PhoneFormatter {
-    public static final String FORMAT_EXAMPLE = "1234-567890";
-    private static final int MAX_DIGITS = 10;
+    public static final String FORMAT_EXAMPLE = "0301-2345678";
+    private static final int MAX_DIGITS = 11;
     private static final int FIRST_PART_LENGTH = 4;
 
     private PhoneFormatter() {
@@ -33,7 +33,7 @@ public final class PhoneFormatter {
     }
 
     public static boolean isValid(String value) {
-        return value != null && value.trim().matches("\\d{4}-\\d{6}");
+        return value != null && value.trim().matches("03\\d{2}-\\d{7}");
     }
 
     public static void installFormatter(JTextField field) {

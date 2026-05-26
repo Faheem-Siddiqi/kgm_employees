@@ -312,14 +312,11 @@ public class EmployeeRecordDao implements AutoCloseable {
     }
 
     private String exitBucket(String reason) {
-        String text = reason == null ? "" : reason.toLowerCase();
-        if (text.contains("lay")) {
+        String text = reason == null ? "" : reason.trim();
+        if (text.equalsIgnoreCase("Layoff")) {
             return "Layoff";
         }
-        if (text.contains("resign")
-                || text.contains("retire")
-                || text.contains("left")
-                || text.contains("quit")) {
+        if (text.equalsIgnoreCase("Resignation")) {
             return "Resignation";
         }
         return "Others";
@@ -554,11 +551,19 @@ public class EmployeeRecordDao implements AutoCloseable {
                 Map<String, Integer> resultColumns = resultColumns(metaData);
                 while (rs.next()) {
                     List<String> missing = new ArrayList<>();
+                    List<String> missingFields = new ArrayList<>();
+                    List<String> missingDocuments = new ArrayList<>();
                     for (EmployeeFieldDefinition definition : required) {
                         Integer index = resultColumns.get(definition.columnName().toUpperCase(Locale.ROOT));
                         String value = index == null ? null : rs.getString(index);
                         if (isMissingValue(value)) {
-                            missing.add(definition.label());
+                            String label = definition.label();
+                            missing.add(label);
+                            if (definition.documentField()) {
+                                missingDocuments.add(label);
+                            } else {
+                                missingFields.add(label);
+                            }
                         }
                     }
                     if (missing.isEmpty()) {
@@ -574,7 +579,9 @@ public class EmployeeRecordDao implements AutoCloseable {
                             safe(valueFor(rs, resultColumns, "SECTION")),
                             safe(valueFor(rs, resultColumns, "JOINING_DATE")),
                             safe(valueFor(rs, resultColumns, "RESIGN_DATE")),
-                            safe(valueFor(rs, resultColumns, "EMP_CONTNO"))
+                            safe(valueFor(rs, resultColumns, "EMP_CONTNO")),
+                            String.join(", ", missingFields),
+                            String.join(", ", missingDocuments)
                     ));
                 }
             }
@@ -1092,8 +1099,21 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
             String section,
             String joiningDate,
             String resignationDate,
-            String phoneNumber
+            String phoneNumber,
+            String missingFieldItems,
+            String missingDocumentItems
     ) {
+        public boolean hasMissingFields() {
+            return hasText(missingFieldItems);
+        }
+
+        public boolean hasMissingDocuments() {
+            return hasText(missingDocumentItems);
+        }
+
+        private static boolean hasText(String value) {
+            return value != null && !value.isBlank();
+        }
     }
 
     public record DashboardStats(

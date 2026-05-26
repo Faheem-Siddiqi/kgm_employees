@@ -226,7 +226,7 @@ public class HomeStatsChartsPanel extends JPanel {
         missingDetail.setForeground(HomeStatsChartHelper.BLUE);
         missingDetail.setFont(HomeStatsChartHelper.BUTTON_FONT);
         missingDetail.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        missingDetail.addActionListener(event -> openMissingDataView());
+        missingDetail.addActionListener(event -> openMissingDataView(selectedMissingGroup));
     }
 
     private void styleSecondaryButton(JButton button) {
@@ -491,21 +491,21 @@ public class HomeStatsChartsPanel extends JPanel {
         } else if ("Documents".equals(selectedMissingGroup)) {
             missingTitle.setText("Missing Documents");
             missingDocsChart.setItems(missingRequirementItems(stats.missingRequiredDocuments(), HomeStatsChartHelper.RED, "employees missing"));
-            missingDocsChart.setClickHandler(item -> openMissingDataView());
+            missingDocsChart.setClickHandler(item -> openMissingDataView(selectedMissingGroup));
         } else {
             missingTitle.setText("Missing Required Fields");
             missingDocsChart.setItems(missingRequirementItems(stats.missingRequiredFields(), HomeStatsChartHelper.PURPLE, "employees missing"));
-            missingDocsChart.setClickHandler(item -> openMissingDataView());
+            missingDocsChart.setClickHandler(item -> openMissingDataView(selectedMissingGroup));
         }
         missingBack.setVisible(selectedMissingGroup != null);
     }
 
-    private void openMissingDataView() {
+    private void openMissingDataView(String missingGroup) {
         Window window = SwingUtilities.getWindowAncestor(this);
         if (window != null) {
             window.dispose();
         }
-        new MissingDataView();
+        new MissingDataView("Documents".equals(missingGroup));
     }
 
     private JPanel chartCard(String title, JComponent chart) {

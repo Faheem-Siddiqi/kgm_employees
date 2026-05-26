@@ -2,7 +2,7 @@
   "kind": "kgm.employeeFieldMetadata",
   "schemaVersion": 1,
   "updatedAt": "2026-05-25T07:01:05.148513500Z",
-  "checksum": "c5a859087006188e2c86a59078ab86e838bd1b1a819e611d4d90cf2f7651765b",
+  "checksum": "a439cb57b2aa458705fc3a60e34ce8fd2b83931bc746e2856578dee3302eeeb2",
   "dbChecksum": "",
   "source": "bundled-default",
   "count": 167,
@@ -1361,8 +1361,8 @@
       "dateField": false,
       "sortOrder": 225,
       "coreField": true,
-      "dropdownField": true,
-      "variableOptionField": true,
+      "dropdownField": false,
+      "variableOptionField": false,
       "textAreaField": false,
       "dropdownOptions": "",
       "requiredField": true
@@ -1432,7 +1432,7 @@
       "dropdownField": true,
       "variableOptionField": true,
       "textAreaField": false,
-      "dropdownOptions": "Layoff\nRetirement\nOther",
+      "dropdownOptions": "Layoff\nResignation\nOther",
       "requiredField": true
     },
     {

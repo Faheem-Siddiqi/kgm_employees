@@ -7,7 +7,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.DocumentFilter;
 
 public final class CnicFormatter {
-    public static final String FORMAT_EXAMPLE = "12345-1234567-4";
+    public static final String FORMAT_EXAMPLE = "12345-1234567-8";
     private static final int MAX_DIGITS = 13;
 
     private CnicFormatter() {

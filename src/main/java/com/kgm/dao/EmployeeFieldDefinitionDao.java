@@ -1457,8 +1457,7 @@ public class EmployeeFieldDefinitionDao {
 
     private static boolean isDefaultDropdownColumn(String column) {
         return "GENDER".equalsIgnoreCase(column)
-                || "RESIGN_REASON".equalsIgnoreCase(column)
-                || "SECTION".equalsIgnoreCase(column);
+                || "RESIGN_REASON".equalsIgnoreCase(column);
     }
 
     private static boolean defaultTextAreaField(String column) {
@@ -1470,7 +1469,7 @@ public class EmployeeFieldDefinitionDao {
             return "Male\nFemale\nOther";
         }
         if ("RESIGN_REASON".equalsIgnoreCase(column)) {
-            return "Layoff\nRetirement\nOther";
+            return "Layoff\nResignation\nOther";
         }
         return "";
     }
