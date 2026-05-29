@@ -12,8 +12,10 @@ import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeFieldDefinitionCache;
 
 import javax.swing.*;
+import javax.swing.border.LineBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -29,6 +31,8 @@ import java.util.Map;
 public class EmployeeAdditionalDetailsPanel extends JPanel {
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
     private static final int DROPDOWN_SEARCH_DEBOUNCE_MS = 350;
+    private static final Color FIELD_BORDER = new Color(200, 200, 200);
+    private static final Color MISSING_BORDER = new Color(220, 38, 38);
 
     private final Employee data;
     private final List<EmployeeFieldDefinition> definitions;
@@ -37,7 +41,10 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     private final Map<String, JComboBox<String>> dropdownFieldMap = new LinkedHashMap<>();
     private final Map<String, UniversalDatePicker> dateFieldMap = new LinkedHashMap<>();
     private final Map<String, Boolean> dateDirtyMap = new LinkedHashMap<>();
+    private final Map<String, Boolean> editableColumns = new LinkedHashMap<>();
+    private final Map<String, Boolean> dirtyColumns = new LinkedHashMap<>();
     private final List<SectionView> sectionViews = new ArrayList<>();
+    private final List<JButton> breadcrumbButtons = new ArrayList<>();
     private JTextField searchField;
     private JButton clearSearchButton;
     private JLabel searchStatusLabel;
@@ -47,6 +54,8 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     private Component sectionNavGap;
     private Boolean lastSingleColumnLayout;
     private JComponent topAnchor;
+    private Runnable pendingChangesListener;
+    private boolean loadingValues;
 
     public EmployeeAdditionalDetailsPanel() {
         this(null);
@@ -107,9 +116,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     }
 
     private JComponent createSearchHeader(int totalFields) {
-        searchStatusLabel = EmployeeAdditionalDetailsPanelHelper.createSearchStatusLabel(
-                "Total fields: " + totalFields
-        );
+        searchStatusLabel = EmployeeAdditionalDetailsPanelHelper.createSearchStatusLabel(statusText(totalFields, missingFieldCount()));
         searchField = new PlaceholderTextField("Search Other Fields");
         searchField.setToolTipText("Search field label, section, value, or DB column");
         clearSearchButton = new JButton("Clear");
@@ -162,11 +169,22 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
         if (breadcrumb == null) {
             return;
         }
+        breadcrumbButtons.clear();
         for (int index = 0; index < labels.size(); index++) {
             JButton link = EmployeeAdditionalDetailsPanelHelper.createBreadcrumbLink(labels.get(index));
             JComponent target = targets.get(index);
-            link.addActionListener(event -> scrollToComponent(target));
+            link.addActionListener(event -> {
+                setActiveBreadcrumb(link);
+                scrollToComponent(target);
+            });
+            breadcrumbButtons.add(link);
             breadcrumb.add(link);
+        }
+    }
+
+    private void setActiveBreadcrumb(JButton activeButton) {
+        for (JButton button : breadcrumbButtons) {
+            EmployeeAdditionalDetailsPanelHelper.setBreadcrumbActive(button, button == activeButton);
         }
     }
 
@@ -294,33 +312,50 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
         JPanel panel = EmployeeAdditionalDetailsPanelHelper.createFieldPanel();
         JLabel label = EmployeeAdditionalDetailsPanelHelper.createFieldLabel(definition.label());
         String value = valueFor(definition.columnName());
+        boolean editable = isEmpty(value);
+        editableColumns.put(definition.columnName(), editable);
+        dirtyColumns.put(definition.columnName(), false);
         JComponent field;
         if (EmployeeBasicFieldUtil.isDateField(definition)) {
             UniversalDatePicker datePicker = EmployeeAdditionalDetailsPanelHelper.createDateField(parseDate(value));
-            datePicker.addDateChangeListener(() -> dateDirtyMap.put(definition.columnName(), true));
+            datePicker.addDateChangeListener(() -> {
+                if (isEditableColumn(definition.columnName())) {
+                    dateDirtyMap.put(definition.columnName(), true);
+                    markDirty(definition.columnName());
+                }
+            });
             dateFieldMap.put(definition.columnName(), datePicker);
             dateDirtyMap.put(definition.columnName(), false);
             field = datePicker;
         } else if (EmployeeBasicFieldUtil.isDropdownField(definition)) {
             JComboBox<String> combo = EmployeeAdditionalDetailsPanelHelper.createDropdownField(
                     EmployeeBasicFieldUtil.dropdownOptions(definition, true),
-                    value == null || value.trim().isEmpty() ? "" : value,
+                    isEmpty(value) ? "" : value,
                     definition.variableOptionField()
             );
             installDynamicDropdownSearch(definition, combo);
+            combo.addItemListener(event -> markDirty(definition.columnName()));
+            Component editor = combo.getEditor() == null ? null : combo.getEditor().getEditorComponent();
+            if (editor instanceof JTextField editorField) {
+                installDocumentListener(definition.columnName(), editorField);
+            }
             dropdownFieldMap.put(definition.columnName(), combo);
             field = combo;
         } else if (EmployeeBasicFieldUtil.isMultilineField(definition)) {
-            UniversalTextArea textArea = new UniversalTextArea(displayValue(value));
+            UniversalTextArea textArea = new UniversalTextArea(editable ? "" : displayValue(value));
+            installDocumentListener(definition.columnName(), textArea.textArea());
             textAreaMap.put(definition.columnName(), textArea);
             field = textArea;
         } else {
-            JTextField textField = EmployeeAdditionalDetailsPanelHelper.createField(displayValue(value));
-            textField.setEditable(true);
+            JTextField textField = EmployeeAdditionalDetailsPanelHelper.createField(editable ? "" : displayValue(value));
+            textField.setEditable(editable);
+            installDocumentListener(definition.columnName(), textField);
             textFieldMap.put(definition.columnName(), textField);
             field = textField;
         }
 
+        applyFieldEditability(field, editable);
+        updateFieldBorder(definition.columnName());
         panel.add(label, BorderLayout.NORTH);
         panel.add(field, BorderLayout.CENTER);
         return panel;
@@ -540,10 +575,16 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
         }
 
         if (query.isBlank()) {
-            searchStatusLabel.setText("Total fields: " + totalFields);
+            searchStatusLabel.setText(statusText(totalFields, missingFieldCount()));
         } else {
-            searchStatusLabel.setText("Showing fields: " + visibleFields + " / " + totalFields);
+            searchStatusLabel.setText("Showing " + visibleFields + " of " + totalFields
+                    + " fields. Missing fields are highlighted with a red border.");
         }
+    }
+
+    private String statusText(int totalFields, int missingFields) {
+        return "Total fields: " + totalFields + ". Missing data fields: " + missingFields
+                + ". Missing fields are highlighted with a red border.";
     }
 
     private String normalized(String value) {
@@ -581,7 +622,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     public Employee getUpdatedOtherDetails() {
         Employee employee = new Employee();
         textFieldMap.forEach((column, field) -> {
-            if (!field.isEditable()) {
+            if (!isDirtyEditableColumn(column) || !field.isEditable()) {
                 return;
             }
 
@@ -593,7 +634,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             writeValue(employee, column, value.trim());
         });
         textAreaMap.forEach((column, area) -> {
-            if (!area.isEditable()) {
+            if (!isDirtyEditableColumn(column) || !area.isEditable()) {
                 return;
             }
 
@@ -605,6 +646,10 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             writeValue(employee, column, value.trim());
         });
         dropdownFieldMap.forEach((column, combo) -> {
+            if (!isDirtyEditableColumn(column)) {
+                return;
+            }
+
             String value = DropdownFieldSupport.value(combo);
             if (isEmpty(value)) {
                 return;
@@ -613,7 +658,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             writeValue(employee, column, value.trim());
         });
         dateFieldMap.forEach((column, picker) -> {
-            if (!Boolean.TRUE.equals(dateDirtyMap.get(column))) {
+            if (!isDirtyEditableColumn(column) || !Boolean.TRUE.equals(dateDirtyMap.get(column))) {
                 return;
             }
 
@@ -625,6 +670,178 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             writeValue(employee, column, DB_DATE_FORMAT.format(value));
         });
         return employee;
+    }
+
+    public void setPendingChangesListener(Runnable pendingChangesListener) {
+        this.pendingChangesListener = pendingChangesListener;
+    }
+
+    public boolean hasPendingChanges() {
+        for (Map.Entry<String, JTextField> entry : textFieldMap.entrySet()) {
+            if (isDirtyEditableColumn(entry.getKey()) && !isEmpty(entry.getValue().getText())) {
+                return true;
+            }
+        }
+        for (Map.Entry<String, UniversalTextArea> entry : textAreaMap.entrySet()) {
+            if (isDirtyEditableColumn(entry.getKey()) && !isEmpty(entry.getValue().getText())) {
+                return true;
+            }
+        }
+        for (Map.Entry<String, JComboBox<String>> entry : dropdownFieldMap.entrySet()) {
+            if (isDirtyEditableColumn(entry.getKey()) && !isEmpty(DropdownFieldSupport.value(entry.getValue()))) {
+                return true;
+            }
+        }
+        for (Map.Entry<String, UniversalDatePicker> entry : dateFieldMap.entrySet()) {
+            if (isDirtyEditableColumn(entry.getKey())
+                    && Boolean.TRUE.equals(dateDirtyMap.get(entry.getKey()))
+                    && entry.getValue().getDate() != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isEditableColumn(String column) {
+        return Boolean.TRUE.equals(editableColumns.get(column));
+    }
+
+    private boolean isDirtyEditableColumn(String column) {
+        return isEditableColumn(column) && Boolean.TRUE.equals(dirtyColumns.get(column));
+    }
+
+    private void installDocumentListener(String column, JTextComponent textComponent) {
+        textComponent.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent event) {
+                markDirty(column);
+            }
+
+            public void removeUpdate(DocumentEvent event) {
+                markDirty(column);
+            }
+
+            public void changedUpdate(DocumentEvent event) {
+                markDirty(column);
+            }
+        });
+    }
+
+    private void markDirty(String column) {
+        if (!loadingValues && isEditableColumn(column)) {
+            dirtyColumns.put(column, true);
+            updateFieldBorder(column);
+        }
+        notifyPendingChanges();
+    }
+
+    private void notifyPendingChanges() {
+        if (loadingValues || pendingChangesListener == null) {
+            return;
+        }
+        pendingChangesListener.run();
+    }
+
+    private void applyFieldEditability(JComponent input, boolean editable) {
+        input.setCursor(Cursor.getPredefinedCursor(editable ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
+        if (input instanceof JTextField textField) {
+            textField.setEditable(editable);
+            styleFieldBorder(textField, false);
+            return;
+        }
+        if (input instanceof UniversalTextArea area) {
+            area.setEditable(editable);
+            area.textArea().setCursor(Cursor.getPredefinedCursor(editable ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
+            styleAreaBorder(area, false);
+            return;
+        }
+        if (input instanceof JComboBox<?> combo) {
+            combo.setEnabled(editable);
+            combo.setFocusable(editable);
+            combo.setRequestFocusEnabled(editable);
+            styleFieldBorder(combo, false);
+            installReadableDisabledRenderer(combo);
+            return;
+        }
+        if (input instanceof UniversalDatePicker picker) {
+            picker.setEnabled(editable);
+            styleFieldBorder(picker, false);
+        }
+    }
+
+    private void updateFieldBorder(String column) {
+        boolean missing = isEditableColumn(column) && isEmpty(currentFieldValueByColumn(column));
+        JComponent input = inputForColumn(column);
+        if (input instanceof UniversalTextArea area) {
+            styleAreaBorder(area, missing);
+        } else if (input != null) {
+            styleFieldBorder(input, missing);
+        }
+    }
+
+    private JComponent inputForColumn(String column) {
+        if (textFieldMap.containsKey(column)) {
+            return textFieldMap.get(column);
+        }
+        if (textAreaMap.containsKey(column)) {
+            return textAreaMap.get(column);
+        }
+        if (dropdownFieldMap.containsKey(column)) {
+            return dropdownFieldMap.get(column);
+        }
+        return dateFieldMap.get(column);
+    }
+
+    private String currentFieldValueByColumn(String column) {
+        JTextField textField = textFieldMap.get(column);
+        if (textField != null) {
+            return textField.getText();
+        }
+        UniversalTextArea textArea = textAreaMap.get(column);
+        if (textArea != null) {
+            return textArea.getText();
+        }
+        JComboBox<String> combo = dropdownFieldMap.get(column);
+        if (combo != null) {
+            return DropdownFieldSupport.value(combo);
+        }
+        UniversalDatePicker picker = dateFieldMap.get(column);
+        if (picker != null && picker.getDate() != null) {
+            return DB_DATE_FORMAT.format(picker.getDate());
+        }
+        return "";
+    }
+
+    private void styleFieldBorder(JComponent component, boolean missing) {
+        component.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(missing ? MISSING_BORDER : FIELD_BORDER),
+                BorderFactory.createEmptyBorder(6, 8, 6, 8)
+        ));
+    }
+
+    private void styleAreaBorder(UniversalTextArea area, boolean missing) {
+        area.setBorder(new LineBorder(missing ? MISSING_BORDER : FIELD_BORDER));
+    }
+
+    private void installReadableDisabledRenderer(JComboBox<?> combo) {
+        combo.setRenderer((list, value, index, isSelected, cellHasFocus) -> {
+            JLabel label = new JLabel(value == null ? "" : String.valueOf(value));
+            label.setOpaque(true);
+            label.setFont(combo.getFont());
+            label.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
+            label.setBackground(Color.WHITE);
+            label.setForeground(new Color(35, 43, 54));
+            return label;
+        });
+    }
+
+    private int missingFieldCount() {
+        int count = 0;
+        for (Boolean editable : editableColumns.values()) {
+            if (Boolean.TRUE.equals(editable)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private String valueFor(String column) {
@@ -675,6 +892,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
                 || text.equalsIgnoreCase("N/A")
                 || text.equalsIgnoreCase("NA")
                 || text.equalsIgnoreCase("NULL")
+                || text.equalsIgnoreCase("EMPTY")
                 || text.equals("-");
     }
 

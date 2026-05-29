@@ -3,9 +3,13 @@ import com.kgm.config.DatabaseConfig;
 import com.kgm.ui.LoginView;
 import com.kgm.util.ApplicationStartup;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import java.awt.Color;
 
 public class Main {
     public static void main(String[] args) {
+        applyButtonTextDefaults();
+
         // Display connection info on startup
         System.out.println("========================================");
         System.out.println("  KGM Ex-Employees Management System");
@@ -22,5 +26,13 @@ public class Main {
             loginView.setVisible(true);
             ApplicationStartup.startSilently();
         });
+    }
+
+    private static void applyButtonTextDefaults() {
+        Color grey = new Color(99, 115, 129);
+        UIManager.put("Button.foreground", grey);
+        UIManager.put("Button.disabledForeground", grey);
+        UIManager.put("ToggleButton.foreground", grey);
+        UIManager.put("ToggleButton.disabledForeground", grey);
     }
 }

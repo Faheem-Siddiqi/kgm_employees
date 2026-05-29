@@ -362,16 +362,16 @@ public final class TablePaginationHelper {
 
     private static JButton createPaginationButton(String text, boolean enabled) {
         JButton button = new JButton(text);
-        button.setEnabled(enabled);
         button.setFocusPainted(false);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         button.setBorder(new EmptyBorder(8, 14, 8, 14));
-        button.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
-        button.setBackground(enabled ? PRIMARY : DISABLED_BUTTON);
-        button.setForeground(enabled ? Color.WHITE : DISABLED_TEXT);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setBackground(PRIMARY);
+        button.setForeground(Color.WHITE);
         button.setOpaque(true);
         button.setContentAreaFilled(true);
         button.setBorderPainted(false);
+        ButtonStateHelper.setEnabled(button, enabled);
         return button;
     }
 
@@ -391,4 +391,3 @@ public final class TablePaginationHelper {
         }
     }
 }
-

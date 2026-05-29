@@ -168,7 +168,7 @@ public class MissingDataView extends JFrame {
     private JPanel createMissingTypeTabsRow() {
         JPanel row = new JPanel(new BorderLayout());
         row.setBackground(Color.WHITE);
-        row.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
+        row.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
 
         missingTypeTabs = new JTabbedPane();
         missingTypeTabs.addTab(MissingDataType.FIELDS.title, createFilterTabContent());
@@ -176,10 +176,10 @@ public class MissingDataView extends JFrame {
         missingTypeTabs.setSelectedIndex(activeMissingType == MissingDataType.DOCUMENTS ? 1 : 0);
         AppTabsHelper.styleTabs(
                 missingTypeTabs,
-                new Insets(0, 0, 0, 0),
-                new Insets(0, 0, 0, 0),
-                new Insets(10, 14, 9, 14),
-                2
+                new Insets(6, 0, 10, 0),
+                new Insets(8, 0, 0, 0),
+                new Insets(12, 14, 11, 14),
+                8
         );
         missingTypeTabs.addChangeListener(event -> {
             MissingDataType nextType = missingTypeTabs.getSelectedIndex() == 1
@@ -208,7 +208,7 @@ public class MissingDataView extends JFrame {
     private JPanel createFilterTabContent() {
         JPanel panel = new JPanel();
         panel.setBackground(Color.WHITE);
-        panel.setPreferredSize(new Dimension(0, 4));
+        panel.setPreferredSize(new Dimension(0, 1));
         return panel;
     }
 

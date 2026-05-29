@@ -133,16 +133,16 @@ public final class UniversalTablePanelHelper {
     }
 
     public static void stylePagingButton(JButton button, boolean enabled) {
-        button.setEnabled(enabled);
         button.setFocusPainted(false);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         button.setBorder(new EmptyBorder(8, 14, 8, 14));
-        button.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
-        button.setBackground(enabled ? TableThemeHelper.PRIMARY : DISABLED_BUTTON);
-        button.setForeground(enabled ? Color.WHITE : DISABLED_TEXT);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setBackground(TableThemeHelper.PRIMARY);
+        button.setForeground(Color.WHITE);
         button.setOpaque(true);
         button.setContentAreaFilled(true);
         button.setBorderPainted(false);
+        ButtonStateHelper.setEnabled(button, enabled);
     }
 
     public static void styleClippedTextCell(JLabel label, JTable table) {

@@ -299,6 +299,7 @@ public class EmployeeDetailView extends JFrame {
                     }
                     employee = loaded;
                     basicPanel = new EmployeeBasicDetailsPanel(loaded, basicDefinitions);
+                    basicPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
                     tabs.setComponentAt(BASIC_TAB_INDEX, basicPanel);
                     basicTabLoaded = true;
                     refreshAfterTabChange();
@@ -348,6 +349,7 @@ public class EmployeeDetailView extends JFrame {
                         throw new IllegalStateException("Employee record was not found.");
                     }
                     otherPanel = new EmployeeAdditionalDetailsPanel(loaded, detailDefinitions);
+                    otherPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
                     tabs.setComponentAt(OTHER_TAB_INDEX, otherPanel);
                     otherTabLoaded = true;
                     refreshAfterTabChange();
@@ -449,10 +451,10 @@ public class EmployeeDetailView extends JFrame {
         boolean hasEmployee = empCode != null && !empCode.isBlank();
         boolean canUpdate = false;
 
-        if (basicPanel != null && panelHasEditableFields(basicPanel)) {
+        if (basicPanel != null && basicPanel.hasPendingChanges()) {
             canUpdate = true;
         }
-        if (!canUpdate && otherPanel != null && panelHasEditableFields(otherPanel)) {
+        if (!canUpdate && otherPanel != null && otherPanel.hasPendingChanges()) {
             canUpdate = true;
         }
         if (!canUpdate && documentPanel != null && documentPanel.hasPendingDocumentUpdates()) {
@@ -470,7 +472,7 @@ public class EmployeeDetailView extends JFrame {
 
         Employee basicUpdate = null;
         File selectedImage = null;
-        if (basicPanel != null && panelHasEditableFields(basicPanel)) {
+        if (basicPanel != null && basicPanel.hasPendingChanges()) {
             String validationMessage = basicPanel.validationMessage();
             if (validationMessage != null) {
                 DialogHelper.warning(this, "Check Employee Details", validationMessage);
@@ -482,7 +484,7 @@ public class EmployeeDetailView extends JFrame {
         }
 
         Employee otherUpdate = null;
-        if (otherPanel != null && panelHasEditableFields(otherPanel)) {
+        if (otherPanel != null && otherPanel.hasPendingChanges()) {
             otherUpdate = otherPanel.getUpdatedOtherDetails();
             otherUpdate.setEMPLOYEE_CODE(empCode);
         }
@@ -1379,11 +1381,11 @@ public class EmployeeDetailView extends JFrame {
         ));
         if (primary) {
             button.setBackground(new Color(20, 101, 192));
-            button.setForeground(Color.WHITE);
+            button.setForeground(new Color(71, 85, 105));
             button.setBorderPainted(false);
         } else {
             button.setBackground(Color.WHITE);
-            button.setForeground(new Color(71, 85, 105));
+            button.setForeground(Color.WHITE);
             button.setBorderPainted(true);
         }
         return button;

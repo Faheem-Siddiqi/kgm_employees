@@ -307,7 +307,7 @@ public final class TableThemeHelper {
         button.setBorderPainted(false);
         button.setFocusPainted(false);
         button.setOpaque(false);
-        button.setForeground(PRIMARY);
+        button.setForeground(TEXT_SECONDARY);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         button.setBorder(new EmptyBorder(8, 10, 8, 10));
@@ -316,19 +316,19 @@ public final class TableThemeHelper {
 
     public static JButton dangerTextButton(String text) {
         JButton button = textButton(text);
-        button.setForeground(DANGER);
+        button.setForeground(TEXT_SECONDARY);
         return button;
     }
 
     public static void setTextButtonEnabled(JButton button, boolean enabled) {
         button.setEnabled(enabled);
-        button.setForeground(enabled ? PRIMARY : new Color(155, 155, 155));
+        button.setForeground(TEXT_SECONDARY);
         button.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
     }
 
     public static void setDangerTextButtonEnabled(JButton button, boolean enabled) {
         button.setEnabled(enabled);
-        button.setForeground(enabled ? DANGER : new Color(155, 155, 155));
+        button.setForeground(TEXT_SECONDARY);
         button.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
     }
 

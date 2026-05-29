@@ -7,6 +7,8 @@ import javax.swing.border.EmptyBorder;
 import com.kgm.ui.component.DropdownFieldSupport;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.Date;
 
 public final class EmployeeAdditionalDetailsPanelHelper {
@@ -15,6 +17,10 @@ public final class EmployeeAdditionalDetailsPanelHelper {
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color SECTION_BORDER = new Color(230, 230, 230);
     private static final Color HEADER_TEXT = new Color(60, 60, 60);
+    private static final Color CHIP_BG = EmployeeRegistrationViewHelper.PRIMARY;
+    private static final Color CHIP_BG_HOVER = new Color(0, 97, 184);
+    private static final Color CHIP_BG_ACTIVE = new Color(0, 76, 145);
+    private static final int CHIP_RADIUS = 20;
 
     private EmployeeAdditionalDetailsPanelHelper() {
     }
@@ -130,20 +136,33 @@ public final class EmployeeAdditionalDetailsPanelHelper {
     }
 
     public static JButton createBreadcrumbLink(String text) {
-        JButton link = new JButton(text);
-        link.setContentAreaFilled(true);
-        link.setBorderPainted(true);
+        JButton link = new RoundedChipButton(text, CHIP_RADIUS);
+        link.setContentAreaFilled(false);
+        link.setBorderPainted(false);
         link.setFocusPainted(false);
-        link.setOpaque(true);
-        link.setBackground(new Color(248, 250, 252));
-        link.setForeground(EmployeeRegistrationViewHelper.PRIMARY);
+        link.setOpaque(false);
+        link.setBackground(CHIP_BG);
+        link.setForeground(Color.WHITE);
         link.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
         link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        link.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(EmployeeRegistrationViewHelper.BORDER),
-                new EmptyBorder(6, 12, 6, 12)
-        ));
+        link.setBorder(new EmptyBorder(8, 15, 8, 15));
+        link.setMargin(new Insets(0, 0, 0, 0));
+        link.setMinimumSize(new Dimension(74, 34));
+        link.setPreferredSize(new Dimension(Math.max(96, link.getPreferredSize().width + 12), 36));
+        installChipHover(link);
         return link;
+    }
+
+    public static void setBreadcrumbActive(JButton button, boolean active) {
+        if (button == null) {
+            return;
+        }
+        button.putClientProperty("kgm.breadcrumb.active", active);
+        button.setBackground(active ? CHIP_BG_ACTIVE : CHIP_BG);
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Segoe UI Semibold", active ? Font.BOLD : Font.PLAIN, 14));
+        button.setBorder(new EmptyBorder(8, 15, 8, 15));
+        button.repaint();
     }
 
     public static JLabel createBreadcrumbSeparator() {
@@ -243,6 +262,46 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         }
     }
 
+    private static void installChipHover(JButton button) {
+        button.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent event) {
+                if (!button.isEnabled() || isActive(button)) {
+                    return;
+                }
+                button.setBackground(CHIP_BG_HOVER);
+            }
+
+            public void mouseExited(MouseEvent event) {
+                if (!button.isEnabled() || isActive(button)) {
+                    return;
+                }
+                button.setBackground(CHIP_BG);
+            }
+        });
+    }
+
+    private static boolean isActive(JButton button) {
+        return Boolean.TRUE.equals(button.getClientProperty("kgm.breadcrumb.active"));
+    }
+
+    private static class RoundedChipButton extends JButton {
+        private final int radius;
+
+        RoundedChipButton(String text, int radius) {
+            super(text);
+            this.radius = radius;
+        }
+
+        protected void paintComponent(Graphics graphics) {
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(getBackground());
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            g2.dispose();
+            super.paintComponent(graphics);
+        }
+    }
+
     private static class RoundedBorder extends AbstractBorder {
         private final int radius;
 
@@ -262,5 +321,6 @@ public final class EmployeeAdditionalDetailsPanelHelper {
             return new Insets(10, 10, 10, 10);
         }
     }
+
 }
 

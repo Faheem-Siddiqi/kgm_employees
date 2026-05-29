@@ -7,9 +7,13 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class AppConfig {
     private static final Map<String, String> DOT_ENV = loadDotEnv();
+    private static final Pattern WINDOWS_ENV_TOKEN = Pattern.compile("%([A-Za-z0-9_]+)%");
+    private static final Pattern UNIX_ENV_TOKEN = Pattern.compile("\\$\\{([A-Za-z0-9_]+)}");
 
     private AppConfig() {
     }
@@ -28,7 +32,7 @@ public final class AppConfig {
                 "KGM_EMPLOYEE_STORAGE_DIR",
                 "resources/employees"
         );
-        Path path = Path.of(configured);
+        Path path = Path.of(expandPath(configured));
         if (!path.isAbsolute()) {
             path = Path.of(System.getProperty("user.dir")).resolve(path);
         }
@@ -70,6 +74,29 @@ public final class AppConfig {
             System.err.println("Could not read .env file: " + exception.getMessage());
         }
         return Collections.unmodifiableMap(values);
+    }
+
+    private static String expandPath(String value) {
+        String expanded = value == null ? "" : value.trim();
+        if (expanded.equals("~")) {
+            expanded = System.getProperty("user.home");
+        } else if (expanded.startsWith("~/") || expanded.startsWith("~\\")) {
+            expanded = System.getProperty("user.home") + expanded.substring(1);
+        }
+        expanded = expandEnvTokens(expanded, WINDOWS_ENV_TOKEN);
+        expanded = expandEnvTokens(expanded, UNIX_ENV_TOKEN);
+        return expanded;
+    }
+
+    private static String expandEnvTokens(String value, Pattern pattern) {
+        Matcher matcher = pattern.matcher(value);
+        StringBuffer buffer = new StringBuffer();
+        while (matcher.find()) {
+            String replacement = System.getenv(matcher.group(1));
+            matcher.appendReplacement(buffer, Matcher.quoteReplacement(replacement == null ? matcher.group(0) : replacement));
+        }
+        matcher.appendTail(buffer);
+        return buffer.toString();
     }
 
     private static void parseLine(String rawLine, Map<String, String> values) {

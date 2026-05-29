@@ -5,8 +5,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
 public final class EmployeeDetailViewLayoutHelper {
-    // Trace: controls the gap between Download Profile and Dashboard in EmployeeDetailView header.
-    private static final int HEADER_CTA_GAP = 8;
+    private static final int HEADER_CTA_GAP = 18;
 
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color NAVY = new Color(0, 38, 77);
@@ -75,13 +74,16 @@ public final class EmployeeDetailViewLayoutHelper {
         titleBlock.add(title);
         titleBlock.add(Box.createVerticalStrut(3));
         titleBlock.add(subtitle);
+        titleBlock.setMinimumSize(new Dimension(0, titleBlock.getPreferredSize().height));
 
-        JPanel actionGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, HEADER_CTA_GAP, 0));
+        JPanel actionGroup = new JPanel();
+        actionGroup.setLayout(new BoxLayout(actionGroup, BoxLayout.X_AXIS));
         actionGroup.setOpaque(false);
         if (onDownloadReport != null) {
             JButton downloadReport = createDownloadReportButton();
             downloadReport.addActionListener(e -> onDownloadReport.run());
             actionGroup.add(downloadReport);
+            actionGroup.add(Box.createHorizontalStrut(HEADER_CTA_GAP));
         }
 
         JButton back = new JButton("Dashboard");
@@ -101,7 +103,8 @@ public final class EmployeeDetailViewLayoutHelper {
         actionGbc.gridx = 1;
         actionGbc.gridy = 0;
         actionGbc.weightx = 0;
-        actionGbc.anchor = GridBagConstraints.CENTER;
+        actionGbc.anchor = GridBagConstraints.EAST;
+        actionGbc.insets = new Insets(0, 24, 0, 0);
         header.add(actionGroup, actionGbc);
         return header;
     }
@@ -114,11 +117,14 @@ public final class EmployeeDetailViewLayoutHelper {
         button.setFocusPainted(false);
         button.setOpaque(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(SUCCESS_GREEN);
+        button.setForeground(new Color(99, 115, 129));
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
         button.setMargin(new Insets(0, 0, 0, 0));
         button.setBorder(new EmptyBorder(0, 0, 0, 0));
-        button.setPreferredSize(new Dimension(142, 34));
+        Dimension size = new Dimension(154, 34);
+        button.setMinimumSize(size);
+        button.setPreferredSize(size);
+        button.setMaximumSize(size);
         button.setVerticalAlignment(SwingConstants.CENTER);
         return button;
     }
@@ -134,9 +140,12 @@ public final class EmployeeDetailViewLayoutHelper {
         button.setContentAreaFilled(false);
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(LINK_BLUE);
+        button.setForeground(new Color(99, 115, 129));
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
-        button.setPreferredSize(new Dimension(96, 34));
+        Dimension size = new Dimension(112, 34);
+        button.setMinimumSize(size);
+        button.setPreferredSize(size);
+        button.setMaximumSize(size);
         button.setVerticalAlignment(SwingConstants.CENTER);
     }
 

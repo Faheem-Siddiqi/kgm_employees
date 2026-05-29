@@ -8,11 +8,14 @@ import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.UniversalTablePanel;
 import com.kgm.ui.styling.AppTabsHelper;
 import com.kgm.ui.styling.AppWindowStateHelper;
+import com.kgm.ui.styling.ButtonStateHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.util.EmployeeDocumentUtil;
 
 import javax.swing.*;
+import javax.swing.border.AbstractBorder;
+import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -30,6 +33,9 @@ public class FieldManagementView extends JFrame {
     private static final int ACTION_GAP = 10;
     private static final int DIALOG_FORM_INSET = 12;
     private static final int DIALOG_FORM_GAP = 8;
+    private static final int BUTTON_RADIUS = 10;
+    private static final Color NEUTRAL_BUTTON_TEXT = new Color(99, 115, 129);
+    private static final Color NEUTRAL_BUTTON_BORDER = new Color(198, 207, 216);
 
     private static final int FIELD_COLUMN = 0;
     private static final int FIELD_LABEL = 1;
@@ -130,7 +136,7 @@ public class FieldManagementView extends JFrame {
         titleBlock.add(subtitle);
 
         JButton dashboard = new JButton("Dashboard");
-        EmployeeRegistrationViewHelper.styleBackButton(dashboard);
+        styleNeutralButton(dashboard);
         dashboard.addActionListener(event -> {
             new HomeView();
             dispose();
@@ -264,8 +270,8 @@ public class FieldManagementView extends JFrame {
 
         JButton add = new JButton("Add Field");
         JButton refresh = new JButton("Refresh");
-        EmployeeRegistrationViewHelper.stylePrimaryButton(add);
-        EmployeeRegistrationViewHelper.styleSecondaryButton(refresh);
+        stylePrimaryButton(add);
+        styleNeutralButton(refresh);
         add.addActionListener(event -> addField());
         refresh.addActionListener(event -> loadData());
 
@@ -317,9 +323,9 @@ public class FieldManagementView extends JFrame {
         JButton rename = new JButton("Edit Selected");
         JButton delete = new JButton("Delete Selected");
         JButton refresh = new JButton("Refresh");
-        EmployeeRegistrationViewHelper.stylePrimaryButton(rename);
-        EmployeeRegistrationViewHelper.styleSecondaryButton(delete);
-        EmployeeRegistrationViewHelper.styleSecondaryButton(refresh);
+        stylePrimaryButton(rename);
+        styleNeutralButton(delete);
+        styleNeutralButton(refresh);
         rename.addActionListener(event -> renameSelectedCategory());
         delete.addActionListener(event -> deleteSelectedCategory());
         refresh.addActionListener(event -> loadData());
@@ -361,7 +367,7 @@ public class FieldManagementView extends JFrame {
         row.setBackground(Color.WHITE);
 
         JButton refresh = new JButton("Refresh");
-        EmployeeRegistrationViewHelper.styleSecondaryButton(refresh);
+        styleNeutralButton(refresh);
         refresh.addActionListener(event -> loadData());
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
@@ -370,6 +376,32 @@ public class FieldManagementView extends JFrame {
         row.add(createRequiredSearchBox(), BorderLayout.WEST);
         row.add(actions, BorderLayout.EAST);
         return row;
+    }
+
+    private static void stylePrimaryButton(JButton button) {
+        EmployeeRegistrationViewHelper.stylePrimaryButton(button);
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        button.setBorder(new CompoundBorder(
+                new RoundedButtonBorder(EmployeeRegistrationViewHelper.PRIMARY, BUTTON_RADIUS),
+                new EmptyBorder(8, 16, 8, 16)
+        ));
+        ButtonStateHelper.install(button);
+    }
+
+    private static void styleNeutralButton(JButton button) {
+        button.setFocusPainted(false);
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setForeground(NEUTRAL_BUTTON_TEXT);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setBorder(new CompoundBorder(
+                new RoundedButtonBorder(NEUTRAL_BUTTON_BORDER, BUTTON_RADIUS),
+                new EmptyBorder(8, 15, 8, 15)
+        ));
+        button.setMargin(new Insets(0, 0, 0, 0));
+        ButtonStateHelper.install(button);
     }
 
     private JPanel createTabPanel() {
@@ -416,6 +448,7 @@ public class FieldManagementView extends JFrame {
         clear.setMargin(new Insets(0, 0, 0, 0));
         clear.setFont(new Font("Segoe UI", Font.BOLD, 11));
         clear.setForeground(new Color(99, 115, 129));
+        ButtonStateHelper.install(clear);
         clear.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         clear.setPreferredSize(new Dimension(28, 28));
         setClearButtonActive(clear, false);
@@ -470,6 +503,7 @@ public class FieldManagementView extends JFrame {
         clear.setMargin(new Insets(0, 0, 0, 0));
         clear.setFont(new Font("Segoe UI", Font.BOLD, 11));
         clear.setForeground(new Color(99, 115, 129));
+        ButtonStateHelper.install(clear);
         clear.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         clear.setPreferredSize(new Dimension(28, 28));
         setClearButtonActive(clear, false);
@@ -530,7 +564,7 @@ public class FieldManagementView extends JFrame {
     private void setClearButtonActive(JButton clear, boolean active) {
         clear.setText(active ? "X" : "");
         clear.setEnabled(active);
-        clear.setForeground(active ? new Color(99, 115, 129) : new Color(255, 255, 255, 0));
+        clear.setForeground(new Color(99, 115, 129));
         clear.setCursor(Cursor.getPredefinedCursor(active ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
     }
 
@@ -1348,7 +1382,7 @@ public class FieldManagementView extends JFrame {
             setOpaque(false);
             rows.setLayout(new BoxLayout(rows, BoxLayout.Y_AXIS));
             rows.setOpaque(false);
-            addOption.setFocusPainted(false);
+            stylePrimaryButton(addOption);
             addOption.addActionListener(event -> addOptionRow(""));
 
             if (options == null || options.isEmpty()) {
@@ -1373,7 +1407,7 @@ public class FieldManagementView extends JFrame {
 
             JTextField field = new JTextField(value == null ? "" : value.trim(), 22);
             JButton remove = new JButton("Remove");
-            remove.setFocusPainted(false);
+            styleNeutralButton(remove);
             remove.addActionListener(event -> {
                 fields.remove(field);
                 rows.remove(row);
@@ -1427,6 +1461,28 @@ public class FieldManagementView extends JFrame {
                 }
             }
             return false;
+        }
+    }
+
+    private static class RoundedButtonBorder extends AbstractBorder {
+        private final Color color;
+        private final int radius;
+
+        RoundedButtonBorder(Color color, int radius) {
+            this.color = color;
+            this.radius = radius;
+        }
+
+        public void paintBorder(Component component, Graphics graphics, int x, int y, int width, int height) {
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
+            g2.dispose();
+        }
+
+        public Insets getBorderInsets(Component component) {
+            return new Insets(1, 1, 1, 1);
         }
     }
 

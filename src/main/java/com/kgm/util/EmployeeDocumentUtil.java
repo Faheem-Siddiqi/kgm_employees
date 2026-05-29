@@ -234,6 +234,7 @@ public final class EmployeeDocumentUtil {
         return !trimmed.equalsIgnoreCase("N/A")
                 && !trimmed.equalsIgnoreCase("NA")
                 && !trimmed.equalsIgnoreCase("NULL")
+                && !trimmed.equalsIgnoreCase("EMPTY")
                 && !trimmed.equals("-");
     }
 

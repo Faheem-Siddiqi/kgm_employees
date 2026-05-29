@@ -17,6 +17,10 @@ import com.kgm.util.PhoneFormatter;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.border.LineBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -35,15 +39,21 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$",
             Pattern.CASE_INSENSITIVE
     );
+    private static final Color FIELD_BORDER = new Color(200, 200, 200);
+    private static final Color MISSING_BORDER = new Color(220, 38, 38);
 
     private final List<EmployeeFieldDefinition> definitions;
     private final Map<String, JComponent> inputsByColumn = new LinkedHashMap<>();
+    private final Map<String, Boolean> editableColumns = new LinkedHashMap<>();
+    private final Map<String, Boolean> dirtyColumns = new LinkedHashMap<>();
 
     private JLabel photoPreview;
     private FileUploadCard photoUploadCard;
     private JLabel infoLabel;
     private File selectedImage;
     private Employee employee;
+    private Runnable pendingChangesListener;
+    private boolean loadingValues;
 
     public EmployeeBasicDetailsPanel() {
         this(null, EmployeeBasicFieldUtil.loadBasicDefinitions());
@@ -235,10 +245,14 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             return;
         }
 
+        loadingValues = true;
         for (EmployeeFieldDefinition definition : definitions) {
             setValue(definition.columnName(), EmployeeBasicFieldUtil.valueFor(employee, definition.columnName()));
         }
         loadProfileImage();
+        applyMissingOnlyEditability();
+        installPendingChangeListeners();
+        loadingValues = false;
     }
 
     private void setValue(String column, String value) {
@@ -352,6 +366,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             if (photoUploadCard != null) {
                 photoUploadCard.setStatus(file.getName());
             }
+            notifyPendingChanges();
         } catch (Exception e) {
             DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
         }
@@ -361,7 +376,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         Employee updated = new Employee();
         for (EmployeeFieldDefinition definition : definitions) {
             String column = definition.columnName();
-            if ("EMPLOYEE_CODE".equalsIgnoreCase(column)) {
+            if ("EMPLOYEE_CODE".equalsIgnoreCase(column) || !isDirtyEditableColumn(column)) {
                 continue;
             }
             String value = valueFor(column);
@@ -383,17 +398,17 @@ public class EmployeeBasicDetailsPanel extends JPanel {
     }
 
     public String validationMessage() {
-        String cnic = valueFor("NID");
+        String cnic = isEditableColumn("NID") ? valueFor("NID") : "";
         if (!cnic.isBlank() && !CnicFormatter.isValid(cnic)) {
             return "CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".";
         }
 
-        String phone = valueFor("EMP_CONTNO");
+        String phone = isEditableColumn("EMP_CONTNO") ? valueFor("EMP_CONTNO") : "";
         if (!phone.isBlank() && !PhoneFormatter.isValid(phone)) {
             return "Phone must use format " + PhoneFormatter.FORMAT_EXAMPLE + ".";
         }
 
-        String email = valueFor("PERSONAL_EMAIL");
+        String email = isEditableColumn("PERSONAL_EMAIL") ? valueFor("PERSONAL_EMAIL") : "";
         if (!email.isBlank() && !EMAIL_PATTERN.matcher(email).matches()) {
             return "Enter a valid email address.";
         }
@@ -442,6 +457,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
                 || trimmed.equalsIgnoreCase("N/A")
                 || trimmed.equalsIgnoreCase("NA")
                 || trimmed.equalsIgnoreCase("NULL")
+                || trimmed.equalsIgnoreCase("EMPTY")
                 || trimmed.equals("-");
     }
 
@@ -451,6 +467,178 @@ public class EmployeeBasicDetailsPanel extends JPanel {
 
     public File getSelectedImage() {
         return selectedImage;
+    }
+
+    public void setPendingChangesListener(Runnable pendingChangesListener) {
+        this.pendingChangesListener = pendingChangesListener;
+    }
+
+    public boolean hasPendingChanges() {
+        if (selectedImage != null) {
+            return true;
+        }
+        for (EmployeeFieldDefinition definition : definitions) {
+            String column = definition.columnName();
+            if (!isDirtyEditableColumn(column)) {
+                continue;
+            }
+            if (!isEmpty(valueFor(column))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void applyMissingOnlyEditability() {
+        for (EmployeeFieldDefinition definition : definitions) {
+            String column = definition.columnName();
+            boolean editable = !"EMPLOYEE_CODE".equalsIgnoreCase(column)
+                    && isEmpty(EmployeeBasicFieldUtil.valueFor(employee, column));
+            editableColumns.put(column, editable);
+            dirtyColumns.put(column, false);
+            applyFieldEditability(inputsByColumn.get(column), editable);
+            updateFieldBorder(column);
+        }
+
+        if (!selectedImageCanChange()) {
+            lockProfileImageUpload();
+        }
+    }
+
+    private boolean isEditableColumn(String column) {
+        return Boolean.TRUE.equals(editableColumns.get(column));
+    }
+
+    private boolean isDirtyEditableColumn(String column) {
+        return isEditableColumn(column) && Boolean.TRUE.equals(dirtyColumns.get(column));
+    }
+
+    private void installPendingChangeListeners() {
+        for (Map.Entry<String, JComponent> entry : inputsByColumn.entrySet()) {
+            installPendingChangeListener(entry.getKey(), entry.getValue());
+        }
+    }
+
+    private void installPendingChangeListener(String column, JComponent input) {
+        if (input instanceof UniversalDatePicker picker) {
+            picker.addDateChangeListener(() -> markDirty(column));
+            return;
+        }
+        if (input instanceof JComboBox<?> combo) {
+            combo.addItemListener(event -> markDirty(column));
+            Component editor = combo.getEditor() == null ? null : combo.getEditor().getEditorComponent();
+            if (editor instanceof JTextField textField) {
+                installDocumentListener(column, textField);
+            }
+            return;
+        }
+        if (input instanceof UniversalTextArea area) {
+            installDocumentListener(column, area.textArea());
+            return;
+        }
+        if (input instanceof JScrollPane scrollPane
+                && scrollPane.getViewport().getView() instanceof JTextArea area) {
+            installDocumentListener(column, area);
+            return;
+        }
+        if (input instanceof JTextField textField) {
+            installDocumentListener(column, textField);
+        }
+    }
+
+    private void installDocumentListener(String column, JTextComponent textComponent) {
+        textComponent.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent event) {
+                markDirty(column);
+            }
+
+            public void removeUpdate(DocumentEvent event) {
+                markDirty(column);
+            }
+
+            public void changedUpdate(DocumentEvent event) {
+                markDirty(column);
+            }
+        });
+    }
+
+    private void markDirty(String column) {
+        if (!loadingValues && isEditableColumn(column)) {
+            dirtyColumns.put(column, true);
+            updateFieldBorder(column);
+        }
+        notifyPendingChanges();
+    }
+
+    private void notifyPendingChanges() {
+        if (loadingValues || pendingChangesListener == null) {
+            return;
+        }
+        pendingChangesListener.run();
+    }
+
+    private void applyFieldEditability(JComponent input, boolean editable) {
+        if (input == null) {
+            return;
+        }
+        input.setCursor(Cursor.getPredefinedCursor(editable ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
+        if (input instanceof JTextField textField) {
+            textField.setEditable(editable);
+            styleFieldBorder(textField, false);
+            return;
+        }
+        if (input instanceof UniversalTextArea area) {
+            area.setEditable(editable);
+            area.textArea().setCursor(Cursor.getPredefinedCursor(editable ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
+            styleAreaBorder(area, false);
+            return;
+        }
+        if (input instanceof JComboBox<?> combo) {
+            combo.setEnabled(editable);
+            combo.setFocusable(editable);
+            combo.setRequestFocusEnabled(editable);
+            styleFieldBorder(combo, false);
+            installReadableDisabledRenderer(combo);
+            return;
+        }
+        if (input instanceof UniversalDatePicker picker) {
+            picker.setEnabled(editable);
+            styleFieldBorder(picker, false);
+        }
+    }
+
+    private void updateFieldBorder(String column) {
+        JComponent input = inputsByColumn.get(column);
+        boolean missing = isEditableColumn(column) && isEmpty(valueFor(column));
+        if (input instanceof UniversalTextArea area) {
+            styleAreaBorder(area, missing);
+        } else if (input != null) {
+            styleFieldBorder(input, missing);
+        }
+    }
+
+    private void styleFieldBorder(JComponent component, boolean missing) {
+        component.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(missing ? MISSING_BORDER : FIELD_BORDER),
+                BorderFactory.createEmptyBorder(6, 8, 6, 8)
+        ));
+    }
+
+    private void styleAreaBorder(UniversalTextArea area, boolean missing) {
+        area.setBorder(new LineBorder(missing ? MISSING_BORDER : FIELD_BORDER));
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void installReadableDisabledRenderer(JComboBox<?> combo) {
+        combo.setRenderer((list, value, index, isSelected, cellHasFocus) -> {
+            JLabel label = new JLabel(value == null ? "" : String.valueOf(value));
+            label.setOpaque(true);
+            label.setFont(combo.getFont());
+            label.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
+            label.setBackground(Color.WHITE);
+            label.setForeground(new Color(35, 43, 54));
+            return label;
+        });
     }
 
     @SuppressWarnings("unchecked")

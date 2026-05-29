@@ -92,6 +92,7 @@ public final class HomeViewHelper {
         button.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         button.setBorder(new EmptyBorder(8, 16, 8, 16));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        ButtonStateHelper.install(button);
     }
 
     public static void styleClearButton(JButton button) {
@@ -100,8 +101,10 @@ public final class HomeViewHelper {
         button.setFocusPainted(false);
         button.setOpaque(false);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
+        button.setForeground(TEXT_SECONDARY);
         button.setBorder(new EmptyBorder(7, 8, 7, 8));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        ButtonStateHelper.install(button);
     }
 
     public static JPanel createNorthContainer() {
@@ -120,6 +123,7 @@ public final class HomeViewHelper {
     public static void styleAddButton(JButton button) {
         styleBaseButton(button, new Dimension(120, 32), Font.PLAIN);
         button.setBackground(PAGE_BACKGROUND);
+        button.setForeground(TEXT_SECONDARY);
         button.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(LIGHT_BORDER),
                 BorderFactory.createEmptyBorder(5, 10, 5, 10)));
@@ -158,14 +162,14 @@ public final class HomeViewHelper {
     private static void styleBaseButton(JButton button, Dimension size, int fontStyle) {
         button.setPreferredSize(size);
         button.setFont(new Font("Segoe UI", fontStyle, 12));
+        button.setForeground(Color.WHITE);
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        ButtonStateHelper.install(button);
     }
 
     public static void setTextButtonEnabled(JButton button, boolean enabled) {
-        button.setEnabled(enabled);
-        button.setForeground(enabled ? ACTION_BLUE : TEXT_SECONDARY);
-        button.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
+        ButtonStateHelper.setEnabled(button, enabled);
     }
 
     private static void styleSearchField(JTextField field) {

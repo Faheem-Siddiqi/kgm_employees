@@ -141,11 +141,11 @@ public final class UniversalDatePickerHelper {
         button.setFocusPainted(false);
         if (primary) {
             button.setBackground(BORDER_FOCUS_COLOR);
-            button.setForeground(Color.WHITE);
+            button.setForeground(new Color(80, 80, 80));
             button.setBorder(new EmptyBorder(4, 10, 4, 10));
         } else {
             button.setBackground(new Color(245, 245, 245));
-            button.setForeground(new Color(80, 80, 80));
+            button.setForeground(Color.WHITE);
             button.setBorder(new CompoundBorder(
                     new LineBorder(new Color(170, 170, 170)),
                     new EmptyBorder(4, 10, 4, 10)));
@@ -170,6 +170,7 @@ public final class UniversalDatePickerHelper {
         iconPanel.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
         displayField.setBackground(enabled ? BACKGROUND_COLOR : DISABLED_BACKGROUND);
         displayField.setForeground(enabled ? Color.BLACK : DISABLED_FOREGROUND);
+        displayField.setDisabledTextColor(DISABLED_FOREGROUND);
         iconPanel.setVisible(enabled);
     }
 

@@ -118,18 +118,19 @@ public final class EmployeeDocumentUploadPanelHelper {
 
     public static void styleSearchButton(JButton button) {
         button.setBackground(PRIMARY);
-        button.setForeground(Color.WHITE);
+        button.setForeground(TEXT_SECONDARY);
         button.setFocusPainted(false);
         button.setBorderPainted(false);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         button.setBorder(new EmptyBorder(8, 16, 8, 16));
         button.setPreferredSize(new Dimension(96, SEARCH_CONTROL_HEIGHT));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        ButtonStateHelper.install(button);
     }
 
     public static void styleTextCtaButton(JButton button) {
         button.setBackground(PRIMARY);
-        button.setForeground(Color.WHITE);
+        button.setForeground(TEXT_SECONDARY);
         button.setBorderPainted(false);
         button.setContentAreaFilled(true);
         button.setFocusPainted(false);
@@ -138,6 +139,7 @@ public final class EmployeeDocumentUploadPanelHelper {
         button.setBorder(new EmptyBorder(8, 16, 8, 16));
         button.setPreferredSize(new Dimension(124, SEARCH_CONTROL_HEIGHT));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        ButtonStateHelper.install(button);
     }
 
     public static void styleClearButton(JButton button) {
@@ -148,13 +150,12 @@ public final class EmployeeDocumentUploadPanelHelper {
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         button.setBorder(new EmptyBorder(7, 8, 7, 8));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        ButtonStateHelper.install(button);
         updateClearButtonState(button, false);
     }
 
     public static void updateClearButtonState(JButton button, boolean enabled) {
-        button.setEnabled(enabled);
-        button.setForeground(enabled ? ACTION_BLUE : TEXT_SECONDARY);
-        button.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
+        ButtonStateHelper.setEnabled(button, enabled);
     }
 
     public static JLabel createSizeLabel() {
@@ -208,13 +209,14 @@ public final class EmployeeDocumentUploadPanelHelper {
         button.setContentAreaFilled(false);
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(ACTION_BLUE);
+        button.setForeground(TEXT_SECONDARY);
         button.setBorder(new EmptyBorder(6, 8, 6, 8));
+        ButtonStateHelper.install(button);
         return button;
     }
 
     public static void styleViewLink(JButton button, boolean uploaded) {
-        button.setForeground(uploaded ? Color.BLACK : DISABLED_TEXT);
+        button.setForeground(TEXT_SECONDARY);
     }
 
     public static void stylePreviewFrame(JFrame frame, Component relativeTo) {

@@ -63,6 +63,11 @@ public final class EmployeeStorageUtil {
             return configured.toFile();
         }
 
+        Path legacyConfigured = resolveLegacyConfiguredPath(trimmed);
+        if (Files.exists(legacyConfigured)) {
+            return legacyConfigured.toFile();
+        }
+
         Path legacy = Path.of(System.getProperty("user.dir")).resolve(trimmed).normalize();
         if (Files.exists(legacy)) {
             return legacy.toFile();
@@ -87,8 +92,36 @@ public final class EmployeeStorageUtil {
         return Path.of(System.getProperty("user.dir")).resolve(storedPath).normalize();
     }
 
+    private static Path resolveLegacyConfiguredPath(String storedPath) {
+        String normalized = storedPath.replace('\\', '/');
+        String prefix = LOGICAL_ROOT + "/";
+        if (normalized.equals(LOGICAL_ROOT)) {
+            return legacyStorageRoot("resources", LOGICAL_ROOT);
+        }
+        if (normalized.startsWith(prefix)) {
+            String relativePath = normalized.substring(prefix.length());
+            Path resourcePath = resolveUnderRoot(legacyStorageRoot("resources", LOGICAL_ROOT), relativePath);
+            if (Files.exists(resourcePath)) {
+                return resourcePath;
+            }
+            return resolveUnderRoot(legacyStorageRoot(LOGICAL_ROOT), relativePath);
+        }
+        return Path.of(System.getProperty("user.dir")).resolve(storedPath).normalize();
+    }
+
+    private static Path legacyStorageRoot(String first, String... more) {
+        Path path = Path.of(System.getProperty("user.dir"), first);
+        for (String segment : more) {
+            path = path.resolve(segment);
+        }
+        return path.normalize();
+    }
+
     private static Path resolveUnderStorage(String relativePath) {
-        Path root = storageRoot();
+        return resolveUnderRoot(storageRoot(), relativePath);
+    }
+
+    private static Path resolveUnderRoot(Path root, String relativePath) {
         Path resolved = root.resolve(relativePath).normalize();
         return resolved.startsWith(root) ? resolved : root;
     }

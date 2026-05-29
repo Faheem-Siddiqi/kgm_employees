@@ -41,7 +41,7 @@ public final class EmployeeRegistrationViewHelper {
         button.setContentAreaFilled(false);
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(LINK_BLUE);
+        button.setForeground(TEXT_SECONDARY);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
     }
 
@@ -151,6 +151,7 @@ public final class EmployeeRegistrationViewHelper {
         button.setOpaque(true);
         button.setBorderPainted(false);
         button.setBorder(new EmptyBorder(8, 16, 8, 16));
+        ButtonStateHelper.install(button);
     }
 
     public static void styleSecondaryButton(JButton button) {
@@ -158,7 +159,7 @@ public final class EmployeeRegistrationViewHelper {
         button.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(BUTTON_SECONDARY_TEXT);
+        button.setForeground(Color.WHITE);
         button.setBackground(BUTTON_SECONDARY_BG);
         button.setOpaque(true);
         button.setBorderPainted(true);
@@ -166,6 +167,7 @@ public final class EmployeeRegistrationViewHelper {
                 new LineBorder(new Color(170, 170, 170)),
                 new EmptyBorder(7, 16, 7, 16)
         ));
+        ButtonStateHelper.install(button);
     }
 
     public static void styleFooterButton(JButton button) {
