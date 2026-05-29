@@ -51,19 +51,20 @@ public class EmployeeDocumentViewPanel extends JPanel {
         lockedDocuments = new boolean[EmployeeDocumentUtil.documentCount()];
 
         JPanel topPanel = EmployeeDocumentViewPanelHelper.createTopPanel();
-        uploadedCountLabel = EmployeeDocumentViewPanelHelper.createUploadedCountLabel("Total fields uploaded: 0");
+        uploadedCountLabel = EmployeeDocumentViewPanelHelper.createUploadedCountLabel(
+                "Total uploads: 0 / " + EmployeeDocumentUtil.documentCount()
+        );
         JLabel sizeLabel = EmployeeDocumentViewPanelHelper.createSizeLabel();
         searchField = new PlaceholderTextField("Search Document Name");
-        JButton searchButton = new JButton("Search");
         clearSearchButton = new JButton("Clear");
         JButton uploadAllButton = new JButton("Upload All");
+        uploadAllButton.setToolTipText("Select multiple JPG or JPEG documents");
+        searchField.setToolTipText("Search document name or saved file");
 
         EmployeeDocumentViewPanelHelper.styleSearchField(searchField);
-        EmployeeDocumentViewPanelHelper.styleSearchButton(searchButton);
         EmployeeDocumentViewPanelHelper.styleClearButton(clearSearchButton);
         EmployeeDocumentViewPanelHelper.styleTextCtaButton(uploadAllButton);
 
-        searchButton.addActionListener(e -> refreshDocumentRows());
         uploadAllButton.addActionListener(e -> chooseMultipleFiles());
         clearSearchButton.addActionListener(e -> {
             searchField.setText("");
@@ -91,14 +92,13 @@ public class EmployeeDocumentViewPanel extends JPanel {
             }
         });
 
-        topPanel.add(uploadedCountLabel);
-        topPanel.add(Box.createVerticalStrut(4));
-        topPanel.add(sizeLabel);
-        topPanel.add(Box.createVerticalStrut(10));
-        topPanel.add(EmployeeDocumentViewPanelHelper.createSearchPanel(searchField, clearSearchButton, searchButton));
-        topPanel.add(Box.createVerticalStrut(8));
-        topPanel.add(EmployeeDocumentViewPanelHelper.createBulkActionPanel(uploadAllButton));
-        topPanel.add(Box.createVerticalStrut(10));
+        topPanel.add(EmployeeDocumentViewPanelHelper.createSummaryPanel(
+                uploadedCountLabel,
+                sizeLabel,
+                null
+        ));
+        topPanel.add(Box.createVerticalStrut(12));
+        topPanel.add(EmployeeDocumentViewPanelHelper.createSearchPanel(searchField, clearSearchButton, uploadAllButton));
         add(topPanel, BorderLayout.NORTH);
 
         String[] columns = {"Document", "File", "Status", "Actions", "DocumentIndex"};
@@ -259,7 +259,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
             }
         }
         if (uploadedCountLabel != null) {
-            uploadedCountLabel.setText("Total fields uploaded: " + count);
+            uploadedCountLabel.setText("Total uploads: " + count + " / " + EmployeeDocumentUtil.documentCount());
         }
     }
 

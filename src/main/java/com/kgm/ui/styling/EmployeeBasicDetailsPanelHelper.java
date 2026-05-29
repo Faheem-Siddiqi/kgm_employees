@@ -8,6 +8,8 @@ public final class EmployeeBasicDetailsPanelHelper {
     public static final int PHOTO_SIZE = 200;
     public static final Font LABEL_FONT = new Font("Segoe UI", Font.PLAIN, 13);
     public static final Font INPUT_FONT = new Font("Segoe UI", Font.PLAIN, 13);
+    private static final int INPUT_MIN_WIDTH = 240;
+    private static final int INPUT_HEIGHT = 34;
 
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color PHOTO_BORDER = new Color(210, 210, 210);
@@ -78,6 +80,14 @@ public final class EmployeeBasicDetailsPanelHelper {
 
     public static void styleInput(JComponent input) {
         EmployeeRegistrationFormPanelHelper.styleInput(input);
+    }
+
+    public static JPanel createGridFiller() {
+        JPanel panel = new JPanel();
+        panel.setBackground(PAGE_BACKGROUND);
+        panel.setMinimumSize(new Dimension(INPUT_MIN_WIDTH, INPUT_HEIGHT));
+        panel.setPreferredSize(new Dimension(INPUT_MIN_WIDTH, INPUT_HEIGHT));
+        return panel;
     }
 }
 

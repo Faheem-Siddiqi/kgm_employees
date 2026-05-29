@@ -6,6 +6,7 @@ import com.kgm.service.AuthService;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.UniversalTablePanel;
+import com.kgm.ui.styling.AppTabsHelper;
 import com.kgm.ui.styling.AppWindowStateHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
@@ -23,6 +24,13 @@ import java.util.Locale;
 import java.util.Map;
 
 public class FieldManagementView extends JFrame {
+    // Trace: shared Field Management spacing so the three tabs keep the same UX rhythm.
+    private static final int PAGE_SIDE_INSET = 28;
+    private static final int TAB_CONTENT_GAP = 14;
+    private static final int ACTION_GAP = 10;
+    private static final int DIALOG_FORM_INSET = 12;
+    private static final int DIALOG_FORM_GAP = 8;
+
     private static final int FIELD_COLUMN = 0;
     private static final int FIELD_LABEL = 1;
     private static final int FIELD_HEADING = 2;
@@ -86,7 +94,7 @@ public class FieldManagementView extends JFrame {
         centerWrapper.add(createTitleRow(), pageConstraints(0, 0));
 
         JTabbedPane tabs = createTabs();
-        centerWrapper.add(createTabsArea(tabs), pageConstraints(1, 8));
+        centerWrapper.add(createTabsArea(tabs), pageConstraints(1, 12));
 
         JScrollPane pageScroll = EmployeeRegistrationViewHelper.createPageScrollPane(centerWrapper);
         tabs.addChangeListener(event -> SwingUtilities.invokeLater(() -> {
@@ -105,7 +113,7 @@ public class FieldManagementView extends JFrame {
     private JPanel createTitleRow() {
         JPanel row = new JPanel(new BorderLayout());
         row.setBackground(Color.WHITE);
-        row.setBorder(new EmptyBorder(25, 28, 0, 28));
+        row.setBorder(new EmptyBorder(25, PAGE_SIDE_INSET, 8, PAGE_SIDE_INSET));
 
         JPanel titleBlock = new JPanel();
         titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
@@ -120,9 +128,6 @@ public class FieldManagementView extends JFrame {
         titleBlock.add(title);
         titleBlock.add(Box.createVerticalStrut(3));
         titleBlock.add(subtitle);
-
-        // Spacing
-        titleBlock.add(Box.createVerticalStrut(16));
 
         JButton dashboard = new JButton("Dashboard");
         EmployeeRegistrationViewHelper.styleBackButton(dashboard);
@@ -145,12 +150,10 @@ public class FieldManagementView extends JFrame {
         tabs.addTab("Fields", createFieldTab());
         tabs.addTab("Categories", createCategoryTab());
         tabs.addTab("Required Fields", createRequiredTab());
-        EmployeeRegistrationViewHelper.styleTabs(
+        AppTabsHelper.styleTabs(
                 tabs,
-                new Insets(0, 28, 2, 28),
-                new Insets(4, 0, 4, 0),
-                new Insets(4, 12, 4, 12),
-                3
+                new Insets(6, PAGE_SIDE_INSET, 12, PAGE_SIDE_INSET),
+                new Insets(8, 0, 0, 0)
         );
         tabs.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent event) {
@@ -248,7 +251,7 @@ public class FieldManagementView extends JFrame {
     }
 
     private JPanel createFieldsBody() {
-        JPanel body = new JPanel(new BorderLayout(0, 12));
+        JPanel body = new JPanel(new BorderLayout(0, TAB_CONTENT_GAP));
         body.setBackground(Color.WHITE);
         body.add(createFieldActionsRow(), BorderLayout.NORTH);
         body.add(fieldTable, BorderLayout.CENTER);
@@ -256,7 +259,7 @@ public class FieldManagementView extends JFrame {
     }
 
     private JPanel createFieldActionsRow() {
-        JPanel row = new JPanel(new BorderLayout(12, 0));
+        JPanel row = new JPanel(new BorderLayout(ACTION_GAP, 0));
         row.setBackground(Color.WHITE);
 
         JButton add = new JButton("Add Field");
@@ -266,7 +269,7 @@ public class FieldManagementView extends JFrame {
         add.addActionListener(event -> addField());
         refresh.addActionListener(event -> loadData());
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
         actions.add(add);
         actions.add(refresh);
@@ -277,7 +280,7 @@ public class FieldManagementView extends JFrame {
     }
 
     private JPanel createFieldFilters() {
-        JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, ACTION_GAP, 0));
         filters.setBackground(Color.WHITE);
         filters.add(createSearchBox());
         filters.add(createOriginFilter());
@@ -302,13 +305,13 @@ public class FieldManagementView extends JFrame {
         actions.setAlignmentX(Component.LEFT_ALIGNMENT);
         categoryTable.setAlignmentX(Component.LEFT_ALIGNMENT);
         body.add(actions);
-        body.add(Box.createVerticalStrut(12));
+        body.add(Box.createVerticalStrut(TAB_CONTENT_GAP));
         body.add(categoryTable);
         return body;
     }
 
     private JPanel createCategoryActionsRow() {
-        JPanel row = new JPanel(new BorderLayout());
+        JPanel row = new JPanel(new BorderLayout(ACTION_GAP, 0));
         row.setBackground(Color.WHITE);
 
         JButton rename = new JButton("Edit Selected");
@@ -321,7 +324,7 @@ public class FieldManagementView extends JFrame {
         delete.addActionListener(event -> deleteSelectedCategory());
         refresh.addActionListener(event -> loadData());
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
         actions.add(rename);
         actions.add(delete);
@@ -348,20 +351,20 @@ public class FieldManagementView extends JFrame {
         actions.setAlignmentX(Component.LEFT_ALIGNMENT);
         requiredTable.setAlignmentX(Component.LEFT_ALIGNMENT);
         body.add(actions);
-        body.add(Box.createVerticalStrut(12));
+        body.add(Box.createVerticalStrut(TAB_CONTENT_GAP));
         body.add(requiredTable);
         return body;
     }
 
     private JPanel createRequiredActionsRow() {
-        JPanel row = new JPanel(new BorderLayout());
+        JPanel row = new JPanel(new BorderLayout(ACTION_GAP, 0));
         row.setBackground(Color.WHITE);
 
         JButton refresh = new JButton("Refresh");
         EmployeeRegistrationViewHelper.styleSecondaryButton(refresh);
         refresh.addActionListener(event -> loadData());
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
         actions.add(refresh);
         row.add(createRequiredSearchBox(), BorderLayout.WEST);
@@ -370,9 +373,9 @@ public class FieldManagementView extends JFrame {
     }
 
     private JPanel createTabPanel() {
-        JPanel tab = new JPanel(new BorderLayout(0, 14));
+        JPanel tab = new JPanel(new BorderLayout(0, TAB_CONTENT_GAP));
         tab.setBackground(Color.WHITE);
-        tab.setBorder(new EmptyBorder(0, 28, 8, 28));
+        tab.setBorder(new EmptyBorder(2, PAGE_SIDE_INSET, 12, PAGE_SIDE_INSET));
         return tab;
     }
 
@@ -381,8 +384,7 @@ public class FieldManagementView extends JFrame {
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBackground(Color.WHITE);
 
-        // Spacing
-        panel.setBorder(new EmptyBorder(8, 0, 12, 0));
+        panel.setBorder(new EmptyBorder(6, 0, TAB_CONTENT_GAP, 0));
 
         JLabel titleLabel = new JLabel(title);
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
@@ -705,7 +707,7 @@ public class FieldManagementView extends JFrame {
         status.setPreferredSize(new Dimension(180, 34));
 
         JPanel form = new JPanel(new GridBagLayout());
-        form.setBorder(new EmptyBorder(8, 8, 8, 8));
+        form.setBorder(new EmptyBorder(DIALOG_FORM_INSET, DIALOG_FORM_INSET, DIALOG_FORM_INSET, DIALOG_FORM_INSET));
         GridBagConstraints gbc = formConstraints();
 
         gbc.gridx = 0;
@@ -880,7 +882,7 @@ public class FieldManagementView extends JFrame {
         fields.setFocusable(false);
 
         JPanel form = new JPanel(new GridBagLayout());
-        form.setBorder(new EmptyBorder(8, 8, 8, 8));
+        form.setBorder(new EmptyBorder(DIALOG_FORM_INSET, DIALOG_FORM_INSET, DIALOG_FORM_INSET, DIALOG_FORM_INSET));
         GridBagConstraints gbc = formConstraints();
 
         gbc.gridx = 0;
@@ -1071,7 +1073,7 @@ public class FieldManagementView extends JFrame {
         JLabel optionsLabel = new JLabel("Options");
 
         JPanel form = new JPanel(new GridBagLayout());
-        form.setBorder(new EmptyBorder(8, 8, 8, 8));
+        form.setBorder(new EmptyBorder(DIALOG_FORM_INSET, DIALOG_FORM_INSET, DIALOG_FORM_INSET, DIALOG_FORM_INSET));
         heading.setEnabled(!"Documents".equals(category.getSelectedItem()));
         dateField.setEnabled(!"Documents".equals(category.getSelectedItem()));
         dropdownField.setEnabled(!"Documents".equals(category.getSelectedItem()));
@@ -1289,7 +1291,7 @@ public class FieldManagementView extends JFrame {
 
     private GridBagConstraints formConstraints() {
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(6, 6, 6, 6);
+        gbc.insets = new Insets(DIALOG_FORM_GAP, DIALOG_FORM_GAP, DIALOG_FORM_GAP, DIALOG_FORM_GAP);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.NORTHWEST;
         return gbc;
@@ -1342,7 +1344,7 @@ public class FieldManagementView extends JFrame {
         private final List<JTextField> fields = new ArrayList<>();
 
         OptionEditorPanel(List<String> options) {
-            setLayout(new BorderLayout(0, 8));
+            setLayout(new BorderLayout(0, 10));
             setOpaque(false);
             rows.setLayout(new BoxLayout(rows, BoxLayout.Y_AXIS));
             rows.setOpaque(false);
@@ -1367,7 +1369,7 @@ public class FieldManagementView extends JFrame {
         void addOptionRow(String value) {
             JPanel row = new JPanel(new BorderLayout(8, 0));
             row.setOpaque(false);
-            row.setBorder(new EmptyBorder(0, 0, 6, 0));
+            row.setBorder(new EmptyBorder(0, 0, 8, 0));
 
             JTextField field = new JTextField(value == null ? "" : value.trim(), 22);
             JButton remove = new JButton("Remove");

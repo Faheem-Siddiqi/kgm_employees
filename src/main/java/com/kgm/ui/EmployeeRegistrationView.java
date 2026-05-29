@@ -9,6 +9,7 @@ import com.kgm.ui.panel.EmployeeDocumentUploadPanel;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.EmployeeRegistrationFormPanel;
 import com.kgm.ui.panel.HeaderPanel;
+import com.kgm.ui.styling.AppTabsHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.util.EmployeeBasicFieldUtil;
@@ -118,7 +119,7 @@ public class EmployeeRegistrationView extends JFrame {
         tabs.addTab("Form", EmployeeRegistrationViewHelper.createTabContent(formPanel, null));
         tabs.addTab("Documents", EmployeeRegistrationViewHelper.createTabContent(documentPanel, documentActions));
 
-        EmployeeRegistrationViewHelper.styleTabs(tabs);
+        AppTabsHelper.styleTabs(tabs);
         tabs.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent event) {
                 int tabIndex = tabs.indexAtLocation(event.getX(), event.getY());

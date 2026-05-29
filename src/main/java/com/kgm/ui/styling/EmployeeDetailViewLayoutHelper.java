@@ -5,6 +5,9 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
 public final class EmployeeDetailViewLayoutHelper {
+    // Trace: controls the gap between Download Profile and Dashboard in EmployeeDetailView header.
+    private static final int HEADER_CTA_GAP = 8;
+
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color NAVY = new Color(0, 38, 77);
     private static final Color LINK_BLUE = new Color(0, 102, 204);
@@ -46,7 +49,7 @@ public final class EmployeeDetailViewLayoutHelper {
             Runnable onBack,
             Runnable onDownloadReport
     ) {
-        JPanel header = new JPanel(new BorderLayout());
+        JPanel header = new JPanel(new GridBagLayout());
         header.setBackground(PAGE_BACKGROUND);
         header.setBorder(new EmptyBorder(25, 28, 0, 28));
 
@@ -73,7 +76,7 @@ public final class EmployeeDetailViewLayoutHelper {
         titleBlock.add(Box.createVerticalStrut(3));
         titleBlock.add(subtitle);
 
-        JPanel actionGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 18, 0));
+        JPanel actionGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, HEADER_CTA_GAP, 0));
         actionGroup.setOpaque(false);
         if (onDownloadReport != null) {
             JButton downloadReport = createDownloadReportButton();
@@ -86,8 +89,20 @@ public final class EmployeeDetailViewLayoutHelper {
         back.addActionListener(e -> onBack.run());
         actionGroup.add(back);
 
-        header.add(titleBlock, BorderLayout.WEST);
-        header.add(actionGroup, BorderLayout.EAST);
+        GridBagConstraints titleGbc = new GridBagConstraints();
+        titleGbc.gridx = 0;
+        titleGbc.gridy = 0;
+        titleGbc.weightx = 1.0;
+        titleGbc.fill = GridBagConstraints.HORIZONTAL;
+        titleGbc.anchor = GridBagConstraints.WEST;
+        header.add(titleBlock, titleGbc);
+
+        GridBagConstraints actionGbc = new GridBagConstraints();
+        actionGbc.gridx = 1;
+        actionGbc.gridy = 0;
+        actionGbc.weightx = 0;
+        actionGbc.anchor = GridBagConstraints.CENTER;
+        header.add(actionGroup, actionGbc);
         return header;
     }
 
@@ -103,6 +118,8 @@ public final class EmployeeDetailViewLayoutHelper {
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
         button.setMargin(new Insets(0, 0, 0, 0));
         button.setBorder(new EmptyBorder(0, 0, 0, 0));
+        button.setPreferredSize(new Dimension(142, 34));
+        button.setVerticalAlignment(SwingConstants.CENTER);
         return button;
     }
 
@@ -119,6 +136,8 @@ public final class EmployeeDetailViewLayoutHelper {
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         button.setForeground(LINK_BLUE);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
+        button.setPreferredSize(new Dimension(96, 34));
+        button.setVerticalAlignment(SwingConstants.CENTER);
     }
 
     public static JPanel createEmployeeSummaryPanel() {

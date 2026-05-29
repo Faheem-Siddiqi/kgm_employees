@@ -10,6 +10,8 @@ import java.awt.*;
 import java.util.Date;
 
 public final class EmployeeAdditionalDetailsPanelHelper {
+    private static final int INPUT_MIN_WIDTH = 260;
+    private static final int INPUT_HEIGHT = 34;
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color SECTION_BORDER = new Color(230, 230, 230);
     private static final Color HEADER_TEXT = new Color(60, 60, 60);
@@ -38,7 +40,7 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         root.setBackground(PAGE_BACKGROUND);
         root.setBorder(new CompoundBorder(
                 new RoundedBorder(16),
-                new EmptyBorder(24, 24, 24, 24)
+                new EmptyBorder(20, 20, 22, 20)
         ));
         return root;
     }
@@ -49,37 +51,104 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         section.setAlignmentX(Component.LEFT_ALIGNMENT);
         section.setBorder(BorderFactory.createCompoundBorder(
                 new RoundedBorder(5),
-                new EmptyBorder(12, 12, 12, 12)));
+                new EmptyBorder(10, 10, 10, 10)));
         return section;
     }
 
+    public static JPanel createSectionsContainer() {
+        JPanel container = new JPanel();
+        container.setLayout(new BoxLayout(container, BoxLayout.Y_AXIS));
+        container.setBackground(PAGE_BACKGROUND);
+        container.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return container;
+    }
+
+    public static JLabel createEmptyStateLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        label.setForeground(EmployeeRegistrationViewHelper.TEXT_SECONDARY);
+        label.setBorder(new EmptyBorder(18, 4, 18, 4));
+        return label;
+    }
+
     public static JPanel createBreadcrumbPanel() {
-        JPanel breadcrumb = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        JPanel breadcrumb = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         breadcrumb.setBackground(PAGE_BACKGROUND);
         breadcrumb.setAlignmentX(Component.LEFT_ALIGNMENT);
-        breadcrumb.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
-        breadcrumb.setBorder(new EmptyBorder(0, 0, 16, 0));
+        breadcrumb.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
+        breadcrumb.setBorder(new EmptyBorder(0, 0, 4, 0));
         return breadcrumb;
+    }
+
+    public static JScrollPane createBreadcrumbScroller(JPanel breadcrumb) {
+        JScrollPane scrollPane = new JScrollPane(breadcrumb);
+        scrollPane.setBorder(null);
+        scrollPane.setOpaque(false);
+        scrollPane.getViewport().setOpaque(false);
+        scrollPane.getViewport().setBackground(PAGE_BACKGROUND);
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+        scrollPane.getHorizontalScrollBar().setUnitIncrement(16);
+        scrollPane.getHorizontalScrollBar().setPreferredSize(new Dimension(0, 7));
+        scrollPane.setPreferredSize(new Dimension(1, 48));
+        scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+        scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return scrollPane;
+    }
+
+    public static JLabel createSearchStatusLabel(String text) {
+        return EmployeeDocumentUploadPanelHelper.createUploadedCountLabel(text);
+    }
+
+    public static JPanel createSearchHeader(JLabel statusLabel, JPanel searchPanel) {
+        JPanel header = EmployeeDocumentUploadPanelHelper.createTopPanel();
+        header.add(EmployeeDocumentUploadPanelHelper.createSummaryPanel(statusLabel, null, null));
+        header.add(Box.createVerticalStrut(12));
+        header.add(searchPanel);
+        return header;
+    }
+
+    public static JPanel createSearchPanel(JTextField searchField, JButton clearButton, JButton searchButton) {
+        return EmployeeDocumentUploadPanelHelper.createSearchPanel(searchField, clearButton, searchButton);
+    }
+
+    public static void styleSearchField(JTextField field) {
+        EmployeeDocumentUploadPanelHelper.styleSearchField(field);
+    }
+
+    public static void styleSearchButton(JButton button) {
+        EmployeeDocumentUploadPanelHelper.styleSearchButton(button);
+    }
+
+    public static void styleClearButton(JButton button) {
+        EmployeeDocumentUploadPanelHelper.styleClearButton(button);
+    }
+
+    public static void updateClearButtonState(JButton button, boolean enabled) {
+        EmployeeDocumentUploadPanelHelper.updateClearButtonState(button, enabled);
     }
 
     public static JButton createBreadcrumbLink(String text) {
         JButton link = new JButton(text);
-        link.setContentAreaFilled(false);
-        link.setBorderPainted(false);
+        link.setContentAreaFilled(true);
+        link.setBorderPainted(true);
         link.setFocusPainted(false);
-        link.setOpaque(false);
+        link.setOpaque(true);
+        link.setBackground(new Color(248, 250, 252));
         link.setForeground(EmployeeRegistrationViewHelper.PRIMARY);
         link.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
         link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        link.setBorder(new EmptyBorder(4, 0, 4, 0));
+        link.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(EmployeeRegistrationViewHelper.BORDER),
+                new EmptyBorder(6, 12, 6, 12)
+        ));
         return link;
     }
 
     public static JLabel createBreadcrumbSeparator() {
-        JLabel separator = new JLabel("/");
-        separator.setForeground(EmployeeRegistrationViewHelper.PRIMARY);
-        separator.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
-        separator.setBorder(new EmptyBorder(4, 2, 4, 2));
+        JLabel separator = new JLabel("");
+        separator.setPreferredSize(new Dimension(0, 1));
         return separator;
     }
 
@@ -122,6 +191,7 @@ public final class EmployeeAdditionalDetailsPanelHelper {
     public static JTextField createField(String value) {
         JTextField field = new JTextField(value);
         EmployeeRegistrationFormPanelHelper.styleInput(field);
+        applySingleLineMinimum(field);
         return field;
     }
 
@@ -130,6 +200,7 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         DropdownFieldSupport.configure(combo, allowCustomValue);
         DropdownFieldSupport.setPlaceholder(combo, EmployeeBasicFieldUtil.dropdownPlaceholder(allowCustomValue));
         EmployeeRegistrationFormPanelHelper.styleInput(combo);
+        applyDropdownMinimum(combo);
         if (value != null && !value.isBlank()) {
             DropdownFieldSupport.setValue(combo, value);
         } else if (combo.getItemCount() > 0) {
@@ -141,13 +212,35 @@ public final class EmployeeAdditionalDetailsPanelHelper {
     public static com.kgm.ui.component.UniversalDatePicker createDateField(Date value) {
         com.kgm.ui.component.UniversalDatePicker datePicker = new com.kgm.ui.component.UniversalDatePicker(value);
         EmployeeRegistrationFormPanelHelper.styleInput(datePicker);
+        applySingleLineMinimum(datePicker);
         return datePicker;
     }
 
     public static JPanel createGridFiller() {
         JPanel panel = new JPanel();
         panel.setBackground(PAGE_BACKGROUND);
+        panel.setMinimumSize(new Dimension(INPUT_MIN_WIDTH, INPUT_HEIGHT));
+        panel.setPreferredSize(new Dimension(INPUT_MIN_WIDTH, INPUT_HEIGHT));
         return panel;
+    }
+
+    private static void applySingleLineMinimum(JComponent input) {
+        Dimension minimum = new Dimension(INPUT_MIN_WIDTH, INPUT_HEIGHT);
+        Dimension preferred = input.getPreferredSize();
+        int preferredWidth = Math.max(INPUT_MIN_WIDTH, preferred == null ? INPUT_MIN_WIDTH : preferred.width);
+        int preferredHeight = Math.max(INPUT_HEIGHT, preferred == null ? INPUT_HEIGHT : preferred.height);
+        input.setMinimumSize(minimum);
+        input.setPreferredSize(new Dimension(preferredWidth, preferredHeight));
+        input.setMaximumSize(new Dimension(Integer.MAX_VALUE, preferredHeight));
+    }
+
+    private static void applyDropdownMinimum(JComboBox<String> combo) {
+        applySingleLineMinimum(combo);
+        Component editor = combo.getEditor() == null ? null : combo.getEditor().getEditorComponent();
+        if (editor instanceof JComponent editorComponent) {
+            editorComponent.setMinimumSize(new Dimension(INPUT_MIN_WIDTH, INPUT_HEIGHT));
+            editorComponent.setPreferredSize(new Dimension(INPUT_MIN_WIDTH, INPUT_HEIGHT));
+        }
     }
 
     private static class RoundedBorder extends AbstractBorder {

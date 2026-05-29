@@ -304,43 +304,59 @@ public class HomeView extends JFrame {
     }
 
     private void showExcelImportActions() {
-        int selected = DialogHelper.option(
-                this,
-                "Excel",
-                "Choose an Excel action.\n\nThe sample and export are rebuilt from current database fields. Document upload fields are not exported as dynamic columns.",
-                "Import Excel",
-                "Download Sample",
-                "Export Excel"
-        );
-        if (selected == 0) {
-            chooseExcelImportFile();
-        } else if (selected == 1) {
-            downloadSampleExcel();
-        } else if (selected == 2) {
-            exportEmployeeExcel();
+        try {
+            int selected = DialogHelper.option(
+                    this,
+                    "Excel",
+                    "Choose an Excel action.\n\nThe sample and export are rebuilt from current database fields. Document upload fields are not exported as dynamic columns.",
+                    "Import Excel",
+                    "Download Sample",
+                    "Export Excel"
+            );
+            if (selected == 0) {
+                chooseExcelImportFile();
+            } else if (selected == 1) {
+                downloadSampleExcel();
+            } else if (selected == 2) {
+                exportEmployeeExcel();
+            }
+        } catch (RuntimeException exception) {
+            showExcelServiceError(
+                    "Excel Services",
+                    "Excel actions could not be opened.",
+                    exception
+            );
         }
     }
 
     private void chooseExcelImportFile() {
-        File selectedFile = FileUploadCard.chooseFile(
-                this,
-                "Import Employee Excel Sheet",
-                FileUploadCard.excelWorkbooks()
-        );
-        if (selectedFile == null) {
-            return;
-        }
+        try {
+            File selectedFile = FileUploadCard.chooseFile(
+                    this,
+                    "Import Employee Excel Sheet",
+                    FileUploadCard.excelWorkbooks()
+            );
+            if (selectedFile == null) {
+                return;
+            }
 
-        if (!ExcelImportService.isExcelFile(selectedFile)) {
-            showUnsupportedImportFileDialog();
-            return;
-        }
+            if (!ExcelImportService.isExcelFile(selectedFile)) {
+                showUnsupportedImportFileDialog();
+                return;
+            }
 
-        ExcelImportService.ImportType importType = chooseExcelImportType();
-        if (importType == null) {
-            return;
+            ExcelImportService.ImportType importType = chooseExcelImportType();
+            if (importType == null) {
+                return;
+            }
+            importEmployeesFromExcel(selectedFile, importType);
+        } catch (RuntimeException exception) {
+            showExcelServiceError(
+                    "Excel import failed",
+                    "The Excel import could not be started.",
+                    exception
+            );
         }
-        importEmployeesFromExcel(selectedFile, importType);
     }
 
     private ExcelImportService.ImportType chooseExcelImportType() {
@@ -420,6 +436,12 @@ public class HomeView extends JFrame {
                             HomeView.this,
                             "Excel import needs attention",
                             friendlyImportFailureMessage(message)
+                    );
+                } catch (RuntimeException exception) {
+                    showExcelServiceError(
+                            "Excel import failed",
+                            "The Excel import could not be completed.",
+                            exception
                     );
                 }
             }
@@ -601,115 +623,147 @@ public class HomeView extends JFrame {
     }
 
     private void downloadSampleExcel() {
-        File selectedFile = FileUploadCard.chooseSaveFile(
-                this,
-                "Save Employee Import Sample",
-                "employee_import_sample.xlsx",
-                FileUploadCard.xlsxWorkbook()
-        );
-        if (selectedFile == null) {
-            return;
-        }
-
-        File target = xlsxFile(selectedFile);
-        LoadingOverlay.Handle loader = LoadingOverlay.show(
-                this,
-                "Saving Sample",
-                "Building the latest import sample..."
-        );
-        SwingWorker<Void, Void> worker = new SwingWorker<>() {
-            @Override
-            protected Void doInBackground() throws Exception {
-                ExcelSampleGenerator.writeSampleWorkbook(target);
-                return null;
+        try {
+            File selectedFile = FileUploadCard.chooseSaveFile(
+                    this,
+                    "Save Employee Import Sample",
+                    "employee_import_sample.xlsx",
+                    FileUploadCard.xlsxWorkbook()
+            );
+            if (selectedFile == null) {
+                return;
             }
 
-            @Override
-            protected void done() {
-                loader.close();
-                try {
-                    get();
-                    showDownloadedFileSuccess(
-                            target,
-                            "Sample Excel Ready",
-                            "Sample Excel file saved:\n" + target.getAbsolutePath()
-                    );
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    DialogHelper.error(HomeView.this, "Sample not saved", "Sample save was interrupted.");
-                } catch (ExecutionException exception) {
-                    Throwable cause = exception.getCause();
-                    if (cause instanceof IOException ioException) {
-                        DialogHelper.error(HomeView.this, "Sample not saved", friendlySampleSaveFailure(target, ioException));
-                    } else {
-                        DialogHelper.error(HomeView.this, "Sample not saved", cause == null ? exception.getMessage() : cause.getMessage());
+            File target = xlsxFile(selectedFile);
+            LoadingOverlay.Handle loader = LoadingOverlay.show(
+                    this,
+                    "Saving Sample",
+                    "Building the latest import sample..."
+            );
+            SwingWorker<Void, Void> worker = new SwingWorker<>() {
+                @Override
+                protected Void doInBackground() throws Exception {
+                    ExcelSampleGenerator.writeSampleWorkbook(target);
+                    return null;
+                }
+
+                @Override
+                protected void done() {
+                    loader.close();
+                    try {
+                        get();
+                        showDownloadedFileSuccess(
+                                target,
+                                "Sample Excel Ready",
+                                "Sample Excel file saved:\n" + target.getAbsolutePath()
+                        );
+                    } catch (InterruptedException exception) {
+                        Thread.currentThread().interrupt();
+                        DialogHelper.error(HomeView.this, "Sample not saved", "Sample save was interrupted.");
+                    } catch (ExecutionException exception) {
+                        Throwable cause = exception.getCause();
+                        if (cause instanceof IOException ioException) {
+                            DialogHelper.error(HomeView.this, "Sample not saved", friendlySampleSaveFailure(target, ioException));
+                        } else {
+                            showExcelServiceError(
+                                    "Sample not saved",
+                                    "The sample Excel file could not be saved.",
+                                    cause == null ? exception : cause
+                            );
+                        }
+                    } catch (RuntimeException exception) {
+                        showExcelServiceError(
+                                "Sample not saved",
+                                "The sample Excel file could not be saved.",
+                                exception
+                        );
                     }
                 }
-            }
-        };
-        worker.execute();
+            };
+            worker.execute();
+        } catch (RuntimeException exception) {
+            showExcelServiceError(
+                    "Sample not saved",
+                    "The sample Excel file could not be started.",
+                    exception
+            );
+        }
     }
 
     private void exportEmployeeExcel() {
-        File selectedFile = FileUploadCard.chooseSaveFile(
-                this,
-                "Save Employee Excel Export",
-                "employee_export.xlsx",
-                FileUploadCard.excelWorkbooks()
-        );
-        if (selectedFile == null) {
-            return;
-        }
-
-        // Ask user for file format
-        String selectedFormat = askForExcelFormat();
-        if (selectedFormat == null) {
-            return; // User cancelled
-        }
-
-        File target = ensureExcelExtension(selectedFile, selectedFormat);
-        setExcelButtonBusy("Exporting...");
-        LoadingOverlay.Handle loader = LoadingOverlay.show(
-                this,
-                "Exporting Excel",
-                "Saving employee workbook..."
-        );
-        SwingWorker<ExcelExportService.ExportResult, Void> worker = new SwingWorker<>() {
-            protected ExcelExportService.ExportResult doInBackground() throws Exception {
-                return excelExportService.exportEmployees(target, (message, completedRows, totalRows, percent) ->
-                        updateExcelLoader(loader, message, percent));
+        try {
+            File selectedFile = FileUploadCard.chooseSaveFile(
+                    this,
+                    "Save Employee Excel Export",
+                    "employee_export.xlsx",
+                    FileUploadCard.excelWorkbooks()
+            );
+            if (selectedFile == null) {
+                return;
             }
 
-            protected void done() {
-                loader.close();
-                setExcelButtonReady();
-                try {
-                    ExcelExportService.ExportResult result = get();
-                    showDownloadedFileSuccess(
-                            target,
-                            "Employee Export Ready",
-                            "Employee Excel export saved:\n" + target.getAbsolutePath()
-                                    + "\n\nEmployees: " + result.employeeCount()
-                                    + "\nColumns: " + result.columnCount()
-                                    + "\nDynamic columns highlighted: " + result.dynamicColumnCount()
-                    );
-                    // Reload home data after successful export to refresh the display
-                    reloadHomeData();
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    DialogHelper.error(HomeView.this, "Excel export stopped", "Export was interrupted.");
-                } catch (ExecutionException exception) {
-                    Throwable cause = exception.getCause();
-                    String detail = cause == null ? exception.getMessage() : cause.getMessage();
-                    DialogHelper.error(
-                            HomeView.this,
-                            "Export not saved",
-                            friendlyExportSaveFailure(target, detail)
-                    );
+            String selectedFormat = askForExcelFormat();
+            if (selectedFormat == null) {
+                return;
+            }
+
+            File target = ensureExcelExtension(selectedFile, selectedFormat);
+            setExcelButtonBusy("Exporting...");
+            LoadingOverlay.Handle loader = LoadingOverlay.show(
+                    this,
+                    "Exporting Excel",
+                    "Saving employee workbook..."
+            );
+            SwingWorker<ExcelExportService.ExportResult, Void> worker = new SwingWorker<>() {
+                protected ExcelExportService.ExportResult doInBackground() throws Exception {
+                    return excelExportService.exportEmployees(target, (message, completedRows, totalRows, percent) ->
+                            updateExcelLoader(loader, message, percent));
                 }
-            }
-        };
-        worker.execute();
+
+                protected void done() {
+                    loader.close();
+                    setExcelButtonReady();
+                    try {
+                        ExcelExportService.ExportResult result = get();
+                        showDownloadedFileSuccess(
+                                target,
+                                "Employee Export Ready",
+                                "Employee Excel export saved:\n" + target.getAbsolutePath()
+                                        + "\n\nEmployees: " + result.employeeCount()
+                                        + "\nColumns: " + result.columnCount()
+                                        + "\nDynamic columns highlighted: " + result.dynamicColumnCount()
+                        );
+                        // Reload home data after successful export to refresh the display
+                        reloadHomeData();
+                    } catch (InterruptedException exception) {
+                        Thread.currentThread().interrupt();
+                        DialogHelper.error(HomeView.this, "Excel export stopped", "Export was interrupted.");
+                    } catch (ExecutionException exception) {
+                        Throwable cause = exception.getCause();
+                        String detail = cause == null ? exception.getMessage() : cause.getMessage();
+                        DialogHelper.error(
+                                HomeView.this,
+                                "Export not saved",
+                                friendlyExportSaveFailure(target, detail)
+                        );
+                    } catch (RuntimeException exception) {
+                        showExcelServiceError(
+                                "Export not saved",
+                                "The employee Excel export could not be completed.",
+                                exception
+                        );
+                    }
+                }
+            };
+            worker.execute();
+        } catch (RuntimeException exception) {
+            setExcelButtonReady();
+            showExcelServiceError(
+                    "Export not saved",
+                    "The employee Excel export could not be started.",
+                    exception
+            );
+        }
     }
 
     private void showUnsupportedImportFileDialog() {
@@ -871,24 +925,28 @@ public class HomeView extends JFrame {
     }
 
     private String askForExcelFormat() {
-        String[] options = {"XLSX (.xlsx)", "XLS (.xls)"};
-        int choice = JOptionPane.showOptionDialog(
+        int choice = DialogHelper.option(
                 this,
-                "Choose the Excel file format:",
                 "Excel Format",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                options,
-                options[0]
+                "Choose the Excel file format:",
+                "XLSX (.xlsx)",
+                "XLS (.xls)"
         );
-        
+
         if (choice == 0) {
             return "xlsx";
         } else if (choice == 1) {
             return "xls";
         }
         return null; // User cancelled
+    }
+
+    private void showExcelServiceError(String title, String action, Throwable throwable) {
+        DialogHelper.error(
+                this,
+                title,
+                action + "\n\nDetails: " + rootMessage(throwable)
+        );
     }
 
     private File ensureExcelExtension(File file, String format) {

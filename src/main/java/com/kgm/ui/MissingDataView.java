@@ -6,6 +6,7 @@ import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.GenericRecordTablePanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.styling.AppWindowStateHelper;
+import com.kgm.ui.styling.AppTabsHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.ui.styling.HomeViewHelper;
 import com.kgm.util.DateDisplayFormatter;
@@ -167,18 +168,18 @@ public class MissingDataView extends JFrame {
     private JPanel createMissingTypeTabsRow() {
         JPanel row = new JPanel(new BorderLayout());
         row.setBackground(Color.WHITE);
-        row.setBorder(BorderFactory.createEmptyBorder(0, 0, 14, 0));
+        row.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
 
-        missingTypeTabs = new FilterTabbedPane();
-        missingTypeTabs.addTab(MissingDataType.FIELDS.title, new JPanel());
-        missingTypeTabs.addTab(MissingDataType.DOCUMENTS.title, new JPanel());
+        missingTypeTabs = new JTabbedPane();
+        missingTypeTabs.addTab(MissingDataType.FIELDS.title, createFilterTabContent());
+        missingTypeTabs.addTab(MissingDataType.DOCUMENTS.title, createFilterTabContent());
         missingTypeTabs.setSelectedIndex(activeMissingType == MissingDataType.DOCUMENTS ? 1 : 0);
-        EmployeeRegistrationViewHelper.styleTabs(
+        AppTabsHelper.styleTabs(
                 missingTypeTabs,
-                new Insets(0, 0, 2, 0),
                 new Insets(0, 0, 0, 0),
-                new Insets(4, 12, 4, 12),
-                3
+                new Insets(0, 0, 0, 0),
+                new Insets(10, 14, 9, 14),
+                2
         );
         missingTypeTabs.addChangeListener(event -> {
             MissingDataType nextType = missingTypeTabs.getSelectedIndex() == 1
@@ -202,6 +203,13 @@ public class MissingDataView extends JFrame {
 
         row.add(missingTypeTabs, BorderLayout.CENTER);
         return row;
+    }
+
+    private JPanel createFilterTabContent() {
+        JPanel panel = new JPanel();
+        panel.setBackground(Color.WHITE);
+        panel.setPreferredSize(new Dimension(0, 4));
+        return panel;
     }
 
     private JPanel createSearchRow() {
@@ -526,13 +534,6 @@ public class MissingDataView extends JFrame {
 
         public boolean getScrollableTracksViewportHeight() {
             return false;
-        }
-    }
-
-    private static class FilterTabbedPane extends JTabbedPane {
-        public Dimension getPreferredSize() {
-            Dimension preferred = super.getPreferredSize();
-            return new Dimension(preferred.width, Math.min(Math.max(38, preferred.height), 46));
         }
     }
 }

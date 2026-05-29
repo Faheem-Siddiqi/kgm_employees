@@ -23,6 +23,10 @@ public final class EmployeeDocumentViewPanelHelper {
         return EmployeeDocumentUploadPanelHelper.createSizeLabel();
     }
 
+    public static JPanel createSummaryPanel(JLabel primaryLabel, JLabel secondaryLabel, JButton actionButton) {
+        return EmployeeDocumentUploadPanelHelper.createSummaryPanel(primaryLabel, secondaryLabel, actionButton);
+    }
+
     public static JPanel createSearchPanel(JTextField searchField, JButton clearButton, JButton searchButton) {
         return EmployeeDocumentUploadPanelHelper.createSearchPanel(searchField, clearButton, searchButton);
     }

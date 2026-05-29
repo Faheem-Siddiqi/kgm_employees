@@ -155,7 +155,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
 
         gbc.gridx = 1;
         if (second == null) {
-            panel.add(Box.createHorizontalStrut(1), gbc);
+            panel.add(EmployeeBasicDetailsPanelHelper.createGridFiller(), gbc);
         } else {
             panel.add(new FormField(second.label(), inputFor(second)), gbc);
         }
@@ -167,7 +167,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         gbc.gridwidth = 1;
         panel.add(new FormField(definition.label(), inputFor(definition)), gbc);
         gbc.gridx = 1;
-        panel.add(Box.createHorizontalStrut(1), gbc);
+        panel.add(EmployeeBasicDetailsPanelHelper.createGridFiller(), gbc);
     }
 
     private void addFullWidthField(JPanel panel, GridBagConstraints gbc, int y, EmployeeFieldDefinition definition) {

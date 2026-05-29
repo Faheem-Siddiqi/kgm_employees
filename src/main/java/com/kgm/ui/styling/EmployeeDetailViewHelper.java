@@ -81,11 +81,11 @@ public final class EmployeeDetailViewHelper {
     }
 
     /**
-     * Apply custom tab styling matching HomeViewHelper's tab UI.
-     * This creates modern tabs with underline indicator for selected tab.
+     * Applies the app-wide tab style shared with registration, missing data,
+     * and field management screens.
      */
     public static void styleTabs(JTabbedPane tabs) {
-        EmployeeRegistrationViewHelper.styleTabs(tabs);
+        AppTabsHelper.styleTabs(tabs);
     }
 }
 

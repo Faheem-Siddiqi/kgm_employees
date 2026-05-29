@@ -1,11 +1,7 @@
 package com.kgm;
 import com.kgm.config.DatabaseConfig;
-import com.kgm.database.DatabaseInitializer;
 import com.kgm.ui.LoginView;
-import com.kgm.ui.component.LoadingOverlay;
-import com.kgm.util.EmployeeDocumentUtil;
-import com.kgm.util.EmployeeFieldDefinitionCache;
-import javax.swing.SwingWorker;
+import com.kgm.util.ApplicationStartup;
 import javax.swing.SwingUtilities;
 
 public class Main {
@@ -24,44 +20,7 @@ public class Main {
         SwingUtilities.invokeLater(() -> {
             LoginView loginView = new LoginView();
             loginView.setVisible(true);
-            LoadingOverlay.Handle loader = LoadingOverlay.show(
-                    loginView,
-                    "Starting Application",
-                    "Preparing database and field settings..."
-            );
-
-            SwingWorker<Void, Void> worker = new SwingWorker<>() {
-                @Override
-                protected Void doInBackground() {
-                    DatabaseInitializer.init();
-                    return null;
-                }
-
-                @Override
-                protected void done() {
-                    loader.close();
-                    System.out.println("Employee Management App started");
-                    warmFieldMetadataCacheAsync();
-                }
-            };
-            worker.execute();
+            ApplicationStartup.startSilently();
         });
-    }
-
-    private static void warmFieldMetadataCacheAsync() {
-        SwingWorker<Void, Void> worker = new SwingWorker<>() {
-            @Override
-            protected Void doInBackground() {
-                try {
-                    EmployeeFieldDefinitionCache.refreshFromDatabase();
-                    EmployeeDocumentUtil.documentTypes();
-                    EmployeeDocumentUtil.requiredDocumentFlags();
-                } catch (RuntimeException exception) {
-                    System.out.println("Field metadata cache warm-up skipped: " + exception.getMessage());
-                }
-                return null;
-            }
-        };
-        worker.execute();
     }
 }

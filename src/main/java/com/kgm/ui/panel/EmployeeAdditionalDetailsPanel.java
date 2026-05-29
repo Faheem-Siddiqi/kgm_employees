@@ -12,13 +12,18 @@ import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeFieldDefinitionCache;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class EmployeeAdditionalDetailsPanel extends JPanel {
@@ -32,6 +37,15 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     private final Map<String, JComboBox<String>> dropdownFieldMap = new LinkedHashMap<>();
     private final Map<String, UniversalDatePicker> dateFieldMap = new LinkedHashMap<>();
     private final Map<String, Boolean> dateDirtyMap = new LinkedHashMap<>();
+    private final List<SectionView> sectionViews = new ArrayList<>();
+    private JTextField searchField;
+    private JButton clearSearchButton;
+    private JLabel searchStatusLabel;
+    private JPanel sectionsContainer;
+    private JLabel emptySearchLabel;
+    private JScrollPane sectionNavScroller;
+    private Component sectionNavGap;
+    private Boolean lastSingleColumnLayout;
     private JComponent topAnchor;
 
     public EmployeeAdditionalDetailsPanel() {
@@ -53,31 +67,78 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
         JPanel root = EmployeeAdditionalDetailsPanelHelper.createRootPanel();
         Map<String, List<EmployeeFieldDefinition>> grouped = groupByHeading(definitions);
 
-        topAnchor = EmployeeAdditionalDetailsPanelHelper.createBreadcrumbPanel();
+        sectionViews.clear();
+        topAnchor = createSearchHeader(definitions.size());
         root.add(topAnchor);
 
         List<String> headings = new ArrayList<>(grouped.keySet());
         List<JComponent> sectionRefs = new ArrayList<>();
+        JPanel sectionNav = null;
+        if (!headings.isEmpty()) {
+            sectionNav = EmployeeAdditionalDetailsPanelHelper.createBreadcrumbPanel();
+            sectionNavScroller = EmployeeAdditionalDetailsPanelHelper.createBreadcrumbScroller(sectionNav);
+            sectionNavGap = Box.createVerticalStrut(14);
+            root.add(sectionNavScroller);
+            root.add(sectionNavGap);
+        }
+        sectionsContainer = EmployeeAdditionalDetailsPanelHelper.createSectionsContainer();
+        root.add(sectionsContainer);
+
         for (int index = 0; index < headings.size(); index++) {
-            if (index > 0) {
-                root.add(Box.createVerticalStrut(18));
-            }
             String heading = headings.get(index);
             JComponent section = createSection(heading, grouped.get(heading));
             sectionRefs.add(section);
-            root.add(section);
         }
 
         if (headings.isEmpty()) {
             JLabel empty = EmployeeAdditionalDetailsPanelHelper.createSectionHeader("No additional fields available");
             empty.setAlignmentX(Component.LEFT_ALIGNMENT);
-            root.add(empty);
+            sectionsContainer.add(empty);
         } else {
+            emptySearchLabel = EmployeeAdditionalDetailsPanelHelper.createEmptyStateLabel("No fields match this search.");
+            rebuildVisibleSections("");
             root.add(EmployeeAdditionalDetailsPanelHelper.createReturnToTopPanel(() -> scrollToComponent(topAnchor)));
-            installBreadcrumbLinks((JPanel) topAnchor, headings, sectionRefs);
+            installBreadcrumbLinks(sectionNav, headings, sectionRefs);
         }
 
+        installResponsiveLayoutRefresh(root);
+        updateSearchStatus(definitions.size(), definitions.size(), "");
         return root;
+    }
+
+    private JComponent createSearchHeader(int totalFields) {
+        searchStatusLabel = EmployeeAdditionalDetailsPanelHelper.createSearchStatusLabel(
+                "Total fields: " + totalFields
+        );
+        searchField = new PlaceholderTextField("Search Other Fields");
+        searchField.setToolTipText("Search field label, section, value, or DB column");
+        clearSearchButton = new JButton("Clear");
+
+        EmployeeAdditionalDetailsPanelHelper.styleSearchField(searchField);
+        EmployeeAdditionalDetailsPanelHelper.styleClearButton(clearSearchButton);
+
+        clearSearchButton.addActionListener(event -> {
+            searchField.setText("");
+            searchField.requestFocusInWindow();
+        });
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent event) {
+                applyFieldFilter();
+            }
+
+            public void removeUpdate(DocumentEvent event) {
+                applyFieldFilter();
+            }
+
+            public void changedUpdate(DocumentEvent event) {
+                applyFieldFilter();
+            }
+        });
+
+        return EmployeeAdditionalDetailsPanelHelper.createSearchHeader(
+                searchStatusLabel,
+                EmployeeAdditionalDetailsPanelHelper.createSearchPanel(searchField, clearSearchButton, null)
+        );
     }
 
     private static List<EmployeeFieldDefinition> loadDefaultDefinitions() {
@@ -98,15 +159,14 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     }
 
     private void installBreadcrumbLinks(JPanel breadcrumb, List<String> labels, List<JComponent> targets) {
+        if (breadcrumb == null) {
+            return;
+        }
         for (int index = 0; index < labels.size(); index++) {
             JButton link = EmployeeAdditionalDetailsPanelHelper.createBreadcrumbLink(labels.get(index));
             JComponent target = targets.get(index);
             link.addActionListener(event -> scrollToComponent(target));
             breadcrumb.add(link);
-
-            if (index < labels.size() - 1) {
-                breadcrumb.add(EmployeeAdditionalDetailsPanelHelper.createBreadcrumbSeparator());
-            }
         }
     }
 
@@ -131,12 +191,15 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     private JPanel createSection(String title, List<EmployeeFieldDefinition> definitions) {
         JPanel section = EmployeeAdditionalDetailsPanelHelper.createSectionPanel();
         JLabel header = EmployeeAdditionalDetailsPanelHelper.createSectionHeader(title);
+        List<FieldView> fieldViews = new ArrayList<>();
         section.add(header, BorderLayout.NORTH);
-        section.add(buildGrid(definitions), BorderLayout.CENTER);
+        JPanel grid = buildGrid(definitions, fieldViews);
+        section.add(grid, BorderLayout.CENTER);
+        sectionViews.add(new SectionView(title, section, grid, fieldViews));
         return section;
     }
 
-    private JPanel buildGrid(List<EmployeeFieldDefinition> definitions) {
+    private JPanel buildGrid(List<EmployeeFieldDefinition> definitions, List<FieldView> fieldViews) {
         JPanel grid = EmployeeAdditionalDetailsPanelHelper.createGridPanel();
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(8, 16, 8, 16);
@@ -148,42 +211,54 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             EmployeeFieldDefinition second = index + 1 < definitions.size() ? definitions.get(index + 1) : null;
             if (EmployeeBasicFieldUtil.isMultilineField(first)
                     && (second == null || !EmployeeBasicFieldUtil.isMultilineField(second))) {
-                addFullWidthField(grid, gbc, row++, first);
+                addFullWidthField(grid, gbc, row++, first, fieldViews);
                 if (second != null) {
-                    addSingleField(grid, gbc, row++, second);
+                    addSingleField(grid, gbc, row++, second, fieldViews);
                 }
                 continue;
             }
             if (second != null
                     && EmployeeBasicFieldUtil.isMultilineField(second)
                     && !EmployeeBasicFieldUtil.isMultilineField(first)) {
-                addSingleField(grid, gbc, row++, first);
-                addFullWidthField(grid, gbc, row++, second);
+                addSingleField(grid, gbc, row++, first, fieldViews);
+                addFullWidthField(grid, gbc, row++, second, fieldViews);
                 continue;
             }
 
-            addPairFields(grid, gbc, row++, first, second);
+            addPairFields(grid, gbc, row++, first, second, fieldViews);
         }
         return grid;
     }
 
-    private void addSingleField(JPanel grid, GridBagConstraints gbc, int row, EmployeeFieldDefinition definition) {
+    private void addSingleField(
+            JPanel grid,
+            GridBagConstraints gbc,
+            int row,
+            EmployeeFieldDefinition definition,
+            List<FieldView> fieldViews
+    ) {
         gbc.gridy = row;
         gbc.gridx = 0;
         gbc.gridwidth = 1;
         gbc.weightx = 0.5;
-        grid.add(createField(definition), gbc);
+        grid.add(createTrackedField(definition, fieldViews), gbc);
 
         gbc.gridx = 1;
         grid.add(EmployeeAdditionalDetailsPanelHelper.createGridFiller(), gbc);
     }
 
-    private void addFullWidthField(JPanel grid, GridBagConstraints gbc, int row, EmployeeFieldDefinition definition) {
+    private void addFullWidthField(
+            JPanel grid,
+            GridBagConstraints gbc,
+            int row,
+            EmployeeFieldDefinition definition,
+            List<FieldView> fieldViews
+    ) {
         gbc.gridy = row;
         gbc.gridx = 0;
         gbc.gridwidth = 2;
         gbc.weightx = 1.0;
-        grid.add(createField(definition), gbc);
+        grid.add(createTrackedField(definition, fieldViews), gbc);
         gbc.gridwidth = 1;
     }
 
@@ -192,20 +267,27 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             GridBagConstraints gbc,
             int row,
             EmployeeFieldDefinition first,
-            EmployeeFieldDefinition second
+            EmployeeFieldDefinition second,
+            List<FieldView> fieldViews
     ) {
         gbc.gridy = row;
         gbc.gridx = 0;
         gbc.gridwidth = 1;
         gbc.weightx = 0.5;
-        grid.add(createField(first), gbc);
+        grid.add(createTrackedField(first, fieldViews), gbc);
 
         gbc.gridx = 1;
         if (second == null) {
             grid.add(EmployeeAdditionalDetailsPanelHelper.createGridFiller(), gbc);
         } else {
-            grid.add(createField(second), gbc);
+            grid.add(createTrackedField(second, fieldViews), gbc);
         }
+    }
+
+    private JPanel createTrackedField(EmployeeFieldDefinition definition, List<FieldView> fieldViews) {
+        JPanel field = createField(definition);
+        fieldViews.add(new FieldView(definition, field));
+        return field;
     }
 
     private JPanel createField(EmployeeFieldDefinition definition) {
@@ -257,6 +339,243 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
                 ),
                 DROPDOWN_SEARCH_DEBOUNCE_MS
         );
+    }
+
+    private void installResponsiveLayoutRefresh(JComponent root) {
+        root.addComponentListener(new ComponentAdapter() {
+            public void componentResized(ComponentEvent event) {
+                boolean singleColumn = useSingleColumnLayout();
+                if (lastSingleColumnLayout != null && lastSingleColumnLayout == singleColumn) {
+                    return;
+                }
+                lastSingleColumnLayout = singleColumn;
+                SwingUtilities.invokeLater(() -> {
+                    FilterSummary summary = rebuildVisibleSections(currentQuery());
+                    updateSearchStatus(summary.visibleFields(), summary.totalFields(), currentQuery());
+                });
+            }
+        });
+        SwingUtilities.invokeLater(() -> {
+            lastSingleColumnLayout = useSingleColumnLayout();
+            rebuildVisibleSections(currentQuery());
+        });
+    }
+
+    private void applyFieldFilter() {
+        String query = currentQuery();
+        FilterSummary summary = rebuildVisibleSections(query);
+        updateSearchStatus(summary.visibleFields(), summary.totalFields(), query);
+        revalidate();
+        repaint();
+    }
+
+    private FilterSummary rebuildVisibleSections(String query) {
+        int visibleFields = 0;
+        int totalFields = 0;
+        boolean hasVisibleSection = false;
+        if (sectionsContainer == null) {
+            return new FilterSummary(0, 0);
+        }
+
+        sectionsContainer.removeAll();
+        boolean searching = !query.isBlank();
+        if (sectionNavScroller != null) {
+            sectionNavScroller.setVisible(!searching);
+        }
+        if (sectionNavGap != null) {
+            sectionNavGap.setVisible(!searching);
+        }
+
+        for (SectionView section : sectionViews) {
+            boolean headingMatches = !query.isEmpty() && matchesText(section.heading(), query);
+            List<FieldView> visibleInSection = new ArrayList<>();
+
+            for (FieldView field : section.fields()) {
+                totalFields++;
+                boolean fieldVisible = query.isEmpty()
+                        || headingMatches
+                        || matchesField(field.definition(), query);
+                if (fieldVisible) {
+                    visibleInSection.add(field);
+                    visibleFields++;
+                }
+            }
+
+            if (!visibleInSection.isEmpty()) {
+                if (hasVisibleSection) {
+                    sectionsContainer.add(Box.createVerticalStrut(14));
+                }
+                rebuildSectionGrid(section, visibleInSection);
+                sectionsContainer.add(section.panel());
+                hasVisibleSection = true;
+            }
+        }
+
+        if (!hasVisibleSection && !query.isBlank() && emptySearchLabel != null) {
+            sectionsContainer.add(emptySearchLabel);
+        }
+
+        sectionsContainer.revalidate();
+        sectionsContainer.repaint();
+        return new FilterSummary(visibleFields, totalFields);
+    }
+
+    private void rebuildSectionGrid(SectionView section, List<FieldView> visibleFields) {
+        section.grid().removeAll();
+        if (useSingleColumnLayout()) {
+            rebuildSingleColumnGrid(section.grid(), visibleFields);
+        } else {
+            rebuildTwoColumnGrid(section.grid(), visibleFields);
+        }
+        section.grid().revalidate();
+        section.grid().repaint();
+    }
+
+    private void rebuildSingleColumnGrid(JPanel grid, List<FieldView> visibleFields) {
+        for (int row = 0; row < visibleFields.size(); row++) {
+            addVisibleField(grid, visibleFields.get(row), row, 0, 1, 1.0);
+        }
+    }
+
+    private void rebuildTwoColumnGrid(JPanel grid, List<FieldView> visibleFields) {
+        int row = 0;
+        for (int index = 0; index < visibleFields.size(); index++) {
+            FieldView first = visibleFields.get(index);
+            if (EmployeeBasicFieldUtil.isMultilineField(first.definition())) {
+                addVisibleField(grid, first, row++, 0, 2, 1.0);
+                continue;
+            }
+
+            FieldView second = index + 1 < visibleFields.size() ? visibleFields.get(index + 1) : null;
+            if (second != null && !EmployeeBasicFieldUtil.isMultilineField(second.definition())) {
+                addVisibleField(grid, first, row, 0, 1, 0.5);
+                addVisibleField(grid, second, row++, 1, 1, 0.5);
+                index++;
+            } else {
+                addVisibleField(grid, first, row, 0, 1, 0.5);
+                grid.add(EmployeeAdditionalDetailsPanelHelper.createGridFiller(), fillerConstraints(row));
+                row++;
+            }
+        }
+    }
+
+    private void addVisibleField(
+            JPanel grid,
+            FieldView field,
+            int row,
+            int column,
+            int width,
+            double weight
+    ) {
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridy = row;
+        gbc.gridx = column;
+        gbc.gridwidth = width;
+        gbc.weightx = weight;
+        gbc.insets = new Insets(7, 12, 7, 12);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        field.panel().setVisible(true);
+        grid.add(field.panel(), gbc);
+    }
+
+    private GridBagConstraints fillerConstraints(int row) {
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridy = row;
+        gbc.gridx = 1;
+        gbc.weightx = 0.5;
+        gbc.insets = new Insets(7, 12, 7, 12);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        return gbc;
+    }
+
+    private boolean useSingleColumnLayout() {
+        int width = sectionsContainer != null && sectionsContainer.getWidth() > 0
+                ? sectionsContainer.getWidth()
+                : getWidth();
+        return width > 0 && width < 760;
+    }
+
+    private String currentQuery() {
+        return normalized(searchField == null ? "" : searchField.getText());
+    }
+
+    private boolean matchesField(EmployeeFieldDefinition definition, String query) {
+        return matchesText(definition.label(), query)
+                || matchesText(definition.columnName(), query)
+                || matchesText(definition.heading(), query)
+                || matchesText(currentFieldValue(definition), query);
+    }
+
+    private String currentFieldValue(EmployeeFieldDefinition definition) {
+        String column = definition.columnName();
+        JTextField textField = textFieldMap.get(column);
+        if (textField != null) {
+            return textField.getText();
+        }
+
+        UniversalTextArea textArea = textAreaMap.get(column);
+        if (textArea != null) {
+            return textArea.getText();
+        }
+
+        JComboBox<String> combo = dropdownFieldMap.get(column);
+        if (combo != null) {
+            return DropdownFieldSupport.value(combo);
+        }
+
+        UniversalDatePicker datePicker = dateFieldMap.get(column);
+        if (datePicker != null && datePicker.getDate() != null) {
+            return DB_DATE_FORMAT.format(datePicker.getDate());
+        }
+
+        return valueFor(column);
+    }
+
+    private void updateSearchStatus(int visibleFields, int totalFields, String query) {
+        if (clearSearchButton != null) {
+            EmployeeAdditionalDetailsPanelHelper.updateClearButtonState(clearSearchButton, !query.isBlank());
+        }
+        if (searchStatusLabel == null) {
+            return;
+        }
+
+        if (query.isBlank()) {
+            searchStatusLabel.setText("Total fields: " + totalFields);
+        } else {
+            searchStatusLabel.setText("Showing fields: " + visibleFields + " / " + totalFields);
+        }
+    }
+
+    private String normalized(String value) {
+        return value == null
+                ? ""
+                : value.replaceAll("[^A-Za-z0-9]+", " ")
+                        .trim()
+                        .replaceAll("\\s+", " ")
+                        .toLowerCase(Locale.ROOT);
+    }
+
+    private boolean matchesText(String value, String query) {
+        String text = normalized(value);
+        if (query.isBlank()) {
+            return true;
+        }
+        if (text.contains(query)) {
+            return true;
+        }
+
+        String[] tokens = query.split("\\s+");
+        boolean hasToken = false;
+        for (String token : tokens) {
+            if (token.isBlank()) {
+                continue;
+            }
+            hasToken = true;
+            if (!text.contains(token)) {
+                return false;
+            }
+        }
+        return hasToken;
     }
 
     public Employee getUpdatedOtherDetails() {
@@ -359,4 +678,35 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
                 || text.equals("-");
     }
 
+    private record SectionView(String heading, JPanel panel, JPanel grid, List<FieldView> fields) {
+    }
+
+    private record FieldView(EmployeeFieldDefinition definition, JPanel panel) {
+    }
+
+    private record FilterSummary(int visibleFields, int totalFields) {
+    }
+
+    private static class PlaceholderTextField extends JTextField {
+        private final String placeholder;
+
+        PlaceholderTextField(String placeholder) {
+            this.placeholder = placeholder;
+        }
+
+        protected void paintComponent(Graphics graphics) {
+            super.paintComponent(graphics);
+            if (!getText().isEmpty()) {
+                return;
+            }
+
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2.setColor(new Color(130, 140, 150));
+            FontMetrics metrics = g2.getFontMetrics(getFont());
+            int y = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
+            g2.drawString(placeholder, 0, y);
+            g2.dispose();
+        }
+    }
 }

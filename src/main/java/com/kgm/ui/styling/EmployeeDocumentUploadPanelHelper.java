@@ -1,6 +1,7 @@
 package com.kgm.ui.styling;
 
 import javax.swing.*;
+import javax.swing.border.AbstractBorder;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
@@ -8,15 +9,16 @@ import javax.swing.border.MatteBorder;
 import java.awt.*;
 
 public final class EmployeeDocumentUploadPanelHelper {
-    private static final int SEARCH_BOX_WIDTH = 340;
-    private static final int SEARCH_ROW_WIDTH = 455;
-    private static final int SEARCH_CONTROL_HEIGHT = 36;
+    private static final int SEARCH_CONTROL_HEIGHT = 38;
+    private static final int TOP_PANEL_BOTTOM_MARGIN = 10;
 
     private static final Color PAGE_BACKGROUND = Color.WHITE;
+    private static final Color CARD_BACKGROUND = new Color(248, 250, 252);
     private static final Color ACTION_BLUE = new Color(30, 144, 255);
     private static final Color DISABLED_TEXT = Color.GRAY;
     private static final Color PRIMARY = new Color(0, 112, 210);
     private static final Color FIELD_BORDER = new Color(200, 200, 200);
+    private static final Color BORDER = new Color(220, 226, 232);
     private static final Color TEXT_PRIMARY = new Color(35, 43, 54);
     private static final Color TEXT_SECONDARY = new Color(99, 115, 129);
     private static final Color CELL_DIVIDER = new Color(232, 236, 240);
@@ -33,41 +35,67 @@ public final class EmployeeDocumentUploadPanelHelper {
     }
 
     public static JPanel createTopPanel() {
-        JPanel panel = new JPanel();
+        JPanel panel = new RoundedPanel(CARD_BACKGROUND, 8, TOP_PANEL_BOTTOM_MARGIN);
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(PAGE_BACKGROUND);
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.setBorder(new CompoundBorder(
+                new EmptyBorder(0, 0, TOP_PANEL_BOTTOM_MARGIN, 0),
+                new CompoundBorder(
+                        new RoundedBorder(8, BORDER),
+                        new EmptyBorder(16, 16, 16, 16)
+                )
+        ));
         return panel;
     }
 
     public static JLabel createUploadedCountLabel(String text) {
         JLabel label = new JLabel(text);
-        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        label.setForeground(TEXT_PRIMARY);
         return label;
     }
 
-    public static JPanel createSearchPanel(JTextField searchField, JButton clearButton, JButton searchButton) {
-        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        row.setBackground(PAGE_BACKGROUND);
+    public static JPanel createSummaryPanel(JLabel primaryLabel, JLabel secondaryLabel, JButton actionButton) {
+        JPanel row = new JPanel(new BorderLayout(14, 0));
+        row.setOpaque(false);
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
-        row.setPreferredSize(new Dimension(SEARCH_ROW_WIDTH, SEARCH_CONTROL_HEIGHT));
-        row.setMaximumSize(new Dimension(SEARCH_ROW_WIDTH, SEARCH_CONTROL_HEIGHT));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
+
+        JPanel summary = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        summary.setOpaque(false);
+        summary.add(primaryLabel);
+        if (secondaryLabel != null) {
+            summary.add(createTextDivider());
+            summary.add(secondaryLabel);
+        }
+
+        row.add(summary, BorderLayout.CENTER);
+        if (actionButton != null) {
+            row.add(actionButton, BorderLayout.EAST);
+        }
+        return row;
+    }
+
+    public static JPanel createSearchPanel(JTextField searchField, JButton clearButton, JButton actionButton) {
+        JPanel row = new JPanel(new BorderLayout(10, 0));
+        row.setOpaque(false);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.setPreferredSize(new Dimension(560, SEARCH_CONTROL_HEIGHT));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, SEARCH_CONTROL_HEIGHT));
 
         JPanel searchBox = new JPanel(new BorderLayout(6, 0));
         searchBox.setBackground(PAGE_BACKGROUND);
-        Dimension searchBoxSize = new Dimension(SEARCH_BOX_WIDTH, SEARCH_CONTROL_HEIGHT);
-        searchBox.setPreferredSize(searchBoxSize);
-        searchBox.setMinimumSize(searchBoxSize);
-        searchBox.setMaximumSize(searchBoxSize);
         searchBox.setBorder(new CompoundBorder(
-                new LineBorder(FIELD_BORDER),
+                new LineBorder(FIELD_BORDER, 1, true),
                 new EmptyBorder(0, 10, 0, 4)
         ));
         searchBox.add(searchField, BorderLayout.CENTER);
         searchBox.add(clearButton, BorderLayout.EAST);
 
-        row.add(searchBox);
-        row.add(searchButton);
+        row.add(searchBox, BorderLayout.CENTER);
+        if (actionButton != null) {
+            row.add(actionButton, BorderLayout.EAST);
+        }
         return row;
     }
 
@@ -93,19 +121,22 @@ public final class EmployeeDocumentUploadPanelHelper {
         button.setForeground(Color.WHITE);
         button.setFocusPainted(false);
         button.setBorderPainted(false);
-        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         button.setBorder(new EmptyBorder(8, 16, 8, 16));
+        button.setPreferredSize(new Dimension(96, SEARCH_CONTROL_HEIGHT));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 
     public static void styleTextCtaButton(JButton button) {
+        button.setBackground(PRIMARY);
+        button.setForeground(Color.WHITE);
         button.setBorderPainted(false);
-        button.setContentAreaFilled(false);
+        button.setContentAreaFilled(true);
         button.setFocusPainted(false);
-        button.setOpaque(false);
-        button.setForeground(ACTION_BLUE);
+        button.setOpaque(true);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
-        button.setBorder(new EmptyBorder(6, 0, 6, 0));
+        button.setBorder(new EmptyBorder(8, 16, 8, 16));
+        button.setPreferredSize(new Dimension(124, SEARCH_CONTROL_HEIGHT));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 
@@ -127,8 +158,9 @@ public final class EmployeeDocumentUploadPanelHelper {
     }
 
     public static JLabel createSizeLabel() {
-        JLabel label = new JLabel("<html>Maximum file size allowed is: <b>400KB</b></html>");
+        JLabel label = new JLabel("Maximum file size allowed: 400 KB per file");
         label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        label.setForeground(TEXT_SECONDARY);
         return label;
     }
 
@@ -188,6 +220,58 @@ public final class EmployeeDocumentUploadPanelHelper {
     public static void stylePreviewFrame(JFrame frame, Component relativeTo) {
         AppWindowStateHelper.lockFullSize(frame);
         frame.setLocationRelativeTo(relativeTo);
+    }
+
+    private static JLabel createTextDivider() {
+        JLabel divider = new JLabel("|");
+        divider.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        divider.setForeground(BORDER);
+        return divider;
+    }
+
+    private static class RoundedBorder extends AbstractBorder {
+        private final int radius;
+        private final Color color;
+
+        private RoundedBorder(int radius, Color color) {
+            this.radius = radius;
+            this.color = color;
+        }
+
+        public void paintBorder(Component component, Graphics g, int x, int y, int width, int height) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
+            g2.dispose();
+        }
+
+        public Insets getBorderInsets(Component component) {
+            return new Insets(1, 1, 1, 1);
+        }
+    }
+
+    private static class RoundedPanel extends JPanel {
+        private final Color color;
+        private final int radius;
+        private final int bottomGap;
+
+        private RoundedPanel(Color color, int radius, int bottomGap) {
+            this.color = color;
+            this.radius = radius;
+            this.bottomGap = bottomGap;
+            setOpaque(false);
+        }
+
+        protected void paintComponent(Graphics graphics) {
+            int paintedHeight = Math.max(0, getHeight() - bottomGap);
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.fillRoundRect(0, 0, getWidth(), paintedHeight, radius, radius);
+            g2.dispose();
+            super.paintComponent(graphics);
+        }
     }
 }
 

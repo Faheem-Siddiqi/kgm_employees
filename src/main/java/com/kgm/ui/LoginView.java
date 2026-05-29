@@ -3,6 +3,7 @@ package com.kgm.ui;
 import com.kgm.service.AuthService;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.LoginViewHelper;
+import com.kgm.util.ApplicationStartup;
 import com.kgm.util.SessionManager;
 import com.kgm.util.SessionWatcher;
 
@@ -54,10 +55,17 @@ public class LoginView extends JFrame {
             String user = userField.getText();
             String pass = new String(passField.getPassword());
             if (AuthService.login(user, pass)) {
-                SessionManager.startSession(user);
-                SessionWatcher.start();
-                SessionWatcher.closeAllWindows();
-                new HomeView();
+                loginBtn.setEnabled(false);
+                ApplicationStartup.prepareThen(
+                        this,
+                        () -> {
+                            SessionManager.startSession(user);
+                            SessionWatcher.start();
+                            SessionWatcher.closeAllWindows();
+                            new HomeView();
+                        },
+                        () -> loginBtn.setEnabled(true)
+                );
             } else {
                 DialogHelper.error(this, "Login Failed", "Invalid username or password.");
             }
