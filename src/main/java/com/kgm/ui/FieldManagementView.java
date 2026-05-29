@@ -1282,7 +1282,7 @@ public class FieldManagementView extends JFrame {
             return false;
         }
 
-        boolean valid = AuthService.login("admin", new String(password.getPassword()));
+        boolean valid = AuthService.isAdminPassword(new String(password.getPassword()));
         if (!valid) {
             DialogHelper.error(this, "Password Incorrect", "The admin password is incorrect.");
         }

@@ -15,7 +15,7 @@ The project follows a layered desktop-application architecture:
 - **Service Layer**: Authentication and future business-service boundaries.
 - **Data Access Layer**: DAO classes for employee registration, lookup, listing, and updates.
 - **Model Layer**: Entity and session data models.
-- **Configuration Layer**: Database settings and connection creation.
+- **Configuration Layer**: Environment-backed app settings, database settings, and connection creation.
 - **Database Layer**: Schema initialization and SQL resources.
 - **Utility Layer**: Session and shared utility helpers.
 
@@ -39,7 +39,8 @@ The project follows a layered desktop-application architecture:
 
 | File | Functionality |
 | --- | --- |
-| **DatabaseConfig.java** | Centralizes database host, port, name, username, and password. Reads JVM properties first, then environment variables, then defaults. |
+| **AppConfig.java** | Loads `.env`, environment variables, and JVM properties for application-wide settings such as admin login and employee storage. |
+| **DatabaseConfig.java** | Centralizes database host, port, name, username, and password through `AppConfig`. |
 | **DatabaseConnection.java** | Creates JDBC connections for both server-level database creation and application-level database access. |
 
 #### `com.kgm.database` Package
@@ -75,7 +76,7 @@ The project follows a layered desktop-application architecture:
 
 | File | Functionality |
 | --- | --- |
-| **AuthService.java** | Handles login validation. Current credential check is `admin` / `1234`; this is the boundary for future DB or directory-based authentication. |
+| **AuthService.java** | Handles login validation using the configured admin username and password from env settings. |
 | **EmployeeService.java** | Reserved business-service boundary for employee workflow rules that should not live directly in UI or DAO classes. |
 | **EmployeeReportService.java** | Generates employee download packages, including PDF profile, selected documents, and merged document PDFs. |
 | **ExcelImportService.java** | Parses employee Excel workbooks, supports standard/legacy import modes, validates required Basic fields, CNIC/date rules, maps known headers to DB fields, and rejects unknown headers with a sample-download prompt. |
@@ -203,7 +204,7 @@ The project follows a layered desktop-application architecture:
 | Path | Functionality |
 | --- | --- |
 | **images/** | Static UI images such as logo, header, login background, and login foreground artwork. |
-| **employees/** | Runtime/sample employee file storage for profile images and uploaded documents. |
+| **resources/employees/** | Runtime employee file storage for profile images and uploaded documents. The folder is created when needed and ignored by Git except for `.gitkeep`. |
 | **%APPDATA%/KGM Ex-Employee Management/employee_field_metadata.json** | Latest user-change metadata backup. It is written after the DB update succeeds and is used first after a database drop/reset. |
 | **%LOCALAPPDATA%/KGM Ex-Employee Management/cache/employee_field_metadata.cache.json** | Metadata cache for fast reload only. It is ignored whenever its schema version or DB checksum is not fresh. |
 | **target/** | Maven build output. Generated and ignored by Git. |
@@ -236,7 +237,7 @@ The project follows a layered desktop-application architecture:
 
 7. Document Handling
    EmployeeDocumentUploadPanel -> dynamic search, single upload, or Upload All filename matching for the 22 configured document fields
-   -> local employees/{employeeCode}/documents storage
+   -> configured local employee storage, saved in DB as employees/{employeeCode}/documents paths
    EmployeeDocumentViewPanel -> searchable saved documents, locked-document checks, single or Upload All upload for missing documents
    -> missing documents uploaded through detail update
 
@@ -352,7 +353,7 @@ The application uses `EmployeeDocumentUtil` as the single source of truth for do
 - Empty values, blank strings, `N/A`, `n/a`, `NA`, `NULL`, and `-` are treated as placeholders and are not written as updates.
 - `EMPLOYEE_CODE` is the record key and stays locked in the detail screen.
 - Document fields are record-safe: if a document path already exists in the database, that document remains marked `Locked`, can be viewed from the detail screen, and cannot be replaced.
-- If a document field is empty or a placeholder, the detail screen allows upload. The file is copied to `employees/{employeeCode}/documents/` and the database path is saved on Update.
+- If a document field is empty or a placeholder, the detail screen allows upload. The file is copied under `KGM_EMPLOYEE_STORAGE_DIR` and the logical database path is saved as `employees/{employeeCode}/documents/{file}` on Update.
 - Profile image follows the same safety rule: it can be uploaded only when `EMP_IMG` is empty or a placeholder.
 - Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be JPG/JPEG, must be 400KB or smaller, and must match a document label, Employee field name, or storage filename after normalizing spaces, underscores, punctuation, and case.
 - Upload matching accepts database-style names such as `SS_CARD` and user-facing names such as `Social Security Card`; files are saved using the configured storage filename for the matching document type.
@@ -393,7 +394,9 @@ The application uses `EmployeeDocumentUtil` as the single source of truth for do
 
 ### Database Configuration
 
-Database values can be passed through environment variables or JVM properties.
+Create a local `.env` file from `.env.example`, then replace the dummy values with the machine's real settings. `.env` is intentionally ignored by Git.
+
+Settings can be passed through JVM properties, OS environment variables, or `.env`. JVM properties win first, then OS environment variables, then `.env`, then safe defaults.
 
 | Environment Variable | JVM Property | Purpose |
 | --- | --- | --- |
@@ -402,6 +405,9 @@ Database values can be passed through environment variables or JVM properties.
 | `KGM_DB_NAME` | `kgm.db.name` | Database name |
 | `KGM_DB_USER` | `kgm.db.user` | Database username |
 | `KGM_DB_PASSWORD` | `kgm.db.password` | Database password |
+| `KGM_ADMIN_USER` | `kgm.admin.user` | Application admin username |
+| `KGM_ADMIN_PASSWORD` | `kgm.admin.password` | Application admin password |
+| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local folder for employee photos and documents |
 
 ### Startup
 
@@ -422,11 +428,11 @@ Yes. Field Management changes are dynamic and are saved outside the database aft
 
 If the MySQL database is dropped or recreated, startup restores the latest valid AppData metadata backup first and recreates missing custom employee columns. The bundled `employee_field_metadata_default.json` is used only as a fallback when no valid local backup exists. Do not delete the AppData metadata file if the latest field setup must be restored after a DB reset.
 
-Default application login:
+Application login is configured in `.env`:
 
 ```text
-Username: admin
-Password: 1234
+KGM_ADMIN_USER=...
+KGM_ADMIN_PASSWORD=...
 ```
 
 ---
@@ -435,20 +441,9 @@ Password: 1234
 
 | Layer | Count | Purpose |
 | --- | ---: | --- |
-| Core entry point | 1 | Application bootstrap |
-| Configuration | 2 | Database configuration and connection creation |
-| Database initializer | 1 | Startup schema/database creation |
-| DAO layer | 3 | Employee persistence, lookup, listing, updates, and field metadata |
-| Service layer | 5 | Authentication, employee report packaging, Excel import/sample generation, and future service boundaries |
-| Models | 3 | Employee, field metadata, and user session data |
-| UI views | 5 | Main application windows |
-| UI dialogs | 1 | Reusable modal dialog |
-| UI components | 2 | Reusable date controls |
-| UI panels | 11 | Forms, tables, document panels, previews, header/footer |
-| UI styling helpers | 17 | Visual design, table styling, layout helpers |
-| Utilities | 7 | Session, Basic field catalog, document matching, and shared utility boundaries |
-| Resources | 1 | SQL schema |
-| **Total source/resource files** | **59** | Complete application code and schema |
+| Java source files | 83 | Application code under `src/main/java` |
+| Bundled resources | 2 | SQL schema and field metadata defaults under `src/main/resources` |
+| **Total source/resource files** | **85** | Generated outputs and runtime employee files are excluded |
 
 ---
 
@@ -483,7 +478,7 @@ Password: 1234
 2. **Excel Import**: Add focused automated tests for workbook parsing, header rejection, duplicate employee IDs, and date/CNIC validation.
 3. **Service Boundaries**: Move validation and employee workflow rules out of UI classes into `EmployeeService` and `ValidationUtil`.
 4. **Database Defaults**: Keep credentials externalized through environment variables or JVM properties for production use.
-5. **Document Storage**: Replace local `employees/` file storage with managed storage, validation, and cleanup policies.
+5. **Document Storage**: Extend the configurable local employee storage with managed retention, validation, and cleanup policies.
 6. **Testing**: Add unit and integration tests for DAOs, services, session expiry, and form validation.
 7. **Error Handling**: Improve user-facing messages and centralize exception handling for database/file operations.
 

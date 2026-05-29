@@ -255,11 +255,7 @@ public class EmployeeReportService {
     }
 
     private Path resolveDocumentPath(String rawPath) {
-        Path path = Path.of(rawPath.trim());
-        if (path.isAbsolute()) {
-            return path.normalize();
-        }
-        return Path.of(System.getProperty("user.dir")).resolve(path).normalize();
+        return EmployeeDocumentUtil.resolveStoredFile(rawPath).toPath().normalize();
     }
 
     private File writePdfSafely(Path target, Employee employee, List<PackagedDocument> documents) throws IOException {

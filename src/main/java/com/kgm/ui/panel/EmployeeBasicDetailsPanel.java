@@ -318,11 +318,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
     }
 
     private File resolveEmployeeImageFile(String imagePath) {
-        File imageFile = new File(imagePath);
-        if (imageFile.isAbsolute()) {
-            return imageFile;
-        }
-        return new File(System.getProperty("user.dir"), imagePath);
+        return EmployeeDocumentUtil.resolveStoredFile(imagePath);
     }
 
     private void chooseImage(JLabel target) {

@@ -14,11 +14,13 @@ import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.EmployeeStorageUtil;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
@@ -212,16 +214,13 @@ public class EmployeeRegistrationView extends JFrame {
             File selectedImage,
             String[] selectedDocuments
     ) throws Exception {
-        File empDir = new File(System.getProperty("user.dir"), "employees/" + empCode);
-        File docDir = new File(empDir, "documents");
-        if (!docDir.exists() && !docDir.mkdirs()) {
-            throw new IllegalStateException("Could not create employee document folder.");
-        }
+        Path empDir = EmployeeStorageUtil.ensureEmployeeDirectory(empCode);
+        Path docDir = EmployeeStorageUtil.ensureDocumentDirectory(empCode);
 
         if (selectedImage != null) {
-            File dest = new File(empDir, "EMP_IMG.jpg");
-            Files.copy(selectedImage.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            emp.setEMP_IMG("employees/" + empCode + "/EMP_IMG.jpg");
+            Path dest = empDir.resolve("EMP_IMG.jpg");
+            Files.copy(selectedImage.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
+            emp.setEMP_IMG(EmployeeStorageUtil.profileImagePath(empCode));
         }
 
         if (selectedDocuments != null) {
@@ -232,9 +231,9 @@ public class EmployeeRegistrationView extends JFrame {
 
                 File src = new File(selectedDocuments[i]);
                 String storageName = EmployeeDocumentUtil.documentType(i).storageName();
-                File dest = new File(docDir, storageName);
-                Files.copy(src.toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                String dbPath = "employees/" + empCode + "/documents/" + storageName;
+                Path dest = docDir.resolve(storageName);
+                Files.copy(src.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
+                String dbPath = EmployeeStorageUtil.documentPath(empCode, storageName);
                 EmployeeDocumentUtil.setDocumentPath(emp, i, dbPath);
             }
         }

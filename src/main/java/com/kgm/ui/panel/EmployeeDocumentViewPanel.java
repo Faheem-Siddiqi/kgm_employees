@@ -6,6 +6,7 @@ import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDocumentViewPanelHelper;
 import com.kgm.ui.styling.TablePaginationHelper;
 import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.EmployeeStorageUtil;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -20,6 +21,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
@@ -399,10 +401,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
             return update;
         }
 
-        File docDir = new File(System.getProperty("user.dir"), "employees/" + empCode + "/documents");
-        if (!docDir.exists() && !docDir.mkdirs()) {
-            throw new IOException("Could not create employee document folder: " + docDir.getAbsolutePath());
-        }
+        Path docDir = EmployeeStorageUtil.ensureDocumentDirectory(empCode);
 
         for (int index = 0; index < files.length; index++) {
             if (lockedDocuments[index] || files[index] == null) {
@@ -410,9 +409,9 @@ public class EmployeeDocumentViewPanel extends JPanel {
             }
 
             String storageName = EmployeeDocumentUtil.documentType(index).storageName();
-            File dest = new File(docDir, storageName);
-            Files.copy(files[index].toPath(), dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            String dbPath = "employees/" + empCode + "/documents/" + storageName;
+            Path dest = docDir.resolve(storageName);
+            Files.copy(files[index].toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
+            String dbPath = EmployeeStorageUtil.documentPath(empCode, storageName);
             EmployeeDocumentUtil.setDocumentPath(update, index, dbPath);
         }
         return update;

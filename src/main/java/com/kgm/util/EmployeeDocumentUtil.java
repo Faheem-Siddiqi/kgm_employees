@@ -238,11 +238,7 @@ public final class EmployeeDocumentUtil {
     }
 
     public static File resolveStoredFile(String path) {
-        File file = new File(path);
-        if (file.isAbsolute()) {
-            return file;
-        }
-        return new File(System.getProperty("user.dir"), path);
+        return EmployeeStorageUtil.resolveStoredFile(path);
     }
 
     public static String fileNameFromPath(String path) {

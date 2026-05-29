@@ -1,10 +1,27 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build output
 target/
 *.class
 
+# IDE/editor
 .idea/
 .vscode/
 *.iml
 
+# Runtime data
 uploads/
 employees/**
 !employees/.gitkeep
+resources/employees/**
+!resources/employees/.gitkeep
+
+# Local OS/editor noise
+*.lnk
+*.log
+.DS_Store
+Thumbs.db
+hs_err_pid*

@@ -17,12 +17,14 @@ import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDetailViewHelper;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeFieldDefinitionCache;
+import com.kgm.util.EmployeeStorageUtil;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -679,14 +681,10 @@ public class EmployeeDetailView extends JFrame {
     }
 
     private String copyProfileImage(File source, String employeeCode) throws IOException {
-        File employeeDir = new File(System.getProperty("user.dir"), "employees/" + employeeCode);
-        if (!employeeDir.exists() && !employeeDir.mkdirs()) {
-            throw new IOException("Could not create employee folder: " + employeeDir.getAbsolutePath());
-        }
-
-        File destination = new File(employeeDir, "EMP_IMG.jpg");
-        Files.copy(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        return "employees/" + employeeCode + "/EMP_IMG.jpg";
+        Path employeeDir = EmployeeStorageUtil.ensureEmployeeDirectory(employeeCode);
+        Path destination = employeeDir.resolve("EMP_IMG.jpg");
+        Files.copy(source.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+        return EmployeeStorageUtil.profileImagePath(employeeCode);
     }
 
     private void downloadEmployeeReport() {
