@@ -75,6 +75,10 @@ public final class EmployeeDocumentViewPanelHelper {
         EmployeeDocumentUploadPanelHelper.styleViewLink(button, uploaded);
     }
 
+    public static void styleActionLink(JButton button, boolean enabled) {
+        EmployeeDocumentUploadPanelHelper.styleActionLink(button, enabled);
+    }
+
     public static void styleActionCell(JPanel panel, boolean selected) {
         EmployeeDocumentUploadPanelHelper.styleActionCell(panel, selected);
     }

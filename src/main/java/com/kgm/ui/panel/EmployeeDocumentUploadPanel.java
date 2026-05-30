@@ -20,6 +20,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class EmployeeDocumentUploadPanel extends JPanel {
     private static final int ACTION_COLUMN = 3;
@@ -34,6 +35,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
     private JButton clearSearchButton;
     private JScrollPane documentScrollPane;
     private JLabel uploadedCountLabel;
+    private Consumer<File> profileImageUploadListener;
 
     public EmployeeDocumentUploadPanel() {
         EmployeeDocumentUploadPanelHelper.stylePanel(this);
@@ -169,7 +171,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         String fileText = file == null ? "-" : file.getName();
         String statusText = file == null
                 ? required ? "Missing required" : "Not Uploaded"
-                : "Uploaded (" + EmployeeDocumentUtil.formatSize(file.length()) + ")";
+                : readyToSaveStatus(file);
         model.addRow(new Object[]{
                 documentLabel(documentIndex),
                 fileText,
@@ -261,11 +263,12 @@ public class EmployeeDocumentUploadPanel extends JPanel {
 
         files[documentIndex] = file;
         filePaths[documentIndex] = file.getAbsolutePath();
+        notifyProfileImageUpload(documentIndex, file);
 
         int modelRow = findModelRowByDocumentIndex(documentIndex);
         if (modelRow >= 0) {
             model.setValueAt(file.getName(), modelRow, 1);
-            model.setValueAt("Uploaded (" + EmployeeDocumentUtil.formatSize(file.length()) + ")", modelRow, 2);
+            model.setValueAt(readyToSaveStatus(file), modelRow, 2);
         }
 
         updateCount();
@@ -286,6 +289,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         for (EmployeeDocumentUtil.BulkUploadItem item : summary.uploadedDocuments()) {
             files[item.documentIndex()] = item.file();
             filePaths[item.documentIndex()] = item.file().getAbsolutePath();
+            notifyProfileImageUpload(item.documentIndex(), item.file());
         }
 
         refreshDocumentRows();
@@ -355,10 +359,12 @@ public class EmployeeDocumentUploadPanel extends JPanel {
 
             int modelRow = table.convertRowIndexToModel(row);
             String status = (String) table.getModel().getValueAt(modelRow, 2);
-            boolean uploaded = status.startsWith("Uploaded");
+            boolean uploaded = isReadyToSaveStatus(status);
 
             JPanel buttons = EmployeeDocumentUploadPanelHelper.createActionButtonsPanel();
-            buttons.add(createLink(uploaded ? "Replace" : "Upload"));
+            JButton uploadButton = createLink(uploaded ? "Replace" : "Upload");
+            EmployeeDocumentUploadPanelHelper.styleActionLink(uploadButton, true);
+            buttons.add(uploadButton);
 
             JButton viewBtn = createLink("View");
             EmployeeDocumentUploadPanelHelper.styleViewLink(viewBtn, uploaded);
@@ -392,10 +398,12 @@ public class EmployeeDocumentUploadPanel extends JPanel {
             EmployeeDocumentUploadPanelHelper.styleActionCell(panel, isSelected);
 
             String status = (String) table.getModel().getValueAt(modelRow, 2);
-            boolean uploaded = status.startsWith("Uploaded");
+            boolean uploaded = isReadyToSaveStatus(status);
 
             JPanel buttons = EmployeeDocumentUploadPanelHelper.createActionButtonsPanel();
-            buttons.add(createButton(uploaded ? "Replace" : "Upload"));
+            JButton uploadButton = createButton(uploaded ? "Replace" : "Upload");
+            EmployeeDocumentUploadPanelHelper.styleActionLink(uploadButton, true);
+            buttons.add(uploadButton);
 
             JButton viewBtn = createButton("View");
             viewBtn.setEnabled(uploaded);
@@ -431,6 +439,47 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         return (filePaths != null && index < filePaths.length)
                 ? filePaths[index]
                 : null;
+    }
+
+    private static String readyToSaveStatus(File file) {
+        return "Ready to Save (" + EmployeeDocumentUtil.formatSize(file.length()) + ")";
+    }
+
+    private static boolean isReadyToSaveStatus(String status) {
+        return status != null && status.startsWith("Ready to Save");
+    }
+
+    public void setProfileImageUploadListener(Consumer<File> profileImageUploadListener) {
+        this.profileImageUploadListener = profileImageUploadListener;
+    }
+
+    public void setProfileImageFromMainTab(File file) {
+        int documentIndex = profileImageDocumentIndex();
+        if (documentIndex < 0 || file == null) {
+            return;
+        }
+        files[documentIndex] = file;
+        filePaths[documentIndex] = file.getAbsolutePath();
+        refreshDocumentRows();
+        updateCount();
+        model.fireTableDataChanged();
+    }
+
+    private void notifyProfileImageUpload(int documentIndex, File file) {
+        if (profileImageUploadListener != null
+                && EmployeeDocumentUtil.isProfileImageDocument(documentIndex)
+                && file != null) {
+            profileImageUploadListener.accept(file);
+        }
+    }
+
+    private int profileImageDocumentIndex() {
+        for (int index = 0; index < EmployeeDocumentUtil.documentCount(); index++) {
+            if (EmployeeDocumentUtil.isProfileImageDocument(index)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     public String[] getAllDocumentPaths() {

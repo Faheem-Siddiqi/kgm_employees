@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 public class EmployeeBasicDetailsPanel extends JPanel {
@@ -53,6 +54,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
     private File selectedImage;
     private Employee employee;
     private Runnable pendingChangesListener;
+    private Consumer<File> selectedImageListener;
     private boolean loadingValues;
 
     public EmployeeBasicDetailsPanel() {
@@ -345,6 +347,22 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             return;
         }
 
+        applySelectedImage(file, true);
+    }
+
+    public void setSelectedImageFromDocumentUpload(File file) {
+        applySelectedImage(file, false);
+    }
+
+    public void setSelectedImageListener(Consumer<File> selectedImageListener) {
+        this.selectedImageListener = selectedImageListener;
+    }
+
+    private void applySelectedImage(File file, boolean notifyListener) {
+        if (file == null || !selectedImageCanChange()) {
+            return;
+        }
+
         String validationMessage = EmployeeDocumentUtil.validateImageFile(file);
         if (validationMessage != null) {
             DialogHelper.warning(this, "Invalid Image", validationMessage);
@@ -361,12 +379,17 @@ public class EmployeeBasicDetailsPanel extends JPanel {
                     EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
                     EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
                     Image.SCALE_SMOOTH);
-            target.setIcon(new ImageIcon(scaled));
-            target.setText("");
+            photoPreview.setIcon(new ImageIcon(scaled));
+            photoPreview.setText("");
             if (photoUploadCard != null) {
                 photoUploadCard.setStatus(file.getName());
             }
+            if (notifyListener && selectedImageListener != null) {
+                selectedImageListener.accept(file);
+            }
             notifyPendingChanges();
+            revalidate();
+            repaint();
         } catch (Exception e) {
             DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
         }

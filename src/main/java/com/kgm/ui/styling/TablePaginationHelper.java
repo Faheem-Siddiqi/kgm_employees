@@ -287,13 +287,13 @@ public final class TablePaginationHelper {
         String normalized = status.toLowerCase().trim();
 
         // Handle document-specific statuses
-        if (normalized.equals("uploaded") || normalized.equals("locked")) {
+        if (normalized.equals("uploaded") || normalized.equals("locked") || normalized.contains("ready to save")) {
             return new Color(38, 128, 64); // Green
         }
         if (normalized.equals("not uploaded")) {
             return TEXT_SECONDARY; // Gray
         }
-        if (normalized.contains("ready to save") || normalized.equals("pending")) {
+        if (normalized.equals("pending")) {
             return PRIMARY; // Blue
         }
         if (normalized.contains("missing") || normalized.contains("error") || normalized.contains("failed")) {

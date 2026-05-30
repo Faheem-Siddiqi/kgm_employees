@@ -1,6 +1,7 @@
 package com.kgm.ui.styling;
 
 import javax.swing.*;
+import javax.swing.plaf.basic.BasicButtonUI;
 import java.awt.*;
 import java.beans.PropertyChangeListener;
 
@@ -11,8 +12,8 @@ public final class ButtonStateHelper {
     private static final String ENABLED_CURSOR = "kgm.buttonState.enabledCursor";
     private static final Color FILLED_BUTTON_TEXT = Color.WHITE;
     private static final Color PLAIN_BUTTON_TEXT = new Color(99, 115, 129);
-    private static final Color DISABLED_FILLED_TEXT = new Color(71, 85, 105);
-    private static final Color DISABLED_PLAIN_TEXT = new Color(120, 130, 140);
+    private static final Color DISABLED_FILLED_TEXT = Color.WHITE;
+    private static final Color DISABLED_PLAIN_TEXT = PLAIN_BUTTON_TEXT;
 
     private ButtonStateHelper() {
     }
@@ -23,6 +24,7 @@ public final class ButtonStateHelper {
         }
 
         button.putClientProperty(INSTALLED, true);
+        button.setUI(new ReadableButtonUI());
         captureEnabledStyle(button);
         PropertyChangeListener listener = event -> {
             if ("enabled".equals(event.getPropertyName())) {
@@ -36,6 +38,12 @@ public final class ButtonStateHelper {
     public static void setEnabled(AbstractButton button, boolean enabled) {
         install(button);
         button.setEnabled(enabled);
+        applyState(button);
+    }
+
+    public static void setEnabledForeground(AbstractButton button, Color foreground) {
+        install(button);
+        button.putClientProperty(ENABLED_FOREGROUND, foreground);
         applyState(button);
     }
 
@@ -110,5 +118,26 @@ public final class ButtonStateHelper {
 
     private static double relativeLuminance(Color color) {
         return (0.2126 * color.getRed() + 0.7152 * color.getGreen() + 0.0722 * color.getBlue()) / 255.0;
+    }
+
+    private static class ReadableButtonUI extends BasicButtonUI {
+        @Override
+        protected void paintText(Graphics graphics, AbstractButton button, Rectangle textRect, String text) {
+            ButtonModel model = button.getModel();
+            FontMetrics metrics = graphics.getFontMetrics();
+            int mnemonicIndex = button.getDisplayedMnemonicIndex();
+            graphics.setColor(button.getForeground());
+            if (model.isEnabled()) {
+                super.paintText(graphics, button, textRect, text);
+                return;
+            }
+            graphics.drawString(text, textRect.x, textRect.y + metrics.getAscent());
+            if (mnemonicIndex >= 0 && mnemonicIndex < text.length()) {
+                int underlineX = textRect.x + metrics.stringWidth(text.substring(0, mnemonicIndex));
+                int underlineY = textRect.y + metrics.getAscent() + 1;
+                int underlineWidth = metrics.charWidth(text.charAt(mnemonicIndex));
+                graphics.fillRect(underlineX, underlineY, underlineWidth, 1);
+            }
+        }
     }
 }

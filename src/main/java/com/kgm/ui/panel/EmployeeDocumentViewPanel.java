@@ -17,6 +17,8 @@ import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import java.awt.*;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -25,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class EmployeeDocumentViewPanel extends JPanel {
     private static final int ACTION_COLUMN = 3;
@@ -40,6 +43,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
     private JButton clearSearchButton;
     private JScrollPane documentScrollPane;
     private Runnable pendingChangesListener;
+    private Consumer<File> profileImageUploadListener;
 
     public EmployeeDocumentViewPanel() {
         this(null);
@@ -120,6 +124,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
 
         documentScrollPane = TablePaginationHelper.createScrollPane(table, false);
         showFullTableWithoutScroll(documentScrollPane);
+        installDocumentTableWheelForwarding();
         add(documentScrollPane, BorderLayout.CENTER);
     }
 
@@ -253,6 +258,54 @@ public class EmployeeDocumentViewPanel extends JPanel {
         scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, tableHeight));
     }
 
+    private void installDocumentTableWheelForwarding() {
+        MouseWheelListener listener = this::forwardMouseWheelToPageScroll;
+        table.addMouseWheelListener(listener);
+        if (table.getTableHeader() != null) {
+            table.getTableHeader().addMouseWheelListener(listener);
+        }
+        documentScrollPane.addMouseWheelListener(listener);
+        documentScrollPane.getViewport().addMouseWheelListener(listener);
+    }
+
+    private void forwardMouseWheelToPageScroll(MouseWheelEvent event) {
+        if (event.isConsumed()) {
+            return;
+        }
+        JScrollPane pageScroll = findOuterScrollPane();
+        if (pageScroll == null) {
+            return;
+        }
+
+        JScrollBar vertical = pageScroll.getVerticalScrollBar();
+        if (vertical == null || !vertical.isVisible()) {
+            return;
+        }
+
+        int direction = event.getWheelRotation() < 0 ? -1 : 1;
+        int amount = event.getScrollType() == MouseWheelEvent.WHEEL_BLOCK_SCROLL
+                ? event.getWheelRotation() * vertical.getBlockIncrement(direction)
+                : event.getUnitsToScroll() * vertical.getUnitIncrement(direction);
+
+        int maxValue = vertical.getMaximum() - vertical.getVisibleAmount();
+        int nextValue = Math.max(vertical.getMinimum(), Math.min(maxValue, vertical.getValue() + amount));
+        if (nextValue != vertical.getValue()) {
+            vertical.setValue(nextValue);
+            event.consume();
+        }
+    }
+
+    private JScrollPane findOuterScrollPane() {
+        Component current = documentScrollPane == null ? null : documentScrollPane.getParent();
+        while (current != null) {
+            if (current instanceof JScrollPane scrollPane) {
+                return scrollPane;
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+
     private void updateCount() {
         int count = 0;
         for (String path : filePaths) {
@@ -292,6 +345,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
 
         files[documentIndex] = file;
         filePaths[documentIndex] = file.getAbsolutePath();
+        notifyProfileImageUpload(documentIndex, file);
         int modelRow = findModelRowByDocumentIndex(documentIndex);
         if (modelRow >= 0) {
             model.setValueAt(file.getName(), modelRow, 1);
@@ -317,6 +371,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
         for (EmployeeDocumentUtil.BulkUploadItem item : summary.uploadedDocuments()) {
             files[item.documentIndex()] = item.file();
             filePaths[item.documentIndex()] = item.file().getAbsolutePath();
+            notifyProfileImageUpload(item.documentIndex(), item.file());
         }
 
         refreshDocumentRows();
@@ -389,10 +444,53 @@ public class EmployeeDocumentViewPanel extends JPanel {
         this.pendingChangesListener = pendingChangesListener;
     }
 
+    public void setProfileImageUploadListener(Consumer<File> profileImageUploadListener) {
+        this.profileImageUploadListener = profileImageUploadListener;
+    }
+
+    public void setProfileImageFromMainTab(File file) {
+        int documentIndex = profileImageDocumentIndex();
+        if (documentIndex < 0 || file == null || lockedDocuments[documentIndex]) {
+            return;
+        }
+        files[documentIndex] = file;
+        filePaths[documentIndex] = file.getAbsolutePath();
+        refreshDocumentRows();
+        updateCount();
+        model.fireTableDataChanged();
+        notifyPendingChanges();
+    }
+
+    public File pendingProfileImageFile() {
+        for (int index = 0; index < files.length; index++) {
+            if (EmployeeDocumentUtil.isProfileImageDocument(index) && files[index] != null && !lockedDocuments[index]) {
+                return files[index];
+            }
+        }
+        return null;
+    }
+
     private void notifyPendingChanges() {
         if (pendingChangesListener != null) {
             pendingChangesListener.run();
         }
+    }
+
+    private void notifyProfileImageUpload(int documentIndex, File file) {
+        if (profileImageUploadListener != null
+                && EmployeeDocumentUtil.isProfileImageDocument(documentIndex)
+                && file != null) {
+            profileImageUploadListener.accept(file);
+        }
+    }
+
+    private int profileImageDocumentIndex() {
+        for (int index = 0; index < EmployeeDocumentUtil.documentCount(); index++) {
+            if (EmployeeDocumentUtil.isProfileImageDocument(index)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     public Employee getDocumentUpdates(String empCode) throws IOException {
@@ -401,6 +499,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
             return update;
         }
 
+        Path employeeDir = EmployeeStorageUtil.ensureEmployeeDirectory(empCode);
         Path docDir = EmployeeStorageUtil.ensureDocumentDirectory(empCode);
 
         for (int index = 0; index < files.length; index++) {
@@ -409,9 +508,13 @@ public class EmployeeDocumentViewPanel extends JPanel {
             }
 
             String storageName = EmployeeDocumentUtil.documentType(index).storageName();
-            Path dest = docDir.resolve(storageName);
+            Path dest = EmployeeDocumentUtil.isProfileImageDocument(index)
+                    ? employeeDir.resolve(storageName)
+                    : docDir.resolve(storageName);
             Files.copy(files[index].toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
-            String dbPath = EmployeeStorageUtil.documentPath(empCode, storageName);
+            String dbPath = EmployeeDocumentUtil.isProfileImageDocument(index)
+                    ? EmployeeStorageUtil.profileImagePath(empCode)
+                    : EmployeeStorageUtil.documentPath(empCode, storageName);
             EmployeeDocumentUtil.setDocumentPath(update, index, dbPath);
         }
         return update;
@@ -451,11 +554,13 @@ public class EmployeeDocumentViewPanel extends JPanel {
             JPanel buttons = EmployeeDocumentViewPanelHelper.createActionButtonsPanel();
 
             if (!lockedDocuments[documentIndex]) {
-                buttons.add(createLink(rowHasPendingFile(documentIndex) ? "Replace" : "Upload"));
+                JButton uploadButton = createLink(rowHasPendingFile(documentIndex) ? "Replace" : "Upload");
+                EmployeeDocumentViewPanelHelper.styleActionLink(uploadButton, true);
+                buttons.add(uploadButton);
             } else {
                 JButton locked = createLink("Locked");
                 locked.setEnabled(false);
-                EmployeeDocumentViewPanelHelper.styleViewLink(locked, false);
+                EmployeeDocumentViewPanelHelper.styleActionLink(locked, false);
                 buttons.add(locked);
             }
 
@@ -492,11 +597,13 @@ public class EmployeeDocumentViewPanel extends JPanel {
             JPanel buttons = EmployeeDocumentViewPanelHelper.createActionButtonsPanel();
 
             if (!lockedDocuments[documentIndex]) {
-                buttons.add(createButton(rowHasPendingFile(documentIndex) ? "Replace" : "Upload"));
+                JButton uploadButton = createButton(rowHasPendingFile(documentIndex) ? "Replace" : "Upload");
+                EmployeeDocumentViewPanelHelper.styleActionLink(uploadButton, true);
+                buttons.add(uploadButton);
             } else {
                 JButton locked = createButton("Locked");
                 locked.setEnabled(false);
-                EmployeeDocumentViewPanelHelper.styleViewLink(locked, false);
+                EmployeeDocumentViewPanelHelper.styleActionLink(locked, false);
                 buttons.add(locked);
             }
 

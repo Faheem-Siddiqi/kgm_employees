@@ -123,6 +123,8 @@ public class EmployeeDetailView extends JFrame {
             basicPanel = new EmployeeBasicDetailsPanel(null, basicDefinitions);
             otherPanel = new EmployeeAdditionalDetailsPanel(null, detailDefinitions);
             documentPanel = new EmployeeDocumentViewPanel();
+            documentPanel.setProfileImageUploadListener(basicPanel::setSelectedImageFromDocumentUpload);
+            basicPanel.setSelectedImageListener(documentPanel::setProfileImageFromMainTab);
             tabs.addTab("Core", basicPanel);
             tabs.addTab("Details", otherPanel);
             tabs.addTab("Documents", documentPanel);
@@ -300,6 +302,14 @@ public class EmployeeDetailView extends JFrame {
                     employee = loaded;
                     basicPanel = new EmployeeBasicDetailsPanel(loaded, basicDefinitions);
                     basicPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
+                    if (documentPanel != null) {
+                        documentPanel.setProfileImageUploadListener(basicPanel::setSelectedImageFromDocumentUpload);
+                        basicPanel.setSelectedImageListener(documentPanel::setProfileImageFromMainTab);
+                        File pendingProfileImage = documentPanel.pendingProfileImageFile();
+                        if (pendingProfileImage != null) {
+                            basicPanel.setSelectedImageFromDocumentUpload(pendingProfileImage);
+                        }
+                    }
                     tabs.setComponentAt(BASIC_TAB_INDEX, basicPanel);
                     basicTabLoaded = true;
                     refreshAfterTabChange();
@@ -397,6 +407,10 @@ public class EmployeeDetailView extends JFrame {
                     }
                     documentPanel = new EmployeeDocumentViewPanel(loaded);
                     documentPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
+                    if (basicPanel != null) {
+                        documentPanel.setProfileImageUploadListener(basicPanel::setSelectedImageFromDocumentUpload);
+                        basicPanel.setSelectedImageListener(documentPanel::setProfileImageFromMainTab);
+                    }
                     tabs.setComponentAt(DOCUMENT_TAB_INDEX, documentPanel);
                     documentTabLoaded = true;
                     refreshAfterTabChange();

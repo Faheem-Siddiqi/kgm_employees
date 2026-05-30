@@ -15,6 +15,7 @@ public final class EmployeeDocumentUploadPanelHelper {
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color CARD_BACKGROUND = new Color(248, 250, 252);
     private static final Color PRIMARY = new Color(22, 163, 74);
+    private static final Color PRIMARY_BLUE = new Color(0, 112, 210);
     private static final Color FIELD_BORDER = new Color(200, 200, 200);
     private static final Color BORDER = new Color(220, 226, 232);
     private static final Color TEXT_PRIMARY = new Color(35, 43, 54);
@@ -216,7 +217,12 @@ public final class EmployeeDocumentUploadPanelHelper {
     }
 
     public static void styleViewLink(JButton button, boolean uploaded) {
-        button.setForeground(TEXT_SECONDARY);
+        styleActionLink(button, uploaded);
+    }
+
+    public static void styleActionLink(JButton button, boolean enabled) {
+        ButtonStateHelper.setEnabledForeground(button, enabled ? PRIMARY_BLUE : TEXT_SECONDARY);
+        ButtonStateHelper.setEnabled(button, enabled);
     }
 
     public static void stylePreviewFrame(JFrame frame, Component relativeTo) {

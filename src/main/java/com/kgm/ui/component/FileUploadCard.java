@@ -18,7 +18,7 @@ public class FileUploadCard extends JPanel {
     private static final Color BACKGROUND_HOVER = new Color(241, 247, 253);
     private static final Color BACKGROUND_DISABLED = new Color(244, 247, 250);
     private static final Color BORDER = new Color(198, 212, 226);
-    private static final Color ACTION = new Color(22, 163, 74);
+    private static final Color ACTION = new Color(0, 112, 210);
     private static final Color ACTION_DISABLED = new Color(71, 85, 105);
     private static final Color TEXT = new Color(35, 43, 54);
     private static final Color MUTED = new Color(99, 115, 129);

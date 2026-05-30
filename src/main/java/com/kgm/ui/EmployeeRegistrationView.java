@@ -109,6 +109,8 @@ public class EmployeeRegistrationView extends JFrame {
         JTabbedPane tabs = new HugHeightTabbedPane();
         formPanel = new EmployeeRegistrationFormPanel(metadata.definitions(), metadata.profileImageRequired());
         documentPanel = new EmployeeDocumentUploadPanel();
+        documentPanel.setProfileImageUploadListener(formPanel::setSelectedImageFromDocumentUpload);
+        formPanel.setSelectedImageListener(documentPanel::setProfileImageFromMainTab);
 
         JButton backButton = new JButton("Back");
         JButton submitButton = new JButton("Submit");
@@ -231,9 +233,16 @@ public class EmployeeRegistrationView extends JFrame {
 
                 File src = new File(selectedDocuments[i]);
                 String storageName = EmployeeDocumentUtil.documentType(i).storageName();
-                Path dest = docDir.resolve(storageName);
+                Path dest;
+                String dbPath;
+                if (EmployeeDocumentUtil.isProfileImageDocument(i)) {
+                    dest = empDir.resolve(storageName);
+                    dbPath = EmployeeStorageUtil.profileImagePath(empCode);
+                } else {
+                    dest = docDir.resolve(storageName);
+                    dbPath = EmployeeStorageUtil.documentPath(empCode, storageName);
+                }
                 Files.copy(src.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
-                String dbPath = EmployeeStorageUtil.documentPath(empCode, storageName);
                 EmployeeDocumentUtil.setDocumentPath(emp, i, dbPath);
             }
         }

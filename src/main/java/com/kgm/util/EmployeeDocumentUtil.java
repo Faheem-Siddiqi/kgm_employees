@@ -134,8 +134,13 @@ public final class EmployeeDocumentUtil {
         List<DocumentType> types = new ArrayList<>();
         try {
             Map<String, EmployeeFieldDefinition> metadata = new LinkedHashMap<>();
+            EmployeeFieldDefinition profileImageDefinition = null;
             for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.fields()) {
-                if (definition.documentField() && !isProfileImageColumn(definition.columnName())) {
+                if (isProfileImageColumn(definition.columnName())) {
+                    profileImageDefinition = definition;
+                    continue;
+                }
+                if (definition.documentField()) {
                     metadata.put(definition.columnName().toUpperCase(Locale.ROOT), definition);
                 }
             }
@@ -164,10 +169,27 @@ public final class EmployeeDocumentUtil {
                         definition.columnName() + ".jpg"
                 ));
             }
+
+            if (isEmployeeImageUploadTarget(profileImageDefinition)) {
+                types.add(new DocumentType(
+                        profileImageDefinition.label(),
+                        "EMP_IMG",
+                        "EMP_IMG.jpg",
+                        "Employee Image",
+                        "Employee Photo",
+                        "Employee_Photo",
+                        "Profile Image"
+                ));
+            }
         } catch (RuntimeException exception) {
             return DOCUMENT_TYPES;
         }
         return List.copyOf(types);
+    }
+
+    private static boolean isEmployeeImageUploadTarget(EmployeeFieldDefinition definition) {
+        return definition != null
+                && isProfileImageColumn(definition.columnName());
     }
 
     private static List<String> aliasesWithOriginalLabel(DocumentType type) {
@@ -223,6 +245,12 @@ public final class EmployeeDocumentUtil {
 
     private static boolean isProfileImageColumn(String columnName) {
         return "EMP_IMG".equalsIgnoreCase(columnName);
+    }
+
+    public static boolean isProfileImageDocument(int documentIndex) {
+        return documentIndex >= 0
+                && documentIndex < documentCount()
+                && isProfileImageColumn(documentType(documentIndex).employeeFieldName());
     }
 
     public static boolean hasStoredPath(String value) {
