@@ -375,10 +375,10 @@ public class HomeView extends JFrame {
         panel.add(new JLabel("Choose how this Excel workbook should be imported:"));
         panel.add(Box.createVerticalStrut(10));
         panel.add(standardImport);
-        panel.add(new JLabel("Requires every Basic field from the sample workbook."));
+        panel.add(new JLabel("Requires CNIC and every field marked Required in Field Management."));
         panel.add(Box.createVerticalStrut(8));
         panel.add(legacyImport);
-        panel.add(new JLabel("For old records. Requires Employee ID, while CNIC/date rules still apply."));
+        panel.add(new JLabel("For old records. Requires Employee ID; CNIC is optional and dates use MM/dd/yyyy HH:mm:ss."));
 
         int selected = DialogHelper.formOption(
                 this,

@@ -398,11 +398,6 @@ public class EmployeeBasicDetailsPanel extends JPanel {
     }
 
     public String validationMessage() {
-        String cnic = isEditableColumn("NID") ? valueFor("NID") : "";
-        if (!cnic.isBlank() && !CnicFormatter.isValid(cnic)) {
-            return "CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".";
-        }
-
         String phone = isEditableColumn("EMP_CONTNO") ? valueFor("EMP_CONTNO") : "";
         if (!phone.isBlank() && !PhoneFormatter.isValid(phone)) {
             return "Phone must use format " + PhoneFormatter.FORMAT_EXAMPLE + ".";

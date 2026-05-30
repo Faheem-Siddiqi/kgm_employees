@@ -4,7 +4,6 @@ import com.kgm.config.DatabaseConnection;
 import com.kgm.dao.EmployeeRegistrationDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
-import com.kgm.util.CnicFormatter;
 import com.kgm.util.EmployeeAdditionalFieldDefaults;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeFieldDefinitionCache;
@@ -14,7 +13,6 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.CellValue;
 import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -34,12 +32,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -52,35 +49,16 @@ import java.util.Map;
 import java.util.Set;
 
 public class ExcelImportService {
-    public static final String DATE_FORMAT_HINT = "M/d/yyyy HH:mm:ss";
+    public static final String DATE_FORMAT_HINT = "MM/dd/yyyy HH:mm:ss";
     private static final String INTERNAL_DATE_FORMAT = "dd/MM/yyyy HH:mm:ss";
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat(INTERNAL_DATE_FORMAT);
     private static final List<String> FALLBACK_CORE_COLUMN_ORDER = EmployeeBasicFieldUtil.BASIC_COLUMNS;
     private static final Set<String> FALLBACK_REQUIRED_STANDARD_COLUMNS = EmployeeBasicFieldUtil.REQUIRED_COLUMNS;
     private static final Set<String> REQUIRED_LEGACY_COLUMNS = Set.of("EMPLOYEE_CODE");
     private static final Set<String> DATE_COLUMNS = EmployeeBasicFieldUtil.DATE_COLUMNS;
-    private static final List<DateTimeFormatter> DATE_TIME_FORMATS = List.of(
-            DateTimeFormatter.ofPattern("M/d/yyyy HH:mm:ss"),
-            DateTimeFormatter.ofPattern("M/d/yyyy H:mm:ss"),
-            DateTimeFormatter.ofPattern("M/d/yy HH:mm:ss"),
-            DateTimeFormatter.ofPattern("M/d/yy H:mm:ss"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy H:mm:ss"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy H:mm:ss"),
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-            DateTimeFormatter.ofPattern("yyyy-MM-dd H:mm:ss"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd H:mm:ss")
-    );
-    private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
-            DateTimeFormatter.ofPattern("yyyy-MM-dd"),
-            DateTimeFormatter.ofPattern("yyyy/MM/dd"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-            DateTimeFormatter.ofPattern("M/d/yyyy"),
-            DateTimeFormatter.ofPattern("M/d/yy")
-    );
+    private static final DateTimeFormatter IMPORT_DATE_FORMAT = DateTimeFormatter
+            .ofPattern("MM/dd/uuuu HH:mm:ss")
+            .withResolverStyle(ResolverStyle.STRICT);
     private static final Map<String, List<String>> EXTRA_ALIASES = aliases();
 
     @FunctionalInterface
@@ -316,9 +294,10 @@ public class ExcelImportService {
     private static TemplateColumn templateColumn(String header, String columnName, EmployeeFieldDefinition definition) {
         String column = columnName.toUpperCase(Locale.ROOT);
         boolean dateField = DATE_COLUMNS.contains(column) || (definition != null && EmployeeBasicFieldUtil.isDateField(definition));
-        boolean required = definition == null
-                ? FALLBACK_REQUIRED_STANDARD_COLUMNS.contains(column)
-                : EmployeeBasicFieldUtil.isRequired(definition);
+        boolean required = "NID".equals(column)
+                || (definition == null
+                        ? FALLBACK_REQUIRED_STANDARD_COLUMNS.contains(column)
+                        : EmployeeBasicFieldUtil.isRequired(definition));
         List<String> dropdownOptions = definition != null && EmployeeBasicFieldUtil.isDropdownField(definition)
                 ? List.of(EmployeeBasicFieldUtil.dropdownOptions(definition, false))
                 : EmployeeBasicFieldUtil.isComboField(column)
@@ -387,7 +366,7 @@ public class ExcelImportService {
             case "DESCR" -> "KGM";
             case "EMP_NAME" -> "Ali Khan";
             case "FATHER_NAME" -> "Ahmed Khan";
-            case "NID" -> CnicFormatter.FORMAT_EXAMPLE;
+            case "NID" -> "35202-1234567-1";
             case "EMP_CONTNO" -> PhoneFormatter.FORMAT_EXAMPLE;
             case "PERSONAL_EMAIL" -> "ali.khan@example.com";
             case "DEPARTMENT" -> "HR";
@@ -395,11 +374,11 @@ public class ExcelImportService {
             case "SECTION" -> "N/A";
             case "GRADE" -> "G-5";
             case "SHIFT" -> "Morning";
-            case "DOB" -> "3/8/1984 00:00:00";
+            case "DOB" -> "03/08/1984 00:00:00";
             case "GENDER" -> "Male";
             case "RESIGN_REASON" -> "Resignation";
-            case "JOINING_DATE" -> "8/23/2010 00:00:00";
-            case "RESIGN_DATE" -> "1/1/2024 00:00:00";
+            case "JOINING_DATE" -> "08/23/2010 00:00:00";
+            case "RESIGN_DATE" -> "01/01/2024 00:00:00";
             case "CURRENT_ADR" -> "House 1, Lahore";
             case "PERMANENT_ADR" -> "House 1, Lahore";
             default -> dateField ? DATE_FORMAT_HINT : "N/A";
@@ -437,7 +416,7 @@ public class ExcelImportService {
                 continue;
             }
             byColumn.put(column, definition);
-            if (EmployeeBasicFieldUtil.isFundamentalsField(definition)) {
+            if (definition.requiredField()) {
                 standardRequiredColumns.add(column);
             }
             addAlias(byAlias, definition.label(), definition);
@@ -446,6 +425,7 @@ public class ExcelImportService {
         if (standardRequiredColumns.isEmpty()) {
             standardRequiredColumns.addAll(FALLBACK_REQUIRED_STANDARD_COLUMNS);
         }
+        standardRequiredColumns.add("NID");
         List<TemplateColumn> templateColumns = templateColumns(new ArrayList<>(byColumn.values()));
         for (TemplateColumn templateColumn : templateColumns) {
             if (!templateColumn.importable()) {
@@ -611,12 +591,8 @@ public class ExcelImportService {
         }
 
         String cnic = rowData.values().get("NID");
-        if (importType == ImportType.STANDARD) {
-            if (isBlankValue(cnic) || !CnicFormatter.isValid(cnic)) {
-                throw new RowImportException("CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".");
-            }
-        } else if (!isBlankValue(cnic) && !CnicFormatter.isValid(cnic)) {
-            throw new RowImportException("CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + " when supplied.");
+        if (importType == ImportType.STANDARD && isBlankValue(cnic)) {
+            throw new RowImportException("CNIC is required.");
         }
 
         validatePhone(rowData, catalog, "EMP_CONTNO");
@@ -847,16 +823,10 @@ public class ExcelImportService {
         if (cell == null || cell.getCellType() == CellType.BLANK) {
             return null;
         }
-        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isValidExcelDate(cell.getNumericCellValue())) {
-            return DateUtil.getJavaDate(cell.getNumericCellValue());
-        }
         if (cell.getCellType() == CellType.FORMULA && evaluator != null) {
             CellValue value = evaluator.evaluate(cell);
             if (value == null) {
                 return null;
-            }
-            if (value.getCellType() == CellType.NUMERIC && DateUtil.isValidExcelDate(value.getNumberValue())) {
-                return DateUtil.getJavaDate(value.getNumberValue());
             }
             if (value.getCellType() == CellType.STRING) {
                 return dateTextValue(value.getStringValue());
@@ -870,21 +840,12 @@ public class ExcelImportService {
         if (text.isEmpty()) {
             return null;
         }
-        for (DateTimeFormatter format : DATE_TIME_FORMATS) {
-            try {
-                LocalDateTime dateTime = LocalDateTime.parse(text, format);
-                return Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
-            } catch (DateTimeParseException ignored) {
-            }
+        try {
+            LocalDateTime dateTime = LocalDateTime.parse(text, IMPORT_DATE_FORMAT);
+            return Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
+        } catch (DateTimeParseException ignored) {
+            return null;
         }
-        for (DateTimeFormatter format : DATE_FORMATS) {
-            try {
-                LocalDate date = LocalDate.parse(text, format);
-                return Date.from(date.atTime(LocalTime.MIDNIGHT).atZone(ZoneId.systemDefault()).toInstant());
-            } catch (DateTimeParseException ignored) {
-            }
-        }
-        return null;
     }
 
     private Date parseDbDate(String value) {

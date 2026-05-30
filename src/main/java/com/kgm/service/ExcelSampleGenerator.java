@@ -1,6 +1,5 @@
 package com.kgm.service;
 
-import com.kgm.util.CnicFormatter;
 import com.kgm.util.PhoneFormatter;
 
 import org.apache.poi.ss.usermodel.Cell;
@@ -42,16 +41,16 @@ public final class ExcelSampleGenerator {
             "0307-5011252", "0334-5040248", "0312-3456789", "0321-7654321", "0345-1234567"
     };
     private static final String[] SAMPLE_JOINING_DATES = {
-            "8/23/2010 00:00:00", "2/19/2011 00:00:00", "7/30/2021 00:00:00",
-            "12/30/2021 00:00:00", "11/1/2023 00:00:00"
+            "08/23/2010 00:00:00", "02/19/2011 00:00:00", "07/30/2021 00:00:00",
+            "12/30/2021 00:00:00", "11/01/2023 00:00:00"
     };
     private static final String[] SAMPLE_RESIGN_DATES = {
-            "1/1/2024 00:00:00", "2/15/2024 00:00:00", "3/31/2024 00:00:00",
-            "4/30/2024 00:00:00", "5/31/2024 00:00:00"
+            "01/01/2024 00:00:00", "02/15/2024 00:00:00", "03/31/2024 00:00:00",
+            "04/30/2024 00:00:00", "05/31/2024 00:00:00"
     };
     private static final String[] SAMPLE_DOBS = {
-            "3/8/1984 00:00:00", "5/14/1990 00:00:00", "9/20/1988 00:00:00",
-            "1/6/1992 00:00:00", "10/11/1986 00:00:00"
+            "03/08/1984 00:00:00", "05/14/1990 00:00:00", "09/20/1988 00:00:00",
+            "01/06/1992 00:00:00", "10/11/1986 00:00:00"
     };
 
     private ExcelSampleGenerator() {
@@ -111,6 +110,7 @@ public final class ExcelSampleGenerator {
         for (int index = 0; index < columns.size(); index++) {
             sheet.autoSizeColumn(index);
         }
+        applyDateValidations(sheet, columns);
     }
 
     private static void writeDropdownListSheet(
@@ -187,6 +187,33 @@ public final class ExcelSampleGenerator {
         sheet.addValidationData(validation);
     }
 
+    private static void applyDateValidations(Sheet sheet, List<ExcelImportService.TemplateColumn> columns) {
+        for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
+            ExcelImportService.TemplateColumn column = columns.get(columnIndex);
+            if (!column.importable() || !column.dateField()) {
+                continue;
+            }
+
+            String cell = formulaColumnLetter(columnIndex) + "2";
+            String formula = "OR(" + cell + "=\"\",AND(LEN(" + cell + ")=19,"
+                    + "MID(" + cell + ",3,1)=\"/\",MID(" + cell + ",6,1)=\"/\",MID(" + cell + ",11,1)=\" \","
+                    + "MID(" + cell + ",14,1)=\":\",MID(" + cell + ",17,1)=\":\","
+                    + "ISNUMBER(DATEVALUE(LEFT(" + cell + ",10))),ISNUMBER(TIMEVALUE(RIGHT(" + cell + ",8)))))";
+            DataValidationHelper helper = sheet.getDataValidationHelper();
+            DataValidationConstraint constraint = helper.createCustomConstraint(formula);
+            CellRangeAddressList addressList = new CellRangeAddressList(1, VALIDATION_LAST_ROW, columnIndex, columnIndex);
+            DataValidation validation = helper.createValidation(constraint, addressList);
+            validation.setEmptyCellAllowed(true);
+            validation.setShowErrorBox(true);
+            validation.setErrorStyle(DataValidation.ErrorStyle.STOP);
+            validation.createErrorBox(
+                    column.header() + " date",
+                    "Use " + ExcelImportService.DATE_FORMAT_HINT + " only, for example 08/23/2010 00:00:00."
+            );
+            sheet.addValidationData(validation);
+        }
+    }
+
     private static void writeValidValuesSheet(
             Workbook workbook,
             List<ExcelImportService.TemplateColumn> columns,
@@ -233,9 +260,9 @@ public final class ExcelSampleGenerator {
         textCell(sheet.createRow(rowIndex++), 0, "1. Import file must be a real .xlsx or .xls workbook and must not be an Excel temporary file.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "2. Row 1 must keep the sample headers. Missing required headers, unsupported headers, document headers, renamed headers, or unknown extra headers are rejected.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "3. Every field marked Required in Field Management must have a value in every imported row.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "4. CNIC is required and must use format " + CnicFormatter.FORMAT_EXAMPLE + ".", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "4. CNIC is required and may contain any text, numbers, spaces, or dashes.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "5. Phone and Emergency Phone, when supplied, must use format " + PhoneFormatter.FORMAT_EXAMPLE + ".", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "6. Date cells must be valid dates. Preferred text format is " + ExcelImportService.DATE_FORMAT_HINT + "; Excel date cells are also accepted.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "6. Date cells must be valid dates using only " + ExcelImportService.DATE_FORMAT_HINT + ".", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "7. Date of Resignation must be after Date of Joining when both dates are supplied.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "8. Fixed dropdown fields must match one configured option exactly. Variable dropdown fields may use a listed value or a typed custom value.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "9. Employee ID must be unique within this workbook and must not already exist in the database.", textStyle);
@@ -247,9 +274,9 @@ public final class ExcelSampleGenerator {
         textCell(sheet.createRow(rowIndex++), 0, "Legacy / Old Data Import Rules", headerStyle);
         textCell(sheet.createRow(rowIndex++), 0, "1. Employee ID is the only required header and value for legacy import.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "2. Known headers are imported when present. Unsupported legacy headers are ignored after Employee ID is found.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "3. CNIC is optional for legacy rows, but when supplied it must use format " + CnicFormatter.FORMAT_EXAMPLE + ".", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "3. CNIC is optional for legacy rows. When supplied, it may contain any text, numbers, spaces, or dashes.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "4. Phone and Emergency Phone are optional, but supplied values must use format " + PhoneFormatter.FORMAT_EXAMPLE + ".", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "5. Date cells must still be valid dates. If Joining and Resignation dates are both supplied, Resignation must be after Joining.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "5. Date cells must use only " + ExcelImportService.DATE_FORMAT_HINT + ". If Joining and Resignation dates are both supplied, Resignation must be after Joining.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "6. Fixed dropdown fields, when supplied, must match one configured option. Variable dropdown fields may contain custom legacy values.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "7. Employee ID must still be unique within this workbook and must not already exist in the database.", textStyle);
         textCell(sheet.createRow(rowIndex++), 0, "8. Legacy import is intended for old incomplete records. Use New Import for strict current employee onboarding data.", textStyle);
@@ -317,7 +344,7 @@ public final class ExcelSampleGenerator {
         }
         if (column.dateField()) {
             return ExcelImportService.DATE_FORMAT_HINT
-                    + " e.g. 8/23/2010 00:00:00, 2/19/2011 00:00:00";
+                    + " e.g. 08/23/2010 00:00:00, 02/19/2011 00:00:00";
         }
         return column.sampleValue();
     }
@@ -328,7 +355,7 @@ public final class ExcelSampleGenerator {
         }
         String dbColumn = column.dbColumn();
         if ("NID".equalsIgnoreCase(dbColumn)) {
-            return "Use CNIC format " + CnicFormatter.FORMAT_EXAMPLE + ", including both hyphens.";
+            return "New import requires CNIC. Any text is accepted, with or without dashes. Legacy import allows this field to be empty.";
         }
         if ("EMP_CONTNO".equalsIgnoreCase(dbColumn) || "EMERGENCY_NO".equalsIgnoreCase(dbColumn)) {
             return "Use phone format " + PhoneFormatter.FORMAT_EXAMPLE + ", including the hyphen.";
@@ -371,6 +398,10 @@ public final class ExcelSampleGenerator {
             column = column / 26 - 1;
         } while (column >= 0);
         return "$" + result;
+    }
+
+    private static String formulaColumnLetter(int zeroBasedColumn) {
+        return columnLetter(zeroBasedColumn).replace("$", "");
     }
 
     private static CellStyle headerStyle(Workbook workbook) {

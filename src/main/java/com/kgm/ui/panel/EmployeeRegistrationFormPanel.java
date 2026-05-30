@@ -328,11 +328,6 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             return "Enter a valid email address.";
         }
 
-        String cnic = valueFor("NID");
-        if (!cnic.isBlank() && !CnicFormatter.isValid(cnic)) {
-            return "CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".";
-        }
-
         String phone = valueFor("EMP_CONTNO");
         if (!phone.isBlank() && !PhoneFormatter.isValid(phone)) {
             return "Phone must use format " + PhoneFormatter.FORMAT_EXAMPLE + ".";

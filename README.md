@@ -345,6 +345,90 @@ The application uses `EmployeeDocumentUtil` as the single source of truth for do
 | 21 | `MISCELLANEOUS_II` | Miscellaneous II |
 | 22 | `MISCELLANEOUS_III` | Miscellaneous III |
 
+### Document Upload Status Colors and States
+
+The document upload feature uses color-coding and status text to communicate the state of each document in the upload workflow. All status indicators are implemented in `EmployeeDocumentUploadPanel` with color styling from `TablePaginationHelper`.
+
+#### Document Upload States and Their Colors
+
+| Status | Description | Color | RGB | Hex Code | Use Case |
+| --- | --- | --- | --- | --- | --- |
+| **Uploaded** | Document file successfully uploaded and saved to database | Green | 38, 128, 64 | #268040 | File is ready, stored in the system, and can be viewed or replaced |
+| **Not Uploaded** | Document has not been uploaded yet (optional field) | Gray | 99, 115, 129 | #637381 | Optional document that is pending upload or intentionally skipped |
+| **Missing required** | Required document is not uploaded (must be provided) | Red | 180, 60, 45 | #B43C2D | Critical missing document that blocks employee registration or detail completion |
+| **Ready to save** / **Pending** | Document has been selected and is queued for database save | Blue | 0, 112, 210 | #0070D2 | Document is in the upload queue and waiting to be persisted to the database |
+
+#### Status Display Locations
+
+Status indicators appear in the following locations within the document upload interface:
+
+- **Document Table Status Column**: Each document row displays its current status in the `Status` column of the `EmployeeDocumentUploadPanel` table.
+- **File Info**: When a file is uploaded, the status displays as `Uploaded (X KB)` or `Uploaded (X MB)` to show both state and file size.
+- **Required Indicator**: Required documents display an asterisk (`*`) next to their label (e.g., `CNIC Front *`) to distinguish them from optional documents.
+- **Search Filtering**: When searching for documents, status keywords like "uploaded", "missing", or "required" are searchable and help locate specific documents.
+
+#### Status Transitions and Workflows
+
+1. **New Document (Not Uploaded → Ready to save)**
+   - User selects a file to upload
+   - Status changes from `Not Uploaded` to `Uploaded (file size)`
+   - Document becomes ready to save when the employee record is submitted
+
+2. **Required Missing Document (Missing required → Uploaded)**
+   - System flags required documents as `Missing required` if not provided
+   - User must upload a file to clear this status
+   - Once uploaded, status changes to `Uploaded (file size)`
+   - Employee cannot be registered/updated without clearing this status
+
+3. **Replace Existing Document (Uploaded → Replace)**
+   - In the detail view, already-saved documents show as `Locked`
+   - Users see a `Replace` button instead of `Upload` for locked documents
+   - Clicking `Replace` opens the file chooser to select a new file
+   - On successful replacement, status updates to show new file size
+
+4. **Bulk Upload Scenario**
+   - User selects multiple files via `Upload All`
+   - System matches filenames to document types (e.g., `CNIC_Front.jpg` → `CNIC Front`)
+   - Matched documents transition to `Uploaded (file size)`
+   - Unmatched files are reported in a summary dialog with discard reasons
+   - User receives feedback on upload count and discarded files
+
+#### Color Palette Consistency
+
+The document upload status colors are part of a broader UI color palette defined in `TablePaginationHelper.DOCUMENT_STATUS_COLORS`:
+
+| Color Name | RGB | Hex Code | Used For |
+| --- | --- | --- | --- |
+| **Green** | 38, 128, 64 | #268040 | Uploaded, Locked, Success states |
+| **Blue (Primary)** | 0, 112, 210 | #0070D2 | Ready to save, Pending, Primary actions |
+| **Red (Danger)** | 180, 60, 45 | #B43C2D | Missing required, Error, Failed states |
+| **Amber** | 245, 158, 11 | #F59E0B | Warning and attention states |
+| **Purple** | 139, 92, 246 | #8B5CF6 | Dynamic/unknown status types generated via hash-based color assignment for consistency |
+| **Pink** | 236, 72, 153 | #EC4899 | Dynamic/unknown status types generated via hash-based color assignment for consistency |
+| **Teal** | 20, 184, 166 | #14B8A6 | Dynamic/unknown status types generated via hash-based color assignment for consistency |
+| **Orange** | 249, 115, 22 | #F97316 | Dynamic/unknown status types generated via hash-based color assignment for consistency |
+
+#### UI Component Colors
+
+Additional styling colors used in the document upload interface:
+
+| Component | Color | RGB | Hex Code | Usage |
+| --- | --- | --- | --- | --- |
+| **Text (Primary)** | Dark Gray | 35, 43, 54 | #232B36 | Document names, labels, field text |
+| **Text (Secondary)** | Medium Gray | 99, 115, 129 | #637381 | Descriptive text, hints, disabled text |
+| **Background (Page)** | White | 255, 255, 255 | #FFFFFF | Main panel background |
+| **Background (Card)** | Light Gray | 248, 250, 252 | #F8FAFC | Summary and control panels |
+| **Border** | Light Gray | 220, 226, 232 | #DCE2E8 | Table borders, panel borders |
+| **Cell Divider** | Very Light Gray | 232, 236, 240 | #E8ECF0 | Table cell separators |
+| **Row Selection** | Light Blue | 229, 242, 255 | #E5F2FF | Highlighted table rows |
+| **Field Border** | Medium Gray | 200, 200, 200 | #C8C8C8 | Text field and search box borders |
+
+#### Accessibility Notes
+
+- Color-blind friendly: Status indicators combine colors with clear text labels (e.g., "Uploaded", "Missing required") so users are not reliant on color alone.
+- Text contrast: All status text meets WCAG contrast requirements for readability.
+- Interactive elements: Action buttons (`Upload`, `Replace`, `View`) respond to both color and text state changes.
+
 ---
 
 ## Employee Update Rules
