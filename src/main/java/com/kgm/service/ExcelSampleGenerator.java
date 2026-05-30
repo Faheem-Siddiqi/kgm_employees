@@ -5,13 +5,18 @@ import com.kgm.util.PhoneFormatter;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataValidation;
+import org.apache.poi.ss.usermodel.DataValidationConstraint;
+import org.apache.poi.ss.usermodel.DataValidationHelper;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Name;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.File;
@@ -25,6 +30,8 @@ import java.util.Locale;
 
 public final class ExcelSampleGenerator {
     private static final int SAMPLE_ROW_COUNT = 5;
+    private static final int VALIDATION_LAST_ROW = 10000;
+    private static final String DROPDOWN_LIST_SHEET = "Dropdown Lists";
     private static final String[] SAMPLE_EMPLOYEE_CODES = {"00050", "00123", "000272", "000273", "000274"};
     private static final String[] SAMPLE_NAMES = {"Ali Khan", "Sana Malik", "Bilal Ahmed", "Ayesha Noor", "Usman Raza"};
     private static final String[] SAMPLE_FATHER_NAMES = {"Ahmed Khan", "Tariq Malik", "Naveed Ahmed", "Imran Noor", "Raza Ali"};
@@ -64,6 +71,7 @@ public final class ExcelSampleGenerator {
                 CellStyle textStyle = unlockedStyle(workbook);
 
                 writeImportSheet(workbook, columns, headerStyle, textStyle);
+                writeDropdownListSheet(workbook, columns, headerStyle, textStyle);
                 writeValidValuesSheet(workbook, columns, headerStyle, textStyle);
                 workbook.write(output);
                 output.flush();
@@ -105,6 +113,80 @@ public final class ExcelSampleGenerator {
         }
     }
 
+    private static void writeDropdownListSheet(
+            Workbook workbook,
+            List<ExcelImportService.TemplateColumn> columns,
+            CellStyle headerStyle,
+            CellStyle textStyle
+    ) {
+        Sheet importSheet = workbook.getSheet("Employee Import");
+        Sheet listSheet = workbook.createSheet(DROPDOWN_LIST_SHEET);
+        unlockColumns(listSheet, textStyle, Math.max(1, columns.size()));
+
+        int listColumnIndex = 0;
+        for (int importColumnIndex = 0; importColumnIndex < columns.size(); importColumnIndex++) {
+            ExcelImportService.TemplateColumn column = columns.get(importColumnIndex);
+            String[] options = dropdownOptions(column);
+            if (options.length == 0) {
+                continue;
+            }
+
+            Row headerRow = listSheet.getRow(0);
+            if (headerRow == null) {
+                headerRow = listSheet.createRow(0);
+            }
+            textCell(headerRow, listColumnIndex, column.header(), headerStyle);
+            for (int optionIndex = 0; optionIndex < options.length; optionIndex++) {
+                Row row = listSheet.getRow(optionIndex + 1);
+                if (row == null) {
+                    row = listSheet.createRow(optionIndex + 1);
+                }
+                textCell(row, listColumnIndex, options[optionIndex], textStyle);
+            }
+
+            String rangeName = "Dropdown_" + (listColumnIndex + 1);
+            Name name = workbook.createName();
+            name.setNameName(rangeName);
+            name.setRefersToFormula("'" + DROPDOWN_LIST_SHEET + "'!"
+                    + columnLetter(listColumnIndex) + "$2:"
+                    + columnLetter(listColumnIndex) + "$" + (options.length + 1));
+            applyDropdownValidation(importSheet, importColumnIndex, rangeName, column);
+            listSheet.autoSizeColumn(listColumnIndex);
+            listColumnIndex++;
+        }
+
+        int listSheetIndex = workbook.getSheetIndex(listSheet);
+        if (listSheetIndex >= 0) {
+            workbook.setSheetHidden(listSheetIndex, true);
+        }
+    }
+
+    private static void applyDropdownValidation(
+            Sheet sheet,
+            int columnIndex,
+            String rangeName,
+            ExcelImportService.TemplateColumn column
+    ) {
+        DataValidationHelper helper = sheet.getDataValidationHelper();
+        DataValidationConstraint constraint = helper.createFormulaListConstraint(rangeName);
+        CellRangeAddressList addressList = new CellRangeAddressList(1, VALIDATION_LAST_ROW, columnIndex, columnIndex);
+        DataValidation validation = helper.createValidation(constraint, addressList);
+        validation.setSuppressDropDownArrow(true);
+        validation.setShowErrorBox(true);
+        validation.createErrorBox(
+                column.header() + " value",
+                column.variableDropdown()
+                        ? "Choose a listed value, or type a custom value if this field is configured as variable."
+                        : "Choose one of the listed values. This field is checked during import."
+        );
+        if (column.variableDropdown()) {
+            validation.setErrorStyle(DataValidation.ErrorStyle.WARNING);
+        } else {
+            validation.setErrorStyle(DataValidation.ErrorStyle.STOP);
+        }
+        sheet.addValidationData(validation);
+    }
+
     private static void writeValidValuesSheet(
             Workbook workbook,
             List<ExcelImportService.TemplateColumn> columns,
@@ -134,34 +216,44 @@ public final class ExcelSampleGenerator {
             textCell(row, 6, ruleComment(column), textStyle);
         }
 
-        rowIndex++;
-        textCell(sheet.createRow(rowIndex++), 0, "Rules", headerStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Only .xlsx or .xls files can be imported.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ", including both hyphens.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Phone must use format " + PhoneFormatter.FORMAT_EXAMPLE + ", including the hyphen.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Date of Joining must be before Date of Resignation.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Date format: " + ExcelImportService.DATE_FORMAT_HINT + " (example: 8/23/2010 00:00:00).", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Document fields are not part of Excel import.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "The sample is rebuilt from current Field Management settings each time it is downloaded.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Required fields come from Field Management > Required Fields.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "The first five rows are examples. Replace them with employee records before import.", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Do not add, remove, or rename headers. Unknown headers are rejected during import.", textStyle);
-
-        rowIndex++;
-        textCell(sheet.createRow(rowIndex++), 0, "Gender", headerStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Male", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Female", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Other", textStyle);
-
-        rowIndex++;
-        textCell(sheet.createRow(rowIndex++), 0, "Common Reasons", headerStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Layoff", textStyle);
-        textCell(sheet.createRow(rowIndex++), 0, "Resignation", textStyle);
-        textCell(sheet.createRow(rowIndex), 0, "Other", textStyle);
+        rowIndex = writeProfessionalRules(sheet, rowIndex + 1, headerStyle, textStyle);
 
         for (int index = 0; index < headers.length; index++) {
             sheet.autoSizeColumn(index);
         }
+    }
+
+    private static int writeProfessionalRules(
+            Sheet sheet,
+            int rowIndex,
+            CellStyle headerStyle,
+            CellStyle textStyle
+    ) {
+        textCell(sheet.createRow(rowIndex++), 0, "New Import / Strict Rules", headerStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "1. Import file must be a real .xlsx or .xls workbook and must not be an Excel temporary file.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "2. Row 1 must keep the sample headers. Missing required headers, unsupported headers, document headers, renamed headers, or unknown extra headers are rejected.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "3. Every field marked Required in Field Management must have a value in every imported row.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "4. CNIC is required and must use format " + CnicFormatter.FORMAT_EXAMPLE + ".", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "5. Phone and Emergency Phone, when supplied, must use format " + PhoneFormatter.FORMAT_EXAMPLE + ".", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "6. Date cells must be valid dates. Preferred text format is " + ExcelImportService.DATE_FORMAT_HINT + "; Excel date cells are also accepted.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "7. Date of Resignation must be after Date of Joining when both dates are supplied.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "8. Fixed dropdown fields must match one configured option exactly. Variable dropdown fields may use a listed value or a typed custom value.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "9. Employee ID must be unique within this workbook and must not already exist in the database.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "10. Document fields, image fields, ID, and export-only ERP columns are not imported from this workbook.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "11. Blank rows are skipped. At least one employee data row is required below the header.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "12. This sample is generated dynamically from the current employee field metadata and the same database insert boundary used by employee registration.", textStyle);
+
+        rowIndex++;
+        textCell(sheet.createRow(rowIndex++), 0, "Legacy / Old Data Import Rules", headerStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "1. Employee ID is the only required header and value for legacy import.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "2. Known headers are imported when present. Unsupported legacy headers are ignored after Employee ID is found.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "3. CNIC is optional for legacy rows, but when supplied it must use format " + CnicFormatter.FORMAT_EXAMPLE + ".", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "4. Phone and Emergency Phone are optional, but supplied values must use format " + PhoneFormatter.FORMAT_EXAMPLE + ".", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "5. Date cells must still be valid dates. If Joining and Resignation dates are both supplied, Resignation must be after Joining.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "6. Fixed dropdown fields, when supplied, must match one configured option. Variable dropdown fields may contain custom legacy values.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "7. Employee ID must still be unique within this workbook and must not already exist in the database.", textStyle);
+        textCell(sheet.createRow(rowIndex++), 0, "8. Legacy import is intended for old incomplete records. Use New Import for strict current employee onboarding data.", textStyle);
+        return rowIndex;
     }
 
     private static String sampleValue(ExcelImportService.TemplateColumn column, int sampleIndex) {
@@ -256,9 +348,29 @@ public final class ExcelSampleGenerator {
             return "Required for standard import.";
         }
         if (!column.dropdownOptions().isBlank()) {
-            return "Use one of the listed values unless this field allows a custom value.";
+            return column.variableDropdown()
+                    ? "Choose a listed value or enter a custom value; legacy custom values are accepted."
+                    : "Must match one listed dropdown value. Excel validation and import both check this field.";
         }
         return "";
+    }
+
+    private static String[] dropdownOptions(ExcelImportService.TemplateColumn column) {
+        if (column == null || column.dropdownOptions() == null || column.dropdownOptions().isBlank()) {
+            return new String[0];
+        }
+        return column.dropdownOptions().split("\\s*,\\s*");
+    }
+
+    private static String columnLetter(int zeroBasedColumn) {
+        StringBuilder result = new StringBuilder();
+        int column = zeroBasedColumn;
+        do {
+            int remainder = column % 26;
+            result.insert(0, (char) ('A' + remainder));
+            column = column / 26 - 1;
+        } while (column >= 0);
+        return "$" + result;
     }
 
     private static CellStyle headerStyle(Workbook workbook) {

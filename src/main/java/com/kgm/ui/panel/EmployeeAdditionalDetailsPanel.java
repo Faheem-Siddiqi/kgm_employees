@@ -47,6 +47,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
     private final List<JButton> breadcrumbButtons = new ArrayList<>();
     private JTextField searchField;
     private JButton clearSearchButton;
+    private JButton missingFieldsChip;
     private JLabel searchStatusLabel;
     private JPanel sectionsContainer;
     private JLabel emptySearchLabel;
@@ -120,6 +121,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
         searchField = new PlaceholderTextField("Search Other Fields");
         searchField.setToolTipText("Search field label, section, value, or DB column");
         clearSearchButton = new JButton("Clear");
+        missingFieldsChip = createMissingFieldsChip();
 
         EmployeeAdditionalDetailsPanelHelper.styleSearchField(searchField);
         EmployeeAdditionalDetailsPanelHelper.styleClearButton(clearSearchButton);
@@ -144,8 +146,102 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
 
         return EmployeeAdditionalDetailsPanelHelper.createSearchHeader(
                 searchStatusLabel,
-                EmployeeAdditionalDetailsPanelHelper.createSearchPanel(searchField, clearSearchButton, null)
+                EmployeeAdditionalDetailsPanelHelper.createSearchPanel(searchField, clearSearchButton, missingFieldsChip)
         );
+    }
+
+    private JButton createMissingFieldsChip() {
+        missingFieldsChip = EmployeeAdditionalDetailsPanelHelper.createBreadcrumbLink(buildMissingFieldsChipLabel());
+        missingFieldsChip.addActionListener(event -> filterToMissingFieldsOnly());
+        return missingFieldsChip;
+    }
+
+    private String buildMissingFieldsChipLabel() {
+        int missingCount = extractMissingFieldCountFromLabel();
+        return "Missing Fields (" + missingCount + ")";
+    }
+
+    private void updateMissingFieldsChipDisplay() {
+        if (missingFieldsChip != null) {
+            missingFieldsChip.setText(buildMissingFieldsChipLabel());
+            missingFieldsChip.revalidate();
+            missingFieldsChip.repaint();
+        }
+    }
+
+    private int extractMissingFieldCountFromLabel() {
+        if (searchStatusLabel == null) {
+            return 0;
+        }
+        String text = searchStatusLabel.getText();
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        try {
+            String[] parts = text.split("Missing data fields: ");
+            if (parts.length > 1) {
+                String countStr = parts[1].split("\\.")[0].trim();
+                return Integer.parseInt(countStr);
+            }
+        } catch (Exception ignored) {
+        }
+        return 0;
+    }
+
+    private void filterToMissingFieldsOnly() {
+        searchField.setText("");
+        FilterSummary summary = rebuildVisibleSectionsForMissingOnly();
+        updateSearchStatus(summary.visibleFields(), summary.totalFields(), "");
+        revalidate();
+        repaint();
+    }
+
+    private FilterSummary rebuildVisibleSectionsForMissingOnly() {
+        int visibleFields = 0;
+        int totalFields = 0;
+        boolean hasVisibleSection = false;
+        if (sectionsContainer == null) {
+            return new FilterSummary(0, 0);
+        }
+
+        sectionsContainer.removeAll();
+        if (sectionNavScroller != null) {
+            sectionNavScroller.setVisible(true);
+        }
+        if (sectionNavGap != null) {
+            sectionNavGap.setVisible(true);
+        }
+
+        for (SectionView section : sectionViews) {
+            List<FieldView> missingInSection = new ArrayList<>();
+
+            for (FieldView field : section.fields()) {
+                totalFields++;
+                String column = field.definition().columnName();
+                boolean isMissing = isEditableColumn(column) && isEmpty(currentFieldValueByColumn(column));
+                if (isMissing) {
+                    missingInSection.add(field);
+                    visibleFields++;
+                }
+            }
+
+            if (!missingInSection.isEmpty()) {
+                if (hasVisibleSection) {
+                    sectionsContainer.add(Box.createVerticalStrut(14));
+                }
+                rebuildSectionGrid(section, missingInSection);
+                sectionsContainer.add(section.panel());
+                hasVisibleSection = true;
+            }
+        }
+
+        if (!hasVisibleSection && emptySearchLabel != null) {
+            sectionsContainer.add(emptySearchLabel);
+        }
+
+        sectionsContainer.revalidate();
+        sectionsContainer.repaint();
+        return new FilterSummary(visibleFields, totalFields);
     }
 
     private static List<EmployeeFieldDefinition> loadDefaultDefinitions() {
@@ -580,6 +676,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             searchStatusLabel.setText("Showing " + visibleFields + " of " + totalFields
                     + " fields. Missing fields are highlighted with a red border.");
         }
+        updateMissingFieldsChipDisplay();
     }
 
     private String statusText(int totalFields, int missingFields) {

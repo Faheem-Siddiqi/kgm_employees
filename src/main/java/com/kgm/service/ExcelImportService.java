@@ -324,6 +324,7 @@ public class ExcelImportService {
                 : EmployeeBasicFieldUtil.isComboField(column)
                         ? List.of(EmployeeBasicFieldUtil.comboOptions(column, false))
                         : List.of();
+        boolean variableDropdown = definition != null && definition.variableOptionField();
         return new TemplateColumn(
                 header,
                 column,
@@ -332,6 +333,7 @@ public class ExcelImportService {
                 required,
                 sampleValue(column, dateField, dropdownOptions),
                 String.join(", ", dropdownOptions),
+                variableDropdown,
                 true
         );
     }
@@ -345,6 +347,7 @@ public class ExcelImportService {
                 false,
                 "",
                 "",
+                false,
                 false
         );
     }
@@ -608,18 +611,68 @@ public class ExcelImportService {
         }
 
         String cnic = rowData.values().get("NID");
-        if (isBlankValue(cnic) || !CnicFormatter.isValid(cnic)) {
-            throw new RowImportException("CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".");
+        if (importType == ImportType.STANDARD) {
+            if (isBlankValue(cnic) || !CnicFormatter.isValid(cnic)) {
+                throw new RowImportException("CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + ".");
+            }
+        } else if (!isBlankValue(cnic) && !CnicFormatter.isValid(cnic)) {
+            throw new RowImportException("CNIC must use format " + CnicFormatter.FORMAT_EXAMPLE + " when supplied.");
         }
 
         validatePhone(rowData, catalog, "EMP_CONTNO");
         validatePhone(rowData, catalog, "EMERGENCY_NO");
+        validateFixedDropdowns(rowData, importType, catalog);
 
         Date joining = parseDbDate(rowData.values().get("JOINING_DATE"));
         Date resignation = parseDbDate(rowData.values().get("RESIGN_DATE"));
         if (joining != null && resignation != null && !joining.before(resignation)) {
             throw new RowImportException("Date of Resignation must be after Date of Joining.");
         }
+    }
+
+    private void validateFixedDropdowns(
+            RowData rowData,
+            ImportType importType,
+            FieldCatalog catalog
+    ) throws RowImportException {
+        List<String> invalidDropdowns = new ArrayList<>();
+        for (Map.Entry<String, String> entry : rowData.values().entrySet()) {
+            String column = entry.getKey();
+            String value = entry.getValue();
+            if (isBlankValue(value)) {
+                continue;
+            }
+
+            EmployeeFieldDefinition definition = catalog.byColumn().get(column);
+            if (definition == null
+                    || !EmployeeBasicFieldUtil.isDropdownField(definition)
+                    || definition.variableOptionField()) {
+                continue;
+            }
+
+            String[] options = EmployeeBasicFieldUtil.dropdownOptions(definition, false);
+            if (options.length == 0 || containsOption(options, value)) {
+                continue;
+            }
+
+            String rule = importType == ImportType.STANDARD
+                    ? "must match one of"
+                    : "must match one of the configured values when supplied";
+            invalidDropdowns.add(templateHeader(column, definition) + " " + rule + ": " + String.join(", ", options));
+        }
+        if (!invalidDropdowns.isEmpty()) {
+            throw new RowImportException(String.join(". ", invalidDropdowns) + ".");
+        }
+    }
+
+    private boolean containsOption(String[] options, String value) {
+        String cleanValue = value == null ? "" : value.trim();
+        for (String option : options) {
+            if (option != null && option.trim().equalsIgnoreCase(cleanValue)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void rejectDuplicateEmployees(
@@ -1071,6 +1124,7 @@ public class ExcelImportService {
             boolean required,
             String sampleValue,
             String dropdownOptions,
+            boolean variableDropdown,
             boolean importable
     ) {
     }
