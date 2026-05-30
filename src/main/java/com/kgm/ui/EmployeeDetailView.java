@@ -1380,14 +1380,15 @@ public class EmployeeDetailView extends JFrame {
                 BorderFactory.createEmptyBorder(8, 14, 8, 14)
         ));
         if (primary) {
-            button.setBackground(new Color(20, 101, 192));
-            button.setForeground(new Color(71, 85, 105));
+            button.setBackground(new Color(22, 163, 74));
+            button.setForeground(Color.WHITE);
             button.setBorderPainted(false);
         } else {
             button.setBackground(Color.WHITE);
-            button.setForeground(Color.WHITE);
+            button.setForeground(new Color(71, 85, 105));
             button.setBorderPainted(true);
         }
+        com.kgm.ui.styling.ButtonStateHelper.install(button);
         return button;
     }
 

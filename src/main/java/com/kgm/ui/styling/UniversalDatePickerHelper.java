@@ -141,15 +141,16 @@ public final class UniversalDatePickerHelper {
         button.setFocusPainted(false);
         if (primary) {
             button.setBackground(BORDER_FOCUS_COLOR);
-            button.setForeground(new Color(80, 80, 80));
+            button.setForeground(Color.WHITE);
             button.setBorder(new EmptyBorder(4, 10, 4, 10));
         } else {
             button.setBackground(new Color(245, 245, 245));
-            button.setForeground(Color.WHITE);
+            button.setForeground(new Color(80, 80, 80));
             button.setBorder(new CompoundBorder(
                     new LineBorder(new Color(170, 170, 170)),
                     new EmptyBorder(4, 10, 4, 10)));
         }
+        ButtonStateHelper.install(button);
         return button;
     }
 

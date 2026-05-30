@@ -7,9 +7,12 @@ import java.beans.PropertyChangeListener;
 public final class ButtonStateHelper {
     private static final String INSTALLED = "kgm.buttonState.installed";
     private static final String ENABLED_BACKGROUND = "kgm.buttonState.enabledBackground";
+    private static final String ENABLED_FOREGROUND = "kgm.buttonState.enabledForeground";
     private static final String ENABLED_CURSOR = "kgm.buttonState.enabledCursor";
     private static final Color FILLED_BUTTON_TEXT = Color.WHITE;
     private static final Color PLAIN_BUTTON_TEXT = new Color(99, 115, 129);
+    private static final Color DISABLED_FILLED_TEXT = new Color(71, 85, 105);
+    private static final Color DISABLED_PLAIN_TEXT = new Color(120, 130, 140);
 
     private ButtonStateHelper() {
     }
@@ -38,18 +41,25 @@ public final class ButtonStateHelper {
 
     private static void captureEnabledStyle(AbstractButton button) {
         button.putClientProperty(ENABLED_BACKGROUND, button.getBackground());
+        button.putClientProperty(ENABLED_FOREGROUND, button.getForeground());
         button.putClientProperty(ENABLED_CURSOR, button.getCursor());
     }
 
     private static void applyState(AbstractButton button) {
         Color background = colorProperty(button, ENABLED_BACKGROUND, button.getBackground());
+        Color foreground = colorProperty(button, ENABLED_FOREGROUND, button.getForeground());
         Cursor cursor = cursorProperty(button, ENABLED_CURSOR);
+        boolean filled = button.isContentAreaFilled() && !isLight(background);
 
-        button.setForeground(textColorFor(button, background));
-        button.setBackground(button.isEnabled() ? background : faded(background));
+        button.setForeground(button.isEnabled()
+                ? textColorFor(button, background, foreground)
+                : disabledTextColorFor(filled));
+        button.setBackground(button.isEnabled()
+                ? background
+                : disabledBackgroundFor(background, filled));
         button.setCursor(button.isEnabled()
                 ? cursor
-                : Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                : Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
     }
 
     private static Color colorProperty(AbstractButton button, String key, Color fallback) {
@@ -62,9 +72,12 @@ public final class ButtonStateHelper {
         return value instanceof Cursor cursor ? cursor : Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
     }
 
-    private static Color faded(Color color) {
+    private static Color disabledBackgroundFor(Color color, boolean filled) {
         if (color == null) {
             return null;
+        }
+        if (!filled) {
+            return color;
         }
         return new Color(
                 mix(color.getRed()),
@@ -78,18 +91,24 @@ public final class ButtonStateHelper {
         return Math.min(255, (int) Math.round(value * 0.68 + 255 * 0.32));
     }
 
-    private static Color textColorFor(AbstractButton button, Color background) {
-        if (!button.isContentAreaFilled() || isWhite(background)) {
-            return PLAIN_BUTTON_TEXT;
+    private static Color textColorFor(AbstractButton button, Color background, Color foreground) {
+        if (!button.isContentAreaFilled() || isLight(background)) {
+            return foreground == null || Color.WHITE.equals(foreground) ? PLAIN_BUTTON_TEXT : foreground;
         }
         return FILLED_BUTTON_TEXT;
     }
 
-    private static boolean isWhite(Color color) {
+    private static Color disabledTextColorFor(boolean filled) {
+        return filled ? DISABLED_FILLED_TEXT : DISABLED_PLAIN_TEXT;
+    }
+
+    private static boolean isLight(Color color) {
         return color != null
                 && color.getAlpha() > 0
-                && color.getRed() >= 250
-                && color.getGreen() >= 250
-                && color.getBlue() >= 250;
+                && relativeLuminance(color) >= 0.78;
+    }
+
+    private static double relativeLuminance(Color color) {
+        return (0.2126 * color.getRed() + 0.7152 * color.getGreen() + 0.0722 * color.getBlue()) / 255.0;
     }
 }

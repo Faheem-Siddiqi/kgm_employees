@@ -1,47 +1,52 @@
 package com.kgm.ui.panel;
 
+import com.kgm.ui.styling.ButtonStateHelper;
+
 import javax.swing.*;
 import java.awt.*;
 
 public class ExcelImportButton extends JButton {
 
-    private final Color excelGreen = new Color(107, 190, 120);
-    private final Color hoverGreen = new Color(85, 170, 105);
+    private static final Color EXCEL_GREEN = new Color(22, 163, 74);
+    private static final Color HOVER_GREEN = new Color(21, 128, 61);
 
     public ExcelImportButton(Runnable onClick) {
         super("Excel Services");
 
-        // ================= SAP STYLE =================
-        setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         setFocusPainted(false);
+        setBorderPainted(false);
+        setContentAreaFilled(true);
+        setOpaque(true);
         setForeground(Color.WHITE);
-        setBackground(excelGreen);
-        setCursor(new Cursor(Cursor.HAND_CURSOR));
-
-        // MATCH EXACT SIZE WITH "ADD RECORD"
+        setBackground(EXCEL_GREEN);
+        setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         setPreferredSize(new Dimension(120, 32));
-
         setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        ButtonStateHelper.install(this);
 
-        // ================= ACTION =================
         addActionListener(e -> {
             if (onClick != null) {
                 onClick.run();
             }
         });
 
-        // ================= HOVER EFFECT =================
         addMouseListener(new java.awt.event.MouseAdapter() {
-
             @Override
             public void mouseEntered(java.awt.event.MouseEvent evt) {
-                setBackground(hoverGreen);
+                if (!isEnabled()) {
+                    return;
+                }
+                setBackground(HOVER_GREEN);
                 repaint();
             }
 
             @Override
             public void mouseExited(java.awt.event.MouseEvent evt) {
-                setBackground(excelGreen);
+                if (!isEnabled()) {
+                    return;
+                }
+                setBackground(EXCEL_GREEN);
                 repaint();
             }
         });
@@ -54,11 +59,6 @@ public class ExcelImportButton extends JButton {
 
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON);
-
-        g2.setColor(getBackground());
- 
-        // rounded SAP-style button border radius
-        // g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
 
         super.paintComponent(g);
         g2.dispose();

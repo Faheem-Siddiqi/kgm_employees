@@ -14,9 +14,7 @@ public final class EmployeeDocumentUploadPanelHelper {
 
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color CARD_BACKGROUND = new Color(248, 250, 252);
-    private static final Color ACTION_BLUE = new Color(30, 144, 255);
-    private static final Color DISABLED_TEXT = Color.GRAY;
-    private static final Color PRIMARY = new Color(0, 112, 210);
+    private static final Color PRIMARY = new Color(22, 163, 74);
     private static final Color FIELD_BORDER = new Color(200, 200, 200);
     private static final Color BORDER = new Color(220, 226, 232);
     private static final Color TEXT_PRIMARY = new Color(35, 43, 54);
@@ -118,9 +116,11 @@ public final class EmployeeDocumentUploadPanelHelper {
 
     public static void styleSearchButton(JButton button) {
         button.setBackground(PRIMARY);
-        button.setForeground(TEXT_SECONDARY);
+        button.setForeground(Color.WHITE);
         button.setFocusPainted(false);
         button.setBorderPainted(false);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         button.setBorder(new EmptyBorder(8, 16, 8, 16));
         button.setPreferredSize(new Dimension(96, SEARCH_CONTROL_HEIGHT));
@@ -130,7 +130,7 @@ public final class EmployeeDocumentUploadPanelHelper {
 
     public static void styleTextCtaButton(JButton button) {
         button.setBackground(PRIMARY);
-        button.setForeground(TEXT_SECONDARY);
+        button.setForeground(Color.WHITE);
         button.setBorderPainted(false);
         button.setContentAreaFilled(true);
         button.setFocusPainted(false);

@@ -16,12 +16,18 @@ import java.util.Locale;
 public class FileUploadCard extends JPanel {
     private static final Color BACKGROUND = new Color(248, 250, 252);
     private static final Color BACKGROUND_HOVER = new Color(241, 247, 253);
+    private static final Color BACKGROUND_DISABLED = new Color(244, 247, 250);
     private static final Color BORDER = new Color(198, 212, 226);
-    private static final Color ACTION = new Color(0, 112, 210);
+    private static final Color ACTION = new Color(22, 163, 74);
+    private static final Color ACTION_DISABLED = new Color(71, 85, 105);
     private static final Color TEXT = new Color(35, 43, 54);
     private static final Color MUTED = new Color(99, 115, 129);
+    private static final Color DISABLED_TEXT = new Color(91, 103, 116);
 
     private final JLabel statusLabel = new JLabel("");
+    private final JLabel titleLabel = new JLabel();
+    private final JLabel hintLabel = new JLabel();
+    private final JLabel actionLabel = new JLabel();
     private final List<ActionListener> listeners = new ArrayList<>();
     private boolean hover;
 
@@ -34,20 +40,17 @@ public class FileUploadCard extends JPanel {
                 new EmptyBorder(10, 12, 10, 12)
         ));
 
-        JLabel titleLabel = new JLabel(title);
+        titleLabel.setText(title);
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        titleLabel.setForeground(TEXT);
 
-        JLabel hintLabel = new JLabel(hint);
+        hintLabel.setText(hint);
         hintLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        hintLabel.setForeground(MUTED);
 
-        JLabel actionLabel = new JLabel(actionText);
+        actionLabel.setText(actionText);
         actionLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        actionLabel.setForeground(ACTION);
 
         statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        statusLabel.setForeground(MUTED);
+        applyStateColors();
 
         JPanel text = new JPanel();
         text.setOpaque(false);
@@ -94,6 +97,7 @@ public class FileUploadCard extends JPanel {
         super.setEnabled(enabled);
         setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
         setChildrenEnabled(this, enabled);
+        applyStateColors();
         repaint();
     }
 
@@ -101,7 +105,7 @@ public class FileUploadCard extends JPanel {
     protected void paintComponent(Graphics graphics) {
         Graphics2D g2 = (Graphics2D) graphics.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setColor(isEnabled() && hover ? BACKGROUND_HOVER : BACKGROUND);
+        g2.setColor(isEnabled() ? hover ? BACKGROUND_HOVER : BACKGROUND : BACKGROUND_DISABLED);
         g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
         g2.dispose();
         super.paintComponent(graphics);
@@ -135,6 +139,14 @@ public class FileUploadCard extends JPanel {
                 setChildrenEnabled(childContainer, enabled);
             }
         }
+    }
+
+    private void applyStateColors() {
+        boolean enabled = isEnabled();
+        titleLabel.setForeground(enabled ? TEXT : DISABLED_TEXT);
+        hintLabel.setForeground(enabled ? MUTED : DISABLED_TEXT);
+        statusLabel.setForeground(enabled ? MUTED : DISABLED_TEXT);
+        actionLabel.setForeground(enabled ? ACTION : ACTION_DISABLED);
     }
 
     public static FileFilterSpec jpegImages() {

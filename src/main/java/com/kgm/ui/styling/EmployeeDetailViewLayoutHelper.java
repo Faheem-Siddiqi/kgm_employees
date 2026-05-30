@@ -113,19 +113,21 @@ public final class EmployeeDetailViewLayoutHelper {
         JButton button = new JButton("Download Profile");
         button.setAlignmentX(Component.LEFT_ALIGNMENT);
         button.setBorderPainted(false);
-        button.setContentAreaFilled(false);
+        button.setContentAreaFilled(true);
         button.setFocusPainted(false);
-        button.setOpaque(false);
+        button.setOpaque(true);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(new Color(99, 115, 129));
+        button.setBackground(new Color(22, 163, 74));
+        button.setForeground(Color.WHITE);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
         button.setMargin(new Insets(0, 0, 0, 0));
-        button.setBorder(new EmptyBorder(0, 0, 0, 0));
+        button.setBorder(new EmptyBorder(7, 16, 7, 16));
         Dimension size = new Dimension(154, 34);
         button.setMinimumSize(size);
         button.setPreferredSize(size);
         button.setMaximumSize(size);
         button.setVerticalAlignment(SwingConstants.CENTER);
+        ButtonStateHelper.install(button);
         return button;
     }
 

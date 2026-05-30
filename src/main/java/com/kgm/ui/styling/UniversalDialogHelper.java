@@ -135,6 +135,7 @@ public final class UniversalDialogHelper {
         button.setFocusPainted(false);
         button.setBorderPainted(false);
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        ButtonStateHelper.install(button);
         return button;
     }
 
@@ -147,6 +148,7 @@ public final class UniversalDialogHelper {
         button.setFocusPainted(false);
         button.setBorder(BorderFactory.createLineBorder(TableThemeHelper.BORDER));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        ButtonStateHelper.install(button);
         return button;
     }
 
