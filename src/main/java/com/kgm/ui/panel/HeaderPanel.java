@@ -1,99 +1,147 @@
 package com.kgm.ui.panel;
+
 import com.kgm.ui.LoginView;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.util.SessionManager;
 import com.kgm.util.SessionWatcher;
-import javax.swing.*;
-import javax.swing.border.*;
-import java.awt.*;
+
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.MatteBorder;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Image;
+import java.awt.Window;
+
 public class HeaderPanel extends JPanel {
+    private static final Color TEXT_PRIMARY = new Color(28, 36, 46);
+    private static final Color TEXT_SECONDARY = new Color(98, 111, 125);
+    private static final Color BORDER = new Color(226, 232, 240);
+    private static final Color LOGOUT = new Color(0, 112, 210);
+    private static final Color LOGOUT_HOVER = new Color(0, 88, 168);
+
     public HeaderPanel(String title) {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
         setBorder(new CompoundBorder(
-                new MatteBorder(0, 0, 1, 0, new Color(222, 226, 230)),
-                new EmptyBorder(10, 20, 10, 20)));
-        // ================= LEFT (LOGO + TEXT) =================
-        JLabel logo = new JLabel();
-        ImageIcon logoIcon = new ImageIcon("images/Header.jpg");
-        Image img = logoIcon.getImage().getScaledInstance(75, 60, Image.SCALE_SMOOTH);
-        logo.setIcon(new ImageIcon(img));
-        JLabel company = new JLabel("Koohinoor Textile Mills");
-        company.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        JLabel screen = new JLabel(title);
-       screen.setFont(new Font("Segoe UI ", Font.PLAIN, 16));
-        screen.setForeground(new Color(90, 90, 90));
-        JPanel textPanel = new JPanel();
-        textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
-        textPanel.setOpaque(false);
-        textPanel.add(company);
-        textPanel.add(screen);
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        left.setOpaque(false);
-        left.add(logo);
-        left.add(textPanel);
-        // force vertical center alignment
-        left.setAlignmentY(Component.CENTER_ALIGNMENT);
-        // ================= RIGHT (INFO + LOGOUT) =================
-        JPanel right = new JPanel();
-        right.setLayout(new BoxLayout(right, BoxLayout.Y_AXIS));
+                new MatteBorder(0, 0, 1, 0, BORDER),
+                new EmptyBorder(10, 22, 10, 22)
+        ));
+
+        JPanel center = createBrandBlock(title);
+        JButton logoutButton = createLogoutButton();
+
+        JPanel leftSpacer = new JPanel();
+        leftSpacer.setOpaque(false);
+        leftSpacer.setPreferredSize(new Dimension(132, 40));
+
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         right.setOpaque(false);
-        right.add(infoRow("Phone:", "0092-051-54955328"));
-        right.add(infoRow("Export:", "0092-051-5473085"));
-        right.add(Box.createVerticalStrut(4));
-        right.add(logoutRow());
-        JPanel rightAlign = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-        rightAlign.setOpaque(false);
-        rightAlign.add(right);
-        rightAlign.setAlignmentY(Component.CENTER_ALIGNMENT);
-        // ================= MAIN LAYOUT =================
-        add(left, BorderLayout.WEST);
-        add(rightAlign, BorderLayout.EAST);
+        right.setPreferredSize(new Dimension(132, 40));
+        right.add(logoutButton);
+
+        add(leftSpacer, BorderLayout.WEST);
+        add(center, BorderLayout.CENTER);
+        add(right, BorderLayout.EAST);
     }
-    // ================= INFO ROW =================
-    private JPanel infoRow(String label, String value) {
-        JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-        p.setOpaque(false);
-        JLabel l1 = new JLabel(label);
-        l1.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        l1.setForeground(new Color(80, 80, 80));
-        JLabel l2 = new JLabel(value);
-        l2.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        l2.setForeground(new Color(50, 50, 50));
-        p.add(l1);
-        p.add(l2);
-        return p;
+
+    private JPanel createBrandBlock(String title) {
+        JPanel wrapper = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
+        wrapper.setOpaque(false);
+
+        JLabel logo = new JLabel(loadLogo());
+        logo.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JPanel textPanel = new JPanel();
+        textPanel.setOpaque(false);
+        textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+
+        JLabel company = new JLabel("Kohinor Textile Mills. Gujar Khan");
+        company.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 18));
+        company.setForeground(TEXT_PRIMARY);
+        company.setAlignmentX(CENTER_ALIGNMENT);
+
+        JLabel screen = new JLabel(title == null || title.isBlank() ? "Dashboard" : title);
+        screen.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        screen.setForeground(TEXT_SECONDARY);
+        screen.setAlignmentX(CENTER_ALIGNMENT);
+
+        textPanel.add(company);
+        textPanel.add(Box.createVerticalStrut(2));
+        textPanel.add(screen);
+
+        wrapper.add(logo);
+        wrapper.add(textPanel);
+        return wrapper;
     }
-    // ================= LOGOUT =================
-    private JPanel logoutRow() {
-        JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-        p.setOpaque(false);
-        JLabel logout = new JLabel("Logout");
-        logout.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        logout.setForeground(new Color(0, 102, 204));
-        logout.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        logout.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                logout();
+
+    private ImageIcon loadLogo() {
+        ImageIcon icon = new ImageIcon("images/Logo.jpg");
+        if (icon.getIconWidth() <= 0) {
+            icon = new ImageIcon("images/Header.jpg");
+        }
+        if (icon.getIconWidth() <= 0) {
+            return new ImageIcon();
+        }
+        int width = 52;
+        int height = Math.max(34, Math.round(width * (icon.getIconHeight() / (float) icon.getIconWidth())));
+        Image image = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
+        return new ImageIcon(image);
+    }
+
+    private JButton createLogoutButton() {
+        JButton button = new JButton("Logout");
+        button.setPreferredSize(new Dimension(92, 34));
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        button.setForeground(LOGOUT);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent event) {
+                button.setForeground(LOGOUT_HOVER);
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent event) {
+                button.setForeground(LOGOUT);
             }
         });
-        p.add(logout);
-        return p;
+        button.addActionListener(event -> logout());
+        return button;
     }
-    // ================= LOGOUT LOGIC =================
+
     private void logout() {
         try {
             SessionManager.clear();
             SessionWatcher.stop();
-            Window w = SwingUtilities.getWindowAncestor(this);
-            if (w != null)
-                w.dispose();
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window != null) {
+                window.dispose();
+            }
             new LoginView().setVisible(true);
-        } catch (Exception e) {
+        } catch (Exception exception) {
             DialogHelper.error(
                     SwingUtilities.getWindowAncestor(this),
                     "Error",
-                    "Failure - Try Again.");
+                    "Failure - Try Again."
+            );
         }
     }
 }

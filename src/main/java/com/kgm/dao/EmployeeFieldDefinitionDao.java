@@ -24,6 +24,11 @@ import java.util.Map;
 import java.util.Set;
 
 public class EmployeeFieldDefinitionDao {
+    @FunctionalInterface
+    public interface DefaultsProgressListener {
+        void onProgress(String message, int completedFields, int totalFields);
+    }
+
     private static final String TABLE = "employee_field_metadata";
     public static final String FUNDAMENTALS_HEADING = "Fundamentals";
     private static final Set<String> RETIRED_FIELD_KEYS = Set.of("RRR");
@@ -932,6 +937,13 @@ public class EmployeeFieldDefinitionDao {
     }
 
     public void applyCustomFieldDefaultsForEmployees(List<String> employeeCodes) {
+        applyCustomFieldDefaultsForEmployees(employeeCodes, null);
+    }
+
+    public void applyCustomFieldDefaultsForEmployees(
+            List<String> employeeCodes,
+            DefaultsProgressListener progressListener
+    ) {
         List<String> cleanCodes = new ArrayList<>();
         for (String employeeCode : employeeCodes == null ? List.<String>of() : employeeCodes) {
             String cleanCode = employeeCode == null ? "" : employeeCode.trim();
@@ -944,15 +956,51 @@ public class EmployeeFieldDefinitionDao {
         }
 
         try {
-            List<EmployeeFieldDefinition> definitions = listFields();
-            for (EmployeeFieldDefinition definition : definitions) {
-                if (definition.documentField() || definition.dateField()) {
-                    continue;
-                }
+            List<EmployeeFieldDefinition> definitions = defaultableTextFields();
+            notifyDefaultsProgress(progressListener, "Preparing field defaults...", 0, definitions.size());
+            for (int index = 0; index < definitions.size(); index++) {
+                EmployeeFieldDefinition definition = definitions.get(index);
+                notifyDefaultsProgress(
+                        progressListener,
+                        "Applying field defaults for " + definition.label() + "...",
+                        index,
+                        definitions.size()
+                );
                 fillMissingTextValueForEmployees(definition.columnName(), cleanCodes);
+                notifyDefaultsProgress(
+                        progressListener,
+                        "Applied field defaults for " + definition.label() + ".",
+                        index + 1,
+                        definitions.size()
+                );
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("Unable to apply employee field defaults: " + exception.getMessage(), exception);
+        }
+    }
+
+    private List<EmployeeFieldDefinition> defaultableTextFields() {
+        List<EmployeeFieldDefinition> defaultable = new ArrayList<>();
+        for (EmployeeFieldDefinition definition : listFields()) {
+            if (!definition.documentField() && !definition.dateField()) {
+                defaultable.add(definition);
+            }
+        }
+        return defaultable;
+    }
+
+    private void notifyDefaultsProgress(
+            DefaultsProgressListener progressListener,
+            String message,
+            int completedFields,
+            int totalFields
+    ) {
+        if (progressListener == null) {
+            return;
+        }
+        try {
+            progressListener.onProgress(message, completedFields, totalFields);
+        } catch (RuntimeException ignored) {
         }
     }
 

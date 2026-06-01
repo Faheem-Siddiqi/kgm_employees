@@ -1040,10 +1040,10 @@ public class ExcelImportService {
             return 84;
         }
         if (state.contains("defaults")) {
-            return 90;
+            return scaledProgress(completedRows, totalRows, 90, 97);
         }
         if (state.contains("finalizing")) {
-            return 94;
+            return 98;
         }
         return scaledProgress(completedRows, totalRows, 65, 95);
     }
@@ -1059,6 +1059,9 @@ public class ExcelImportService {
     private static String rowAwareMessage(String message, int completedRows, int totalRows) {
         if (totalRows <= 0) {
             return message;
+        }
+        if (message != null && message.toLowerCase(Locale.ROOT).contains("field defaults")) {
+            return message + " (" + formattedRowProgress(completedRows, totalRows) + " fields)";
         }
         return message + " (" + formattedRowProgress(completedRows, totalRows) + " rows)";
     }

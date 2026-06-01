@@ -9,7 +9,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.StringJoiner;
 
 public class EmployeeRegistrationDao {
@@ -56,8 +59,10 @@ public class EmployeeRegistrationDao {
         String sql = "INSERT INTO employees (" + quotedColumns(columns) + ") VALUES (" + placeholders(columns.size()) + ")";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            Set<String> defaultTextColumns = defaultTextColumns();
             for (int index = 0; index < columns.size(); index++) {
-                ps.setString(index + 1, safe(readField(employee, columns.get(index))));
+                String column = columns.get(index);
+                ps.setString(index + 1, insertValue(employee, column, defaultTextColumns));
             }
             ps.executeUpdate();
             new EmployeeFieldDefinitionDao(conn).applyCustomFieldDefaultsForEmployee(employee.getEMPLOYEE_CODE());
@@ -92,6 +97,7 @@ public class EmployeeRegistrationDao {
         }
 
         String sql = "INSERT INTO employees (" + quotedColumns(columns) + ") VALUES (" + placeholders(columns.size()) + ")";
+        Set<String> defaultTextColumns = defaultTextColumns();
         boolean originalAutoCommit;
         try {
             originalAutoCommit = conn.getAutoCommit();
@@ -102,13 +108,12 @@ public class EmployeeRegistrationDao {
         try {
             conn.setAutoCommit(false);
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                List<String> employeeCodes = new ArrayList<>();
                 notifyProgress(progressListener, "Preparing rows for database insert...", 0, employees.size());
                 for (int employeeIndex = 0; employeeIndex < employees.size(); employeeIndex++) {
                     Employee employee = employees.get(employeeIndex);
-                    employeeCodes.add(safe(readField(employee, "EMPLOYEE_CODE")));
                     for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
-                        ps.setString(columnIndex + 1, safe(readField(employee, columns.get(columnIndex))));
+                        String column = columns.get(columnIndex);
+                        ps.setString(columnIndex + 1, insertValue(employee, column, defaultTextColumns));
                     }
                     ps.addBatch();
                     notifyProgress(progressListener, "Preparing rows for database insert...", employeeIndex + 1, employees.size());
@@ -119,8 +124,7 @@ public class EmployeeRegistrationDao {
                 }
                 notifyProgress(progressListener, "Writing employee batch to database...", employees.size(), employees.size());
                 ps.executeBatch();
-                notifyProgress(progressListener, "Applying field defaults...", employees.size(), employees.size());
-                new EmployeeFieldDefinitionDao(conn).applyCustomFieldDefaultsForEmployees(employeeCodes);
+                notifyProgress(progressListener, "Field defaults prepared during insert.", employees.size(), employees.size());
                 notifyProgress(progressListener, "Finalizing import transaction...", employees.size(), employees.size());
                 conn.commit();
                 return employees.size();
@@ -149,6 +153,33 @@ public class EmployeeRegistrationDao {
             progressListener.onProgress(message, completedRows, totalRows);
         } catch (RuntimeException ignored) {
         }
+    }
+
+    private String insertValue(Employee employee, String column, Set<String> defaultTextColumns) {
+        String value = safe(readField(employee, column));
+        if (defaultTextColumns.contains(normalizeColumn(column)) && value.isBlank()) {
+            return "N/A";
+        }
+        return value;
+    }
+
+    private Set<String> defaultTextColumns() {
+        Set<String> columns = new HashSet<>();
+        for (EmployeeFieldDefinition definition : new EmployeeFieldDefinitionDao(conn).listFields()) {
+            if (definition.documentField() || definition.dateField()) {
+                continue;
+            }
+            String column = normalizeColumn(definition.columnName());
+            if (column.isBlank() || "ID".equals(column) || "EMPLOYEE_CODE".equals(column)) {
+                continue;
+            }
+            columns.add(column);
+        }
+        return columns;
+    }
+
+    private String normalizeColumn(String column) {
+        return column == null ? "" : column.trim().toUpperCase(Locale.ROOT);
     }
 
     private List<String> insertColumns() {
