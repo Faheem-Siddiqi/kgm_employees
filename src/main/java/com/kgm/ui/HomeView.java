@@ -3,6 +3,7 @@ package com.kgm.ui;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.database.DatabaseInitializer;
 import com.kgm.model.Employee;
+import com.kgm.service.BulkFolderDocumentImportService;
 import com.kgm.service.ExcelExportService;
 import com.kgm.service.ExcelImportService;
 import com.kgm.service.ExcelSampleGenerator;
@@ -29,6 +30,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
 public class HomeView extends JFrame {
+    private final BulkFolderDocumentImportService bulkFolderDocumentImportService = new BulkFolderDocumentImportService();
     private final ExcelImportService excelImportService = new ExcelImportService();
     private final ExcelExportService excelExportService = new ExcelExportService();
     private EmployeeTablePanel tablePanel;
@@ -36,7 +38,9 @@ public class HomeView extends JFrame {
     private ChartsPanel chartsPanel;
     private JScrollPane mainScrollPane;
     private ExcelImportButton excelBtn;
+    private JButton bulkDocumentBtn;
     private JButton refreshBtn;
+    private boolean bulkDocumentActionRunning;
     private boolean homeDataLoading;
     private boolean dashboardStatsLoading;
     private int homeLoadToken;
@@ -125,6 +129,10 @@ public class HomeView extends JFrame {
         JPanel btnRow = HomeViewHelper.createButtonRow();
         excelBtn = new ExcelImportButton(this::showExcelImportActions);
 
+        bulkDocumentBtn = new JButton("Bulk Documents");
+        HomeViewHelper.styleBulkDocumentButton(bulkDocumentBtn);
+        bulkDocumentBtn.addActionListener(e -> chooseBulkDocumentFolders());
+
         JButton addBtn = new JButton("Add Employee");
         HomeViewHelper.styleAddButton(addBtn);
         addBtn.addActionListener(e -> {
@@ -151,6 +159,7 @@ public class HomeView extends JFrame {
         });
 
         btnRow.add(excelBtn);
+        btnRow.add(bulkDocumentBtn);
         btnRow.add(addBtn);
         btnRow.add(settingsBtn);
         btnRow.add(refreshBtn);
@@ -326,6 +335,290 @@ public class HomeView extends JFrame {
                     "Excel actions could not be opened.",
                     exception
             );
+        }
+    }
+
+    private void chooseBulkDocumentFolders() {
+        if (bulkDocumentActionRunning) {
+            return;
+        }
+        bulkDocumentActionRunning = true;
+        setBulkDocumentButtonOpening();
+        SwingWorker<File[], Void> pickerWorker = new SwingWorker<>() {
+            @Override
+            protected File[] doInBackground() {
+                return FileUploadCard.chooseDirectories(HomeView.this, "Select employee folders or files inside them");
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    File[] selectedFolders = get();
+                    if (selectedFolders.length == 0) {
+                        bulkDocumentActionRunning = false;
+                        setBulkDocumentButtonReady();
+                        return;
+                    }
+                    if (selectedFolders.length > BulkFolderDocumentImportService.MAX_FOLDERS) {
+                        bulkDocumentActionRunning = false;
+                        setBulkDocumentButtonReady();
+                        DialogHelper.warning(
+                                HomeView.this,
+                                "Too Many Folders",
+                                "Select up to " + BulkFolderDocumentImportService.MAX_FOLDERS + " employee folders at once."
+                        );
+                        return;
+                    }
+                    importBulkDocumentFolders(selectedFolders);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    bulkDocumentActionRunning = false;
+                    setBulkDocumentButtonReady();
+                    DialogHelper.error(HomeView.this, "Bulk upload stopped", "Folder selection was interrupted.");
+                } catch (ExecutionException exception) {
+                    bulkDocumentActionRunning = false;
+                    setBulkDocumentButtonReady();
+                    Throwable cause = exception.getCause();
+                    showExcelServiceError(
+                            "Bulk document upload failed",
+                            "The bulk document upload could not be started.",
+                            cause == null ? exception : cause
+                    );
+                }
+            }
+        };
+        pickerWorker.execute();
+    }
+
+    private void importBulkDocumentFolders(File[] folders) {
+        setBulkDocumentButtonBusy();
+        setExcelButtonBusy("Uploading...");
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Uploading Documents",
+                "Scanning employee folders..."
+        );
+        SwingWorker<BulkFolderDocumentImportService.ImportResult, Void> worker = new SwingWorker<>() {
+            protected BulkFolderDocumentImportService.ImportResult doInBackground() throws Exception {
+                return bulkFolderDocumentImportService.importFolders(folders, (message, completedFolders, totalFolders, percent) ->
+                        updateExcelLoader(loader, message, percent));
+            }
+
+            protected void done() {
+                loader.close();
+                bulkDocumentActionRunning = false;
+                setBulkDocumentButtonReady();
+                setExcelButtonReady();
+                try {
+                    BulkFolderDocumentImportService.ImportResult result = get();
+                    showBulkDocumentImportResult(result);
+                    if (result.uploadedCount() > 0) {
+                        reloadHomeData();
+                    }
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    DialogHelper.error(HomeView.this, "Bulk upload stopped", "Document folder upload was interrupted.");
+                } catch (ExecutionException exception) {
+                    Throwable cause = exception.getCause();
+                    DialogHelper.error(
+                            HomeView.this,
+                            "Bulk upload failed",
+                            "Document folder upload could not be completed.\n\n" + rootMessage(cause == null ? exception : cause)
+                    );
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void showBulkDocumentImportResult(BulkFolderDocumentImportService.ImportResult result) {
+        JDialog dialog = new JDialog(this, "Bulk Document Upload Complete", Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dialog.setContentPane(createBulkDocumentResultContent(dialog, result));
+        dialog.pack();
+        dialog.setMinimumSize(new Dimension(560, 240));
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    private JPanel createBulkDocumentResultContent(JDialog dialog, BulkFolderDocumentImportService.ImportResult result) {
+        Color accent = result.skippedCount() == 0 ? new Color(28, 137, 85) : new Color(176, 76, 19);
+        JPanel root = new JPanel(new BorderLayout());
+        root.setBackground(Color.WHITE);
+
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(accent);
+        header.setBorder(BorderFactory.createEmptyBorder(16, 22, 16, 22));
+        JLabel title = new JLabel("Bulk Document Upload Complete");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        title.setForeground(Color.WHITE);
+        header.add(title, BorderLayout.WEST);
+        root.add(header, BorderLayout.NORTH);
+
+        JPanel body = new JPanel();
+        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+        body.setBackground(Color.WHITE);
+        body.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
+
+        body.add(summaryCard(result));
+        if (!result.uploadedEmployees().isEmpty()) {
+            body.add(Box.createVerticalStrut(10));
+            body.add(uploadedEmployeesCard(result.uploadedEmployees()));
+        }
+        if (!result.folderErrors().isEmpty()) {
+            body.add(Box.createVerticalStrut(10));
+            body.add(folderErrorsCard(result.folderErrors()));
+        }
+
+        JScrollPane scroll = new JScrollPane(body);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(Color.WHITE);
+        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        int preferredHeight = Math.min(560, Math.max(180, body.getPreferredSize().height + 12));
+        scroll.setPreferredSize(new Dimension(640, preferredHeight));
+        root.add(scroll, BorderLayout.CENTER);
+
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        footer.setBackground(new Color(247, 249, 251));
+        footer.setBorder(BorderFactory.createEmptyBorder(14, 22, 14, 22));
+        JButton close = new JButton("OK");
+        close.setPreferredSize(new Dimension(92, 34));
+        close.setBackground(accent);
+        close.setForeground(Color.WHITE);
+        close.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
+        close.setFocusPainted(false);
+        close.setBorderPainted(false);
+        close.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        close.addActionListener(event -> dialog.dispose());
+        footer.add(close);
+        root.add(footer, BorderLayout.SOUTH);
+        dialog.getRootPane().setDefaultButton(close);
+        return root;
+    }
+
+    private JPanel summaryCard(BulkFolderDocumentImportService.ImportResult result) {
+        JPanel card = resultCard(new Color(248, 250, 252), new Color(220, 226, 232));
+        JLabel heading = sectionHeading("Summary");
+        JLabel text = new JLabel(result.uploadedCount() + " document" + plural(result.uploadedCount())
+                + " uploaded, " + result.skippedCount() + " issue" + plural(result.skippedCount()) + " found.");
+        text.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        text.setForeground(new Color(35, 43, 54));
+        text.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.add(heading);
+        card.add(Box.createVerticalStrut(4));
+        card.add(text);
+        return card;
+    }
+
+    private JPanel uploadedEmployeesCard(java.util.List<BulkFolderDocumentImportService.UploadedEmployee> employees) {
+        JPanel card = resultCard(new Color(248, 255, 250), new Color(187, 247, 208));
+        card.add(sectionHeading("Updated"));
+        for (BulkFolderDocumentImportService.UploadedEmployee employee : employees) {
+            card.add(Box.createVerticalStrut(10));
+            JLabel code = new JLabel("Employee Code - " + employee.employeeCode());
+            code.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+            code.setForeground(new Color(35, 43, 54));
+            code.setAlignmentX(Component.LEFT_ALIGNMENT);
+            card.add(code);
+            card.add(wrappedText(String.join(", ", employee.labels()), new Color(248, 255, 250)));
+        }
+        return card;
+    }
+
+    private JPanel folderErrorsCard(java.util.List<BulkFolderDocumentImportService.FolderError> errors) {
+        JPanel card = resultCard(new Color(255, 250, 245), new Color(254, 215, 170));
+        card.add(sectionHeading("Error Folder"));
+        for (BulkFolderDocumentImportService.FolderError error : errors) {
+            card.add(Box.createVerticalStrut(10));
+            card.add(folderLink("Employee Code - " + error.folderName(), error.folder()));
+            card.add(wrappedText(String.join("\n", error.messages()), new Color(255, 250, 245)));
+        }
+        return card;
+    }
+
+    private JPanel resultCard(Color background, Color border) {
+        JPanel card = new JPanel();
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBackground(background);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(border),
+                BorderFactory.createEmptyBorder(12, 14, 12, 14)
+        ));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        return card;
+    }
+
+    private JLabel sectionHeading(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        label.setForeground(new Color(35, 43, 54));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return label;
+    }
+
+    private JTextArea wrappedText(String text, Color background) {
+        JTextArea area = new JTextArea(text == null || text.isBlank() ? "-" : text);
+        area.setEditable(false);
+        area.setFocusable(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        area.setForeground(new Color(35, 43, 54));
+        area.setBackground(background);
+        area.setBorder(BorderFactory.createEmptyBorder(3, 0, 0, 0));
+        area.setAlignmentX(Component.LEFT_ALIGNMENT);
+        area.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+        return area;
+    }
+
+    private JLabel folderLink(String folderName, File folder) {
+        JLabel label = new JLabel(folderName == null || folderName.isBlank() ? "Open folder" : folderName);
+        Color normal = new Color(35, 43, 54);
+        Color active = new Color(0, 112, 210);
+        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        label.setForeground(normal);
+        label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        label.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent event) {
+                label.setForeground(active);
+            }
+
+            public void mouseExited(java.awt.event.MouseEvent event) {
+                label.setForeground(normal);
+            }
+
+            public void mousePressed(java.awt.event.MouseEvent event) {
+                label.setForeground(active.darker());
+            }
+
+            public void mouseReleased(java.awt.event.MouseEvent event) {
+                label.setForeground(active);
+            }
+
+            public void mouseClicked(java.awt.event.MouseEvent event) {
+                openFolder(folder);
+            }
+        });
+        return label;
+    }
+
+    private void openFolder(File folder) {
+        if (folder == null || !folder.isDirectory()) {
+            DialogHelper.warning(this, "Folder Not Found", "The selected folder could not be found.");
+            return;
+        }
+        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+            DialogHelper.warning(this, "Open Folder Unavailable", "This computer does not support opening folders from the app.");
+            return;
+        }
+
+        try {
+            Desktop.getDesktop().open(folder);
+        } catch (IOException exception) {
+            DialogHelper.error(this, "Open Folder Failed", "Could not open folder:\n" + folder.getAbsolutePath());
         }
     }
 
@@ -1011,6 +1304,30 @@ public class HomeView extends JFrame {
         excelBtn.setEnabled(true);
         excelBtn.setText("Import Excel");
         excelBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
+    private void setBulkDocumentButtonOpening() {
+        if (bulkDocumentBtn == null) {
+            return;
+        }
+        bulkDocumentBtn.setText("Opening...");
+        HomeViewHelper.styleBulkDocumentButton(bulkDocumentBtn);
+    }
+
+    private void setBulkDocumentButtonBusy() {
+        if (bulkDocumentBtn == null) {
+            return;
+        }
+        bulkDocumentBtn.setText("Uploading...");
+        HomeViewHelper.styleBulkDocumentButton(bulkDocumentBtn);
+    }
+
+    private void setBulkDocumentButtonReady() {
+        if (bulkDocumentBtn == null) {
+            return;
+        }
+        bulkDocumentBtn.setText("Bulk Documents");
+        HomeViewHelper.styleBulkDocumentButton(bulkDocumentBtn);
     }
 
     private record HomeTableData(

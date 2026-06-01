@@ -169,6 +169,10 @@ public class FileUploadCard extends JPanel {
         return NativeFileDialog.chooseFiles(parent, title, filter);
     }
 
+    public static File[] chooseDirectories(Component parent, String title) {
+        return NativeFileDialog.chooseDirectories(parent, title);
+    }
+
     public static File chooseSaveFile(Component parent, String title, String suggestedFileName, FileFilterSpec filter) {
         return NativeFileDialog.chooseSaveFile(parent, title, suggestedFileName, filter);
     }

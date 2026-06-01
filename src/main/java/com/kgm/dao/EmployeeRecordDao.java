@@ -718,6 +718,44 @@ public class EmployeeRecordDao implements AutoCloseable {
         return getEmployeeSectionByCode(empCode, columns);
     }
 
+    public Employee getEmployeeDocumentsByCodeOrId(String folderName) {
+        if (folderName == null || folderName.isBlank()) {
+            return null;
+        }
+
+        List<String> requestedColumns = new ArrayList<>();
+        requestedColumns.add("ID");
+        requestedColumns.add("EMPLOYEE_CODE");
+        requestedColumns.add("EMP_NAME");
+        requestedColumns.add("EMP_IMG");
+        for (EmployeeDocumentUtil.DocumentType documentType : EmployeeDocumentUtil.documentTypes()) {
+            requestedColumns.add(documentType.employeeFieldName());
+        }
+
+        try {
+            List<String> columns = normalizedProjectionColumns(requestedColumns);
+            String sql = "SELECT " + quotedColumnList(columns)
+                    + " FROM employees WHERE TRIM(CAST(EMPLOYEE_CODE AS CHAR)) = ?"
+                    + " OR CAST(ID AS CHAR) = ?"
+                    + " OR ID = ? LIMIT 1";
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                applyReadQuerySettings(ps);
+                ps.setString(1, folderName.trim());
+                ps.setString(2, numericEmployeeId(folderName));
+                ps.setInt(3, parseEmployeeId(folderName));
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return mapProjectedEmployee(rs);
+                    }
+                }
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+        }
+
+        return null;
+    }
+
     // ==============================
     // 🔹 FULL EMPLOYEE BY CODE (ALL FIELDS)
     // ==============================
@@ -1009,6 +1047,23 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
 
     private String quoteIdentifier(String identifier) {
         return "`" + identifier.replace("`", "``") + "`";
+    }
+
+    private String numericEmployeeId(String value) {
+        String trimmed = value == null ? "" : value.trim();
+        try {
+            return String.valueOf(Integer.parseInt(trimmed));
+        } catch (RuntimeException exception) {
+            return trimmed;
+        }
+    }
+
+    private int parseEmployeeId(String value) {
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (RuntimeException exception) {
+            return -1;
+        }
     }
 
     private void addUpdateValue(

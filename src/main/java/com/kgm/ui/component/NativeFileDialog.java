@@ -26,6 +26,10 @@ public final class NativeFileDialog {
         return files == null ? new File[0] : files;
     }
 
+    public static File[] chooseDirectories(Component parent, String title) {
+        return WindowsNativeFolderDialog.chooseFolders(parent, title);
+    }
+
     public static File chooseSaveFile(
             Component parent,
             String title,

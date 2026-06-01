@@ -129,6 +129,13 @@ public final class HomeViewHelper {
                 BorderFactory.createEmptyBorder(5, 10, 5, 10)));
     }
 
+    public static void styleBulkDocumentButton(JButton button) {
+        styleBaseButton(button, new Dimension(150, 32), Font.PLAIN);
+        button.setBackground(ACTION_BLUE);
+        button.setForeground(Color.WHITE);
+        button.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+    }
+
     public static void styleRefreshButton(JButton button) {
         styleBaseButton(button, new Dimension(100, 32), Font.BOLD);
         button.setForeground(Color.WHITE);
