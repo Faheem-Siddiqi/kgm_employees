@@ -378,7 +378,7 @@ public class HomeView extends JFrame {
         panel.add(new JLabel("Requires CNIC and every field marked Required in Field Management."));
         panel.add(Box.createVerticalStrut(8));
         panel.add(legacyImport);
-        panel.add(new JLabel("For old records. Requires Employee ID; CNIC is optional and dates use MM/dd/yyyy HH:mm:ss."));
+        panel.add(new JLabel("For old records. Requires Employee ID; CNIC is optional and dates use mm/dd/yyyy hh:mm:ss."));
 
         int selected = DialogHelper.formOption(
                 this,

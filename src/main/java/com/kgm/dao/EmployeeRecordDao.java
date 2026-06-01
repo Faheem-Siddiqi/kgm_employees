@@ -295,31 +295,20 @@ public class EmployeeRecordDao implements AutoCloseable {
     }
 
     private List<CountStat> exitTrends() {
-        Map<String, Integer> totals = new LinkedHashMap<>();
-        totals.put("Layoff", 0);
-        totals.put("Resignation", 0);
-        totals.put("Others", 0);
-        for (CountStat reason : countByColumn("RESIGN_REASON")) {
-            String bucket = exitBucket(reason.label());
-            totals.put(bucket, totals.getOrDefault(bucket, 0) + reason.count());
+        List<CountStat> reasons = countByColumn("RESIGN_REASON");
+        if (reasons.size() <= 4) {
+            return reasons;
         }
 
-        List<CountStat> stats = new ArrayList<>();
-        for (Map.Entry<String, Integer> entry : totals.entrySet()) {
-            stats.add(new CountStat(entry.getKey(), entry.getValue()));
+        List<CountStat> stats = new ArrayList<>(reasons.subList(0, 3));
+        int otherTotal = 0;
+        for (int index = 3; index < reasons.size(); index++) {
+            otherTotal += reasons.get(index).count();
+        }
+        if (otherTotal > 0) {
+            stats.add(new CountStat("Others", otherTotal));
         }
         return stats;
-    }
-
-    private String exitBucket(String reason) {
-        String text = reason == null ? "" : reason.trim();
-        if (text.equalsIgnoreCase("Layoff")) {
-            return "Layoff";
-        }
-        if (text.equalsIgnoreCase("Resignation")) {
-            return "Resignation";
-        }
-        return "Others";
     }
 
     private DashboardMissingStats missingDashboardStats(

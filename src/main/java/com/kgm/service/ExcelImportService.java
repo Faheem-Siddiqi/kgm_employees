@@ -13,6 +13,7 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.CellValue;
 import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -49,7 +50,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class ExcelImportService {
-    public static final String DATE_FORMAT_HINT = "MM/dd/yyyy HH:mm:ss";
+    public static final String DATE_FORMAT_HINT = "mm/dd/yyyy hh:mm:ss";
     private static final String INTERNAL_DATE_FORMAT = "dd/MM/yyyy HH:mm:ss";
     private static final SimpleDateFormat DB_DATE_FORMAT = new SimpleDateFormat(INTERNAL_DATE_FORMAT);
     private static final List<String> FALLBACK_CORE_COLUMN_ORDER = EmployeeBasicFieldUtil.BASIC_COLUMNS;
@@ -294,10 +295,9 @@ public class ExcelImportService {
     private static TemplateColumn templateColumn(String header, String columnName, EmployeeFieldDefinition definition) {
         String column = columnName.toUpperCase(Locale.ROOT);
         boolean dateField = DATE_COLUMNS.contains(column) || (definition != null && EmployeeBasicFieldUtil.isDateField(definition));
-        boolean required = "NID".equals(column)
-                || (definition == null
-                        ? FALLBACK_REQUIRED_STANDARD_COLUMNS.contains(column)
-                        : EmployeeBasicFieldUtil.isRequired(definition));
+        boolean required = definition == null
+                ? FALLBACK_REQUIRED_STANDARD_COLUMNS.contains(column)
+                : EmployeeBasicFieldUtil.isRequired(definition);
         List<String> dropdownOptions = definition != null && EmployeeBasicFieldUtil.isDropdownField(definition)
                 ? List.of(EmployeeBasicFieldUtil.dropdownOptions(definition, false))
                 : EmployeeBasicFieldUtil.isComboField(column)
@@ -823,10 +823,16 @@ public class ExcelImportService {
         if (cell == null || cell.getCellType() == CellType.BLANK) {
             return null;
         }
+        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isValidExcelDate(cell.getNumericCellValue())) {
+            return DateUtil.getJavaDate(cell.getNumericCellValue());
+        }
         if (cell.getCellType() == CellType.FORMULA && evaluator != null) {
             CellValue value = evaluator.evaluate(cell);
             if (value == null) {
                 return null;
+            }
+            if (value.getCellType() == CellType.NUMERIC && DateUtil.isValidExcelDate(value.getNumberValue())) {
+                return DateUtil.getJavaDate(value.getNumberValue());
             }
             if (value.getCellType() == CellType.STRING) {
                 return dateTextValue(value.getStringValue());
@@ -844,8 +850,8 @@ public class ExcelImportService {
             LocalDateTime dateTime = LocalDateTime.parse(text, IMPORT_DATE_FORMAT);
             return Date.from(dateTime.atZone(ZoneId.systemDefault()).toInstant());
         } catch (DateTimeParseException ignored) {
-            return null;
         }
+        return null;
     }
 
     private Date parseDbDate(String value) {

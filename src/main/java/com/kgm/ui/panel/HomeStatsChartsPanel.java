@@ -157,9 +157,7 @@ public class HomeStatsChartsPanel extends JPanel {
 
         for (int i = 0; i < cards.size(); i++) {
             ChartCardSpec spec = cards.get(i);
-            // Single chart left in the row should always take full width
-            boolean singleInRow = (col == 0) && (i == cards.size() - 1 || isChartFullWidth(cards.get(i + 1).chart()));
-            boolean fullWidth = singleColumn || singleInRow || !((DashboardChart) spec.chart()).canFitInColumn(halfWidth);
+            boolean fullWidth = singleColumn || !((DashboardChart) spec.chart()).canFitInColumn(halfWidth);
 
             if (fullWidth && col == 1) {
                 row++;
@@ -176,14 +174,6 @@ public class HomeStatsChartsPanel extends JPanel {
                 col = 1;
             }
         }
-    }
-
-    private boolean isChartFullWidth(JComponent chart) {
-        // Check if the next chart is a bar chart that can't fit in half width
-        if (chart instanceof DashboardBarChart barChart) {
-            return !barChart.canFitInColumn(320);
-        }
-        return false;
     }
 
     private JPanel departmentCard() {
@@ -1280,7 +1270,7 @@ public class HomeStatsChartsPanel extends JPanel {
         }
 
         public boolean canFitInColumn(int availableColumnWidth) {
-            return items.size() <= 4 && availableColumnWidth >= 460;
+            return chartPreferredWidth() <= availableColumnWidth;
         }
 
         public JToolTip createToolTip() {
