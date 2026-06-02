@@ -2,6 +2,7 @@ package com.kgm.ui.panel;
 
 import com.kgm.model.Employee;
 import com.kgm.ui.component.FileUploadCard;
+import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDocumentViewPanelHelper;
 import com.kgm.ui.styling.TablePaginationHelper;
@@ -27,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 public class EmployeeDocumentViewPanel extends JPanel {
@@ -337,18 +339,54 @@ public class EmployeeDocumentViewPanel extends JPanel {
             return;
         }
 
-        String validationMessage = EmployeeDocumentUtil.validateImageFile(file);
-        if (validationMessage != null) {
-            DialogHelper.warning(this, "Cannot Upload File", validationMessage);
+        prepareSingleFile(documentIndex, file);
+    }
+
+    private void prepareSingleFile(int documentIndex, File selectedFile) {
+        if (selectedFile.length() <= EmployeeDocumentUtil.maxUploadSizeBytes()) {
+            applySingleFile(documentIndex, EmployeeDocumentUtil.prepareImageForUpload(selectedFile));
+            return;
+        }
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Preparing Upload",
+                "Compressing JPG/JPEG image to fit the upload limit..."
+        );
+        SwingWorker<EmployeeDocumentUtil.PreparedUploadFile, Void> worker = new SwingWorker<>() {
+            @Override
+            protected EmployeeDocumentUtil.PreparedUploadFile doInBackground() {
+                return EmployeeDocumentUtil.prepareImageForUpload(selectedFile);
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                try {
+                    applySingleFile(documentIndex, get());
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    DialogHelper.warning(EmployeeDocumentViewPanel.this, "Upload Stopped", "Image preparation was interrupted.");
+                } catch (ExecutionException exception) {
+                    DialogHelper.warning(EmployeeDocumentViewPanel.this, "Cannot Upload File", "The selected image could not be prepared.");
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void applySingleFile(int documentIndex, EmployeeDocumentUtil.PreparedUploadFile prepared) {
+        if (!prepared.ready()) {
+            DialogHelper.warning(this, "Cannot Upload File", prepared.message());
             return;
         }
 
+        File file = prepared.file();
         files[documentIndex] = file;
         filePaths[documentIndex] = file.getAbsolutePath();
         notifyProfileImageUpload(documentIndex, file);
         int modelRow = findModelRowByDocumentIndex(documentIndex);
         if (modelRow >= 0) {
-            model.setValueAt(file.getName(), modelRow, 1);
+            model.setValueAt(prepared.originalFile().getName(), modelRow, 1);
             model.setValueAt("Ready to Save (" + EmployeeDocumentUtil.formatSize(file.length()) + ")", modelRow, 2);
         }
         updateCount();
