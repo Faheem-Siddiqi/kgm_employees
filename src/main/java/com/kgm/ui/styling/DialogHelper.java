@@ -38,6 +38,10 @@ public final class DialogHelper {
         UniversalDialog.message(parent, UniversalDialog.Type.WARNING, title, message);
     }
 
+    public static void warningContent(Component parent, String title, JComponent content) {
+        UniversalDialog.formOption(parent, UniversalDialog.Type.WARNING, title, content, "OK");
+    }
+
     public static void warningSections(Component parent, String title, String... sections) {
         UniversalDialog.message(
                 parent,
@@ -49,6 +53,10 @@ public final class DialogHelper {
 
     public static void error(Component parent, String title, String message) {
         UniversalDialog.message(parent, UniversalDialog.Type.ERROR, title, message);
+    }
+
+    public static void successContent(Component parent, String title, JComponent content) {
+        UniversalDialog.formOption(parent, UniversalDialog.Type.SUCCESS, title, content, "OK");
     }
 
     public static void errorSections(Component parent, String title, String... sections) {

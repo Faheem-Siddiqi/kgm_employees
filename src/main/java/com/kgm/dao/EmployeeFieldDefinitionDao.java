@@ -354,12 +354,40 @@ public class EmployeeFieldDefinitionDao {
             if (columns.containsKey(column)) {
                 continue;
             }
+            EmployeeFieldDefinition definition = metadata.get(column);
+            if (shouldRestoreEmployeeColumn(definition)) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("ALTER TABLE employees ADD COLUMN " + quoteIdentifier(definition.columnName()) + " TEXT");
+                }
+                applyValueDefaultsForType(
+                        definition.columnName(),
+                        definition.documentField(),
+                        definition.dateField(),
+                        definition.dropdownField()
+                );
+                columns.put(column, 3000 + columns.size());
+                continue;
+            }
             try (PreparedStatement ps = conn.prepareStatement(
                     "DELETE FROM employee_field_metadata WHERE column_name = ?")) {
                 ps.setString(1, column);
                 ps.executeUpdate();
             }
         }
+    }
+
+    private boolean shouldRestoreEmployeeColumn(EmployeeFieldDefinition definition) {
+        if (definition == null || !validColumnName(definition.columnName())) {
+            return false;
+        }
+        String column = definition.columnName().toUpperCase(Locale.ROOT);
+        if ("ID".equals(column) || isRetiredFieldKey(column) || isRetiredFieldKey(definition.label())) {
+            return false;
+        }
+        return definition.documentField()
+                || definition.customField()
+                || definition.detailField()
+                || !definition.coreField();
     }
 
     public List<EmployeeFieldDefinition> listFields() {

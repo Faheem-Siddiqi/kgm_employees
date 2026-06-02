@@ -11,7 +11,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class AppConfig {
-    private static final Map<String, String> DOT_ENV = loadDotEnv();
+    private static final long DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES = 400L * 1024L;
+    private static final int DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES = 15;
     private static final Pattern WINDOWS_ENV_TOKEN = Pattern.compile("%([A-Za-z0-9_]+)%");
     private static final Pattern UNIX_ENV_TOKEN = Pattern.compile("\\$\\{([A-Za-z0-9_]+)}");
 
@@ -39,6 +40,23 @@ public final class AppConfig {
         return path.normalize();
     }
 
+    public static long documentUploadMaxBytes() {
+        return positiveLongSetting(
+                "kgm.document.upload.max.bytes",
+                "KGM_DOCUMENT_UPLOAD_MAX_BYTES",
+                DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES
+        );
+    }
+
+    public static int longServiceTimeoutMinutes() {
+        long minutes = positiveLongSetting(
+                "kgm.long.service.timeout.minutes",
+                "KGM_LONG_SERVICE_TIMEOUT_MINUTES",
+                DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES
+        );
+        return minutes > Integer.MAX_VALUE ? DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES : (int) minutes;
+    }
+
     public static String setting(String propertyName, String envName, String defaultValue) {
         String propertyValue = System.getProperty(propertyName);
         if (propertyValue != null && !propertyValue.isBlank()) {
@@ -50,12 +68,26 @@ public final class AppConfig {
             return envValue.trim();
         }
 
-        String dotEnvValue = DOT_ENV.get(envName);
+        String dotEnvValue = loadDotEnv().get(envName);
         if (dotEnvValue != null && !dotEnvValue.isBlank()) {
             return dotEnvValue.trim();
         }
 
         return defaultValue;
+    }
+
+    private static long positiveLongSetting(String propertyName, String envName, long defaultValue) {
+        String configured = setting(propertyName, envName, Long.toString(defaultValue));
+        try {
+            long parsed = Long.parseLong(normalizeNumber(configured));
+            return parsed > 0 ? parsed : defaultValue;
+        } catch (NumberFormatException exception) {
+            return defaultValue;
+        }
+    }
+
+    private static String normalizeNumber(String value) {
+        return value == null ? "" : value.trim().replace(",", "").replace("_", "");
     }
 
     private static Map<String, String> loadDotEnv() {

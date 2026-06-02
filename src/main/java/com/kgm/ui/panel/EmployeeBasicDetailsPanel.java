@@ -109,7 +109,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             }
         });
 
-        photoUploadCard = new FileUploadCard("Employee Photo", "JPEG only - Max 400KB", "Choose");
+        photoUploadCard = new FileUploadCard("Employee Photo", "JPEG only - Max " + EmployeeDocumentUtil.maxUploadSizeLabel(), "Choose");
         photoUploadCard.addActionListener(event -> {
             if (selectedImageCanChange()) {
                 chooseImage(photoPreview);

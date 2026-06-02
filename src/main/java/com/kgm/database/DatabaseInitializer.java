@@ -333,9 +333,10 @@ public class DatabaseInitializer {
     );
 
     public static synchronized void init() {
-        if (initialized) {
+        if (initialized && schemaReady()) {
             return;
         }
+        initialized = false;
 
         try {
             createDatabaseIfNeeded();
@@ -367,6 +368,18 @@ public class DatabaseInitializer {
         } catch (SQLException e) {
             System.out.println("=> MySQL schema failed!");
             e.printStackTrace();
+        }
+    }
+
+    private static boolean schemaReady() {
+        try {
+            createDatabaseIfNeeded();
+            try (Connection conn = DatabaseConnection.getConnection()) {
+                return tableExists(conn, "employees")
+                        && tableExists(conn, "employee_field_metadata");
+            }
+        } catch (SQLException exception) {
+            return false;
         }
     }
 

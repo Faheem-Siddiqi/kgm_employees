@@ -1,5 +1,6 @@
 package com.kgm.ui;
 
+import com.kgm.config.AppConfig;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.database.DatabaseInitializer;
 import com.kgm.model.Employee;
@@ -398,6 +399,7 @@ public class HomeView extends JFrame {
                 "Uploading Documents",
                 "Scanning employee folders..."
         );
+        final ServiceTimeoutGuard[] timeoutGuard = new ServiceTimeoutGuard[1];
         SwingWorker<BulkFolderDocumentImportService.ImportResult, Void> worker = new SwingWorker<>() {
             protected BulkFolderDocumentImportService.ImportResult doInBackground() throws Exception {
                 return bulkFolderDocumentImportService.importFolders(folders, (message, completedFolders, totalFolders, percent) ->
@@ -405,10 +407,14 @@ public class HomeView extends JFrame {
             }
 
             protected void done() {
+                finishTimeoutGuard(timeoutGuard);
                 loader.close();
                 bulkDocumentActionRunning = false;
                 setBulkDocumentButtonReady();
                 setExcelButtonReady();
+                if (timedOut(timeoutGuard)) {
+                    return;
+                }
                 try {
                     BulkFolderDocumentImportService.ImportResult result = get();
                     showBulkDocumentImportResult(result);
@@ -418,6 +424,8 @@ public class HomeView extends JFrame {
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     DialogHelper.error(HomeView.this, "Bulk upload stopped", "Document folder upload was interrupted.");
+                } catch (CancellationException exception) {
+                    DialogHelper.error(HomeView.this, "Bulk upload stopped", "Document folder upload was cancelled.");
                 } catch (ExecutionException exception) {
                     Throwable cause = exception.getCause();
                     DialogHelper.error(
@@ -428,6 +436,17 @@ public class HomeView extends JFrame {
                 }
             }
         };
+        timeoutGuard[0] = startServiceTimeout(
+                worker,
+                loader,
+                "Bulk upload timeout",
+                "Document folder upload ran for more than " + longServiceTimeoutLabel() + " and was stopped.\nTry fewer folders, check file sizes, and start again.",
+                () -> {
+                    bulkDocumentActionRunning = false;
+                    setBulkDocumentButtonReady();
+                    setExcelButtonReady();
+                }
+        );
         worker.execute();
     }
 
@@ -700,6 +719,7 @@ public class HomeView extends JFrame {
                 "Importing Excel",
                 "Reading workbook and saving employees..."
         );
+        final ServiceTimeoutGuard[] timeoutGuard = new ServiceTimeoutGuard[1];
         SwingWorker<ExcelImportService.ImportResult, Void> worker = new SwingWorker<>() {
             protected ExcelImportService.ImportResult doInBackground() throws Exception {
                 return excelImportService.importEmployees(file, importType, (message, completedRows, totalRows, percent) ->
@@ -707,8 +727,12 @@ public class HomeView extends JFrame {
             }
 
             protected void done() {
+                finishTimeoutGuard(timeoutGuard);
                 loader.close();
                 setImportButtonEnabled(true);
+                if (timedOut(timeoutGuard)) {
+                    return;
+                }
                 try {
                     ExcelImportService.ImportResult result = get();
                     showImportResult(result);
@@ -718,6 +742,8 @@ public class HomeView extends JFrame {
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     DialogHelper.error(HomeView.this, "Excel import stopped", "Import was interrupted.");
+                } catch (CancellationException exception) {
+                    DialogHelper.error(HomeView.this, "Excel import stopped", "Import was cancelled.");
                 } catch (ExecutionException exception) {
                     Throwable cause = exception.getCause();
                     String message = cause == null ? exception.getMessage() : cause.getMessage();
@@ -739,6 +765,13 @@ public class HomeView extends JFrame {
                 }
             }
         };
+        timeoutGuard[0] = startServiceTimeout(
+                worker,
+                loader,
+                "Excel import timeout",
+                "Excel import ran for more than " + longServiceTimeoutLabel() + " and was stopped.\nCheck the workbook size, close any locked files, and try again.",
+                () -> setImportButtonEnabled(true)
+        );
         worker.execute();
     }
 
@@ -1007,6 +1040,7 @@ public class HomeView extends JFrame {
                     "Exporting Excel",
                     "Saving employee workbook..."
             );
+            final ServiceTimeoutGuard[] timeoutGuard = new ServiceTimeoutGuard[1];
             SwingWorker<ExcelExportService.ExportResult, Void> worker = new SwingWorker<>() {
                 protected ExcelExportService.ExportResult doInBackground() throws Exception {
                     return excelExportService.exportEmployees(target, (message, completedRows, totalRows, percent) ->
@@ -1014,8 +1048,12 @@ public class HomeView extends JFrame {
                 }
 
                 protected void done() {
+                    finishTimeoutGuard(timeoutGuard);
                     loader.close();
                     setExcelButtonReady();
+                    if (timedOut(timeoutGuard)) {
+                        return;
+                    }
                     try {
                         ExcelExportService.ExportResult result = get();
                         showDownloadedFileSuccess(
@@ -1031,6 +1069,8 @@ public class HomeView extends JFrame {
                     } catch (InterruptedException exception) {
                         Thread.currentThread().interrupt();
                         DialogHelper.error(HomeView.this, "Excel export stopped", "Export was interrupted.");
+                    } catch (CancellationException exception) {
+                        DialogHelper.error(HomeView.this, "Excel export stopped", "Export was cancelled.");
                     } catch (ExecutionException exception) {
                         Throwable cause = exception.getCause();
                         String detail = cause == null ? exception.getMessage() : cause.getMessage();
@@ -1048,6 +1088,13 @@ public class HomeView extends JFrame {
                     }
                 }
             };
+            timeoutGuard[0] = startServiceTimeout(
+                    worker,
+                    loader,
+                    "Excel export timeout",
+                    "Excel export ran for more than " + longServiceTimeoutLabel() + " and was stopped.\nClose any open export file, then try again.",
+                    this::setExcelButtonReady
+            );
             worker.execute();
         } catch (RuntimeException exception) {
             setExcelButtonReady();
@@ -1269,6 +1316,55 @@ public class HomeView extends JFrame {
         loader.setProgress(percent);
     }
 
+    private ServiceTimeoutGuard startServiceTimeout(
+            SwingWorker<?, ?> worker,
+            LoadingOverlay.Handle loader,
+            String title,
+            String message,
+            Runnable resetUi
+    ) {
+        ServiceTimeoutGuard guard = new ServiceTimeoutGuard();
+        Timer timer = new Timer(longServiceTimeoutMs(), event -> {
+            if (worker.isDone()) {
+                return;
+            }
+            guard.markTimedOut();
+            worker.cancel(true);
+            loader.close();
+            if (resetUi != null) {
+                resetUi.run();
+            }
+            DialogHelper.error(HomeView.this, title, message);
+        });
+        timer.setRepeats(false);
+        guard.setTimer(timer);
+        timer.start();
+        return guard;
+    }
+
+    private int longServiceTimeoutMs() {
+        long milliseconds = AppConfig.longServiceTimeoutMinutes() * 60_000L;
+        return milliseconds > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) milliseconds;
+    }
+
+    private String longServiceTimeoutLabel() {
+        int minutes = AppConfig.longServiceTimeoutMinutes();
+        return minutes + " minute" + plural(minutes);
+    }
+
+    private void finishTimeoutGuard(ServiceTimeoutGuard[] timeoutGuard) {
+        if (timeoutGuard != null && timeoutGuard.length > 0 && timeoutGuard[0] != null) {
+            timeoutGuard[0].stop();
+        }
+    }
+
+    private boolean timedOut(ServiceTimeoutGuard[] timeoutGuard) {
+        return timeoutGuard != null
+                && timeoutGuard.length > 0
+                && timeoutGuard[0] != null
+                && timeoutGuard[0].timedOut();
+    }
+
     private String rootMessage(Throwable throwable) {
         Throwable current = throwable;
         while (current != null && current.getCause() != null) {
@@ -1302,7 +1398,7 @@ public class HomeView extends JFrame {
             return;
         }
         excelBtn.setEnabled(true);
-        excelBtn.setText("Import Excel");
+        excelBtn.setText("Excel Services");
         excelBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
 
@@ -1334,5 +1430,28 @@ public class HomeView extends JFrame {
             java.util.List<Employee> employees,
             java.util.List<Object[]> rows
     ) {
+    }
+
+    private static final class ServiceTimeoutGuard {
+        private Timer timer;
+        private boolean timedOut;
+
+        private void setTimer(Timer timer) {
+            this.timer = timer;
+        }
+
+        private void markTimedOut() {
+            timedOut = true;
+        }
+
+        private boolean timedOut() {
+            return timedOut;
+        }
+
+        private void stop() {
+            if (timer != null) {
+                timer.stop();
+            }
+        }
     }
 }

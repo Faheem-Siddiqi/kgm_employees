@@ -1,5 +1,7 @@
 package com.kgm.ui.styling;
 
+import com.kgm.util.EmployeeDocumentUtil;
+
 import javax.swing.*;
 import javax.swing.border.AbstractBorder;
 import javax.swing.border.CompoundBorder;
@@ -160,7 +162,7 @@ public final class EmployeeDocumentUploadPanelHelper {
     }
 
     public static JLabel createSizeLabel() {
-        JLabel label = new JLabel("Maximum file size allowed: 400 KB per file");
+        JLabel label = new JLabel("Maximum file size allowed: " + EmployeeDocumentUtil.maxUploadSizeLabel() + " per file");
         label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         label.setForeground(TEXT_SECONDARY);
         return label;

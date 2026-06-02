@@ -122,6 +122,18 @@ public final class EmployeeFieldMetadataStore {
         }
     }
 
+    public static void clearCache() {
+        synchronized (LOCK) {
+            Path cache = cachePath().toAbsolutePath().normalize();
+            try {
+                Files.deleteIfExists(cache);
+                Files.deleteIfExists(cache.resolveSibling(cache.getFileName() + ".tmp"));
+            } catch (IOException ignored) {
+                // A cache file is optional; the database and external metadata backup remain authoritative.
+            }
+        }
+    }
+
     public static void repairExternalAndCacheIfNeeded(
             List<EmployeeFieldDefinition> definitions,
             String dbChecksum

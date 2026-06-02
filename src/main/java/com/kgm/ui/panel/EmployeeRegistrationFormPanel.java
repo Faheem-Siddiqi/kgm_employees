@@ -109,7 +109,7 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             }
         });
 
-        photoUploadCard = new FileUploadCard(requiredLabel("Employee Photo"), "JPEG only - Max 400KB", "Choose");
+        photoUploadCard = new FileUploadCard(requiredLabel("Employee Photo"), "JPEG only - Max " + EmployeeDocumentUtil.maxUploadSizeLabel(), "Choose");
         photoUploadCard.addActionListener(event -> chooseImage(photoPreview));
 
         JPanel bottom = EmployeeRegistrationFormPanelHelper.createPhotoInfoPanel();

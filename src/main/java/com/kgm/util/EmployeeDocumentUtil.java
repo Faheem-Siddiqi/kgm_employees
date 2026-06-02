@@ -3,6 +3,8 @@ package com.kgm.util;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 
+import com.kgm.config.AppConfig;
+
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -14,7 +16,6 @@ import java.util.Map;
 import java.util.Set;
 
 public final class EmployeeDocumentUtil {
-    public static final long MAX_SIZE = 400 * 1024;
     private static volatile List<DocumentType> cachedDocumentTypes;
     private static volatile Set<String> cachedRequiredDocumentColumns;
     private static final Set<String> DEFAULT_REQUIRED_DOCUMENT_COLUMNS = Set.of(
@@ -279,7 +280,7 @@ public final class EmployeeDocumentUtil {
 
     public static String formatSize(long bytes) {
         if (bytes < 1024) {
-            return bytes + " B";
+        return bytes + " B";
         }
         if (bytes < 1024 * 1024) {
             return (bytes / 1024) + " KB";
@@ -297,11 +298,19 @@ public final class EmployeeDocumentUtil {
             return "Only JPG or JPEG files can be uploaded.";
         }
 
-        if (file.length() > MAX_SIZE) {
-            return "File size is " + formatSize(file.length()) + "; the limit is 400 KB.";
+        if (file.length() > maxUploadSizeBytes()) {
+            return "File size is " + formatSize(file.length()) + "; the limit is " + maxUploadSizeLabel() + ".";
         }
 
         return null;
+    }
+
+    public static long maxUploadSizeBytes() {
+        return AppConfig.documentUploadMaxBytes();
+    }
+
+    public static String maxUploadSizeLabel() {
+        return formatSize(maxUploadSizeBytes());
     }
 
     public static BulkUploadResult matchBulkFiles(File[] selectedFiles, boolean[] lockedDocuments) {
@@ -509,6 +518,10 @@ public final class EmployeeDocumentUtil {
 
         public int discardedCount() {
             return discardedFiles.size();
+        }
+
+        public List<String> discardedFiles() {
+            return discardedFiles;
         }
 
         public String discardedDetails() {

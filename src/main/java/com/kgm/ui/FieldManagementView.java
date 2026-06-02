@@ -3,6 +3,7 @@ package com.kgm.ui;
 import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.service.AuthService;
+import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.UniversalTablePanel;
@@ -11,7 +12,8 @@ import com.kgm.ui.styling.AppWindowStateHelper;
 import com.kgm.ui.styling.ButtonStateHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
-import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.EmployeeFieldDefinitionCache;
+import com.kgm.util.EmployeeFieldMetadataStore;
 
 import javax.swing.*;
 import javax.swing.border.AbstractBorder;
@@ -25,6 +27,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class FieldManagementView extends JFrame {
     // Trace: shared Field Management spacing so the three tabs keep the same UX rhythm.
@@ -273,7 +277,7 @@ public class FieldManagementView extends JFrame {
         stylePrimaryButton(add);
         styleNeutralButton(refresh);
         add.addActionListener(event -> addField());
-        refresh.addActionListener(event -> loadData());
+        refresh.addActionListener(event -> refreshMetadataWithLoader("Refreshing field metadata..."));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
@@ -328,7 +332,7 @@ public class FieldManagementView extends JFrame {
         styleNeutralButton(refresh);
         rename.addActionListener(event -> renameSelectedCategory());
         delete.addActionListener(event -> deleteSelectedCategory());
-        refresh.addActionListener(event -> loadData());
+        refresh.addActionListener(event -> refreshMetadataWithLoader("Refreshing category metadata..."));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
@@ -368,7 +372,7 @@ public class FieldManagementView extends JFrame {
 
         JButton refresh = new JButton("Refresh");
         styleNeutralButton(refresh);
-        refresh.addActionListener(event -> loadData());
+        refresh.addActionListener(event -> refreshMetadataWithLoader("Refreshing required field metadata..."));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
@@ -570,19 +574,32 @@ public class FieldManagementView extends JFrame {
 
     private void loadData() {
         try {
-            allFields.clear();
-            definitionsByColumn.clear();
-            allFields.addAll(dao.listFields());
-            for (EmployeeFieldDefinition definition : allFields) {
-                definitionsByColumn.put(definition.columnName().toUpperCase(Locale.ROOT), definition);
-            }
-            applyFieldSearch();
-            refreshCategoryTable();
-            refreshRequiredTable();
+            loadData(EmployeeFieldDefinitionCache.refreshFromDatabase());
         } catch (RuntimeException exception) {
             exception.printStackTrace();
             DialogHelper.error(this, "Field Management Load Failed", rootMessage(exception));
         }
+    }
+
+    private void loadData(List<EmployeeFieldDefinition> definitions) {
+        allFields.clear();
+        definitionsByColumn.clear();
+        allFields.addAll(definitions);
+        for (EmployeeFieldDefinition definition : allFields) {
+            definitionsByColumn.put(definition.columnName().toUpperCase(Locale.ROOT), definition);
+        }
+        applyFieldSearch();
+        refreshCategoryTable();
+        refreshRequiredTable();
+    }
+
+    private void refreshMetadataWithLoader(String message) {
+        runMetadataOperation(
+                message,
+                () -> null,
+                ignored -> DialogHelper.success(this, "Field metadata refreshed."),
+                "Field Management Refresh Failed"
+        );
     }
 
     private void applyFieldSearch() {
@@ -722,17 +739,15 @@ public class FieldManagementView extends JFrame {
         if (required == null || required == selected.requiredField()) {
             return;
         }
-        try {
-            dao.updateRequiredField(selected.columnName(), required);
-            loadData();
-            refreshOpenEmployeeForms();
-            DialogHelper.success(this, "Required status updated.\nField: "
-                    + selected.label()
-                    + "\nRequired: "
-                    + (required ? "True" : "False"));
-        } catch (RuntimeException exception) {
-            DialogHelper.error(this, "Required Field Update Failed", rootMessage(exception));
-        }
+        runMetadataOperation(
+                "Updating required field metadata...",
+                () -> dao.updateRequiredField(selected.columnName(), required),
+                updated -> DialogHelper.success(this, "Required status updated.\nField: "
+                        + updated.label()
+                        + "\nRequired: "
+                        + (updated.requiredField() ? "True" : "False")),
+                "Required Field Update Failed"
+        );
     }
 
     private Boolean showRequiredStatusDialog(EmployeeFieldDefinition definition) {
@@ -849,16 +864,15 @@ public class FieldManagementView extends JFrame {
             return;
         }
 
-        try {
-            int deleted = dao.deleteHeading(category.heading());
-            selectedCategoryHeading = null;
-            EmployeeDocumentUtil.refreshDocumentTypes();
-            loadData();
-            refreshOpenEmployeeForms();
-            DialogHelper.success(this, "Category deleted.\nFields deleted: " + deleted);
-        } catch (RuntimeException exception) {
-            DialogHelper.error(this, "Delete Category Failed", rootMessage(exception));
-        }
+        runMetadataOperation(
+                "Deleting category metadata and field columns...",
+                () -> dao.deleteHeading(category.heading()),
+                deleted -> {
+                    selectedCategoryHeading = null;
+                    DialogHelper.success(this, "Category deleted.\nFields deleted: " + deleted);
+                },
+                "Delete Category Failed"
+        );
     }
 
     private CategoryRow selectedCategory() {
@@ -896,15 +910,15 @@ public class FieldManagementView extends JFrame {
             return;
         }
 
-        try {
-            int updated = dao.renameHeading(category.heading(), renamed);
-            selectedCategoryHeading = renamed;
-            loadData();
-            refreshOpenEmployeeForms();
-            DialogHelper.success(this, "Category name updated.\nFields updated: " + updated);
-        } catch (RuntimeException exception) {
-            DialogHelper.error(this, "Edit Category Failed", rootMessage(exception));
-        }
+        runMetadataOperation(
+                "Updating category metadata...",
+                () -> dao.renameHeading(category.heading(), renamed),
+                updated -> {
+                    selectedCategoryHeading = renamed;
+                    DialogHelper.success(this, "Category name updated.\nFields updated: " + updated);
+                },
+                "Edit Category Failed"
+        );
     }
 
     private String showCategoryDialog(CategoryRow category) {
@@ -972,24 +986,21 @@ public class FieldManagementView extends JFrame {
             return;
         }
 
-        try {
-            EmployeeFieldDefinition added = dao.addField(
-                    data.label(),
-                    data.heading(),
-                    data.documentField(),
-                    data.dateField(),
-                    data.dropdownField(),
-                    data.variableOptionField(),
-                    data.textAreaField(),
-                    data.dropdownOptions()
-            );
-            EmployeeDocumentUtil.refreshDocumentTypes();
-            loadData();
-            refreshOpenEmployeeForms();
-            DialogHelper.success(this, "Field added.\nColumn: " + added.columnName());
-        } catch (RuntimeException exception) {
-            DialogHelper.error(this, "Add Field Failed", rootMessage(exception));
-        }
+        runMetadataOperation(
+                "Adding field and refreshing application metadata...",
+                () -> dao.addField(
+                        data.label(),
+                        data.heading(),
+                        data.documentField(),
+                        data.dateField(),
+                        data.dropdownField(),
+                        data.variableOptionField(),
+                        data.textAreaField(),
+                        data.dropdownOptions()
+                ),
+                added -> DialogHelper.success(this, "Field added.\nColumn: " + added.columnName()),
+                "Add Field Failed"
+        );
     }
 
     private void editFieldAtRow(int row) {
@@ -1007,24 +1018,21 @@ public class FieldManagementView extends JFrame {
             return;
         }
 
-        try {
-            EmployeeFieldDefinition updated = dao.updateFieldSettings(
-                    selected.columnName(),
-                    data.label(),
-                    data.heading(),
-                    data.dateField(),
-                    data.dropdownField(),
-                    data.variableOptionField(),
-                    data.textAreaField(),
-                    data.dropdownOptions()
-            );
-            EmployeeDocumentUtil.refreshDocumentTypes();
-            loadData();
-            refreshOpenEmployeeForms();
-            DialogHelper.success(this, "Field updated.\nColumn: " + updated.columnName());
-        } catch (RuntimeException exception) {
-            DialogHelper.error(this, "Edit Field Failed", rootMessage(exception));
-        }
+        runMetadataOperation(
+                "Updating field and refreshing application metadata...",
+                () -> dao.updateFieldSettings(
+                        selected.columnName(),
+                        data.label(),
+                        data.heading(),
+                        data.dateField(),
+                        data.dropdownField(),
+                        data.variableOptionField(),
+                        data.textAreaField(),
+                        data.dropdownOptions()
+                ),
+                updated -> DialogHelper.success(this, "Field updated.\nColumn: " + updated.columnName()),
+                "Edit Field Failed"
+        );
     }
 
     private void deleteFieldAtRow(int row) {
@@ -1052,15 +1060,15 @@ public class FieldManagementView extends JFrame {
             return;
         }
 
-        try {
-            dao.deleteField(selected.columnName());
-            EmployeeDocumentUtil.refreshDocumentTypes();
-            loadData();
-            refreshOpenEmployeeForms();
-            DialogHelper.success(this, "Field deleted.");
-        } catch (RuntimeException exception) {
-            DialogHelper.error(this, "Delete Field Failed", rootMessage(exception));
-        }
+        runMetadataOperation(
+                "Deleting field and refreshing application metadata...",
+                () -> {
+                    dao.deleteField(selected.columnName());
+                    return selected;
+                },
+                deleted -> DialogHelper.success(this, "Field deleted."),
+                "Delete Field Failed"
+        );
     }
 
     private EmployeeFieldDefinition fieldAtRow(int row) {
@@ -1355,6 +1363,56 @@ public class FieldManagementView extends JFrame {
                 detailView.refreshDynamicFields();
             }
         }
+    }
+
+    private <T> void runMetadataOperation(
+            String message,
+            Supplier<T> operation,
+            Consumer<T> onSuccess,
+            String errorTitle
+    ) {
+        LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Updating Field Metadata", message);
+        SwingWorker<MetadataOperationResult<T>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected MetadataOperationResult<T> doInBackground() {
+                T value = null;
+                RuntimeException failure = null;
+                try {
+                    value = operation.get();
+                } catch (RuntimeException exception) {
+                    failure = exception;
+                }
+                EmployeeFieldDefinitionCache.invalidate();
+                EmployeeFieldMetadataStore.clearCache();
+                List<EmployeeFieldDefinition> refreshed = EmployeeFieldDefinitionCache.refreshFromDatabase();
+                return new MetadataOperationResult<>(value, refreshed, failure);
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                try {
+                    MetadataOperationResult<T> result = get();
+                    loadData(result.definitions());
+                    refreshOpenEmployeeForms();
+                    if (result.failure() != null) {
+                        DialogHelper.error(FieldManagementView.this, errorTitle, rootMessage(result.failure()));
+                        return;
+                    }
+                    onSuccess.accept(result.value());
+                } catch (Exception exception) {
+                    DialogHelper.error(FieldManagementView.this, errorTitle, rootMessage(exception));
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private record MetadataOperationResult<T>(
+            T value,
+            List<EmployeeFieldDefinition> definitions,
+            RuntimeException failure
+    ) {
     }
 
     private record FieldFormData(
