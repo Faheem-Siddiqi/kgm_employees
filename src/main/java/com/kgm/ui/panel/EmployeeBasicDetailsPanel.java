@@ -9,6 +9,7 @@ import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.component.UniversalTextArea;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeBasicDetailsPanelHelper;
+import com.kgm.ui.styling.EmployeeRegistrationFormPanelHelper;
 import com.kgm.util.CnicFormatter;
 import com.kgm.util.DateDisplayFormatter;
 import com.kgm.util.EmployeeBasicFieldUtil;
@@ -119,11 +120,46 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         JPanel bottom = EmployeeBasicDetailsPanelHelper.createPhotoInfoPanel();
         infoLabel = EmployeeBasicDetailsPanelHelper.createPhotoInfoLabel("");
         infoLabel.setVisible(false);
-        bottom.add(photoUploadCard);
+        photoUploadCard.setVisible(false);
+        bottom.add(createEmployeeIdentityBlock());
 
         left.add(photoPreview, BorderLayout.CENTER);
         left.add(bottom, BorderLayout.SOUTH);
         return left;
+    }
+
+    private JPanel createEmployeeIdentityBlock() {
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createEmptyBorder(2, 2, 0, 2));
+
+        JLabel name = new JLabel(displayOrFallback(employee == null ? null : employee.getEMP_NAME(), "Employee Name"));
+        name.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 15));
+        name.setForeground(new Color(20, 101, 192));
+        name.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel code = identityLine("Code", employee == null ? null : employee.getEMPLOYEE_CODE());
+        JLabel designation = identityLine("Designation", employee == null ? null : employee.getDESIGNATION());
+
+        panel.add(name);
+        panel.add(Box.createVerticalStrut(3));
+        panel.add(code);
+        panel.add(Box.createVerticalStrut(2));
+        panel.add(designation);
+        return panel;
+    }
+
+    private JLabel identityLine(String label, String value) {
+        JLabel line = new JLabel(label + ": " + displayOrFallback(value, "N/A"));
+        line.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        line.setForeground(new Color(99, 115, 129));
+        line.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return line;
+    }
+
+    private String displayOrFallback(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 
     private JPanel buildRightForm() {
@@ -306,12 +342,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
                 return;
             }
 
-            Image scaled = img.getScaledInstance(
-                    EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
-                    EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
-                    Image.SCALE_SMOOTH);
-            photoPreview.setIcon(new ImageIcon(scaled));
-            photoPreview.setText("");
+            setPhotoPreviewImage(img);
             lockProfileImageUpload();
         } catch (Exception ex) {
             lockProfileImageUpload();
@@ -375,12 +406,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
                 return;
             }
             selectedImage = file;
-            Image scaled = img.getScaledInstance(
-                    EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
-                    EmployeeBasicDetailsPanelHelper.PHOTO_SIZE,
-                    Image.SCALE_SMOOTH);
-            photoPreview.setIcon(new ImageIcon(scaled));
-            photoPreview.setText("");
+            setPhotoPreviewImage(img);
             if (photoUploadCard != null) {
                 photoUploadCard.setStatus(file.getName());
             }
@@ -393,6 +419,15 @@ public class EmployeeBasicDetailsPanel extends JPanel {
         } catch (Exception e) {
             DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
         }
+    }
+
+    private void setPhotoPreviewImage(BufferedImage image) {
+        if (photoPreview instanceof EmployeeRegistrationFormPanelHelper.PhotoPreviewLabel preview) {
+            preview.setPreviewImage(image);
+            return;
+        }
+        photoPreview.setIcon(new ImageIcon(image));
+        photoPreview.setText("");
     }
 
     public Employee getEmployeeFromForm() {

@@ -10,6 +10,9 @@ import javax.swing.border.LineBorder;
 import javax.swing.plaf.basic.BasicArrowButton;
 import javax.swing.plaf.basic.BasicComboBoxUI;
 import java.awt.*;
+import java.awt.Shape;
+import java.awt.geom.RoundRectangle2D;
+import java.awt.image.BufferedImage;
 
 public final class EmployeeRegistrationFormPanelHelper {
     public static final int PHOTO_SIZE = 200;
@@ -45,16 +48,16 @@ public final class EmployeeRegistrationFormPanelHelper {
         root.setBackground(PAGE_BACKGROUND);
         root.setBorder(new CompoundBorder(
                 new RoundedBorder(16),
-                new EmptyBorder(24, 24, 24, 24)
+                new EmptyBorder(18, 18, 18, 18)
         ));
         return root;
     }
 
     public static JPanel createPhotoPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setPreferredSize(new Dimension(240, 300));
+        panel.setPreferredSize(new Dimension(218, 278));
         panel.setBackground(PAGE_BACKGROUND);
-        panel.setBorder(new EmptyBorder(4, 0, 4, 18));
+        panel.setBorder(new EmptyBorder(2, 0, 2, 12));
         return panel;
     }
 
@@ -86,19 +89,13 @@ public Insets getBorderInsets(Component c) {
 }
 }
 
-   public static JLabel createPhotoPreview(String text) {
-    JLabel label = new JLabel(text, SwingConstants.CENTER);
-
-    label.setPreferredSize(new Dimension(220, 220));
-
-    label.setHorizontalAlignment(SwingConstants.CENTER);
-    label.setVerticalAlignment(SwingConstants.CENTER);
-
-    label.setBorder(new CompoundBorder(
-            new RoundedPhotoBorder(8),
-            new EmptyBorder(5, 5, 5, 5)
-    ));
-
+   public static PhotoPreviewLabel createPhotoPreview(String text) {
+    PhotoPreviewLabel label = new PhotoPreviewLabel(text);
+    Dimension size = new Dimension(PHOTO_SIZE, PHOTO_SIZE);
+    label.setPreferredSize(size);
+    label.setMinimumSize(size);
+    label.setMaximumSize(size);
+    label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     return label;
 }
 
@@ -111,15 +108,107 @@ public Insets getBorderInsets(Component c) {
         JPanel panel = new JPanel();
         panel.setBackground(PAGE_BACKGROUND);
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBorder(new EmptyBorder(4, 0, 0, 0));
+        panel.setBorder(new EmptyBorder(8, 0, 0, 0));
         return panel;
     }
 
     public static JLabel createPhotoInfoLabel(String text) {
         JLabel label = new JLabel(text);
         label.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-          label.setBorder(new EmptyBorder(4, 0, 0, 0));
+        label.setBorder(new EmptyBorder(4, 0, 0, 0));
         return label;
+    }
+
+    public static final class PhotoPreviewLabel extends JLabel {
+        private static final Color PHOTO_BACKGROUND = new Color(248, 250, 252);
+        private static final Color PLACEHOLDER_ICON = new Color(148, 163, 184);
+        private static final Color PLACEHOLDER_TEXT = new Color(100, 116, 139);
+        private BufferedImage image;
+        private String placeholder;
+
+        private PhotoPreviewLabel(String placeholder) {
+            this.placeholder = cleanPlaceholder(placeholder);
+            setOpaque(false);
+            setHorizontalAlignment(SwingConstants.CENTER);
+            setVerticalAlignment(SwingConstants.CENTER);
+            setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+            setForeground(PLACEHOLDER_TEXT);
+            setBorder(new RoundedPhotoBorder(8));
+            setToolTipText("Choose employee photo");
+        }
+
+        public void setPreviewImage(BufferedImage image) {
+            this.image = image;
+            super.setText("");
+            setIcon(null);
+            repaint();
+        }
+
+        public void clearPreviewImage(String placeholder) {
+            this.image = null;
+            this.placeholder = cleanPlaceholder(placeholder);
+            super.setText("");
+            setIcon(null);
+            repaint();
+        }
+
+        @Override
+        public void setText(String text) {
+            if (text != null && !text.isBlank()) {
+                placeholder = cleanPlaceholder(text);
+            }
+            super.setText("");
+        }
+
+        @Override
+        protected void paintComponent(Graphics graphics) {
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            int width = getWidth();
+            int height = getHeight();
+            Shape clip = new RoundRectangle2D.Float(0, 0, width - 1, height - 1, 8, 8);
+            g2.setColor(PHOTO_BACKGROUND);
+            g2.fill(clip);
+            g2.setClip(clip);
+            if (image == null) {
+                drawPlaceholder(g2, width, height);
+            } else {
+                drawCoverImage(g2, width, height);
+            }
+            g2.dispose();
+        }
+
+        private void drawCoverImage(Graphics2D g2, int width, int height) {
+            double scale = Math.max(width / (double) image.getWidth(), height / (double) image.getHeight());
+            int drawWidth = Math.max(1, (int) Math.round(image.getWidth() * scale));
+            int drawHeight = Math.max(1, (int) Math.round(image.getHeight() * scale));
+            int x = (width - drawWidth) / 2;
+            int y = (height - drawHeight) / 2;
+            g2.drawImage(image, x, y, drawWidth, drawHeight, null);
+        }
+
+        private void drawPlaceholder(Graphics2D g2, int width, int height) {
+            int centerX = width / 2;
+            int centerY = height / 2 - 8;
+            g2.setStroke(new BasicStroke(2f));
+            g2.setColor(PLACEHOLDER_ICON);
+            g2.drawOval(centerX - 20, centerY - 32, 40, 40);
+            g2.drawRoundRect(centerX - 42, centerY + 8, 84, 46, 28, 28);
+
+            String text = placeholder == null || placeholder.isBlank() ? "Photo" : placeholder;
+            FontMetrics metrics = g2.getFontMetrics(getFont());
+            int textX = centerX - metrics.stringWidth(text) / 2;
+            g2.setFont(getFont());
+            g2.setColor(PLACEHOLDER_TEXT);
+            g2.drawString(text, Math.max(8, textX), centerY + 76);
+        }
+
+        private static String cleanPlaceholder(String value) {
+            String clean = value == null
+                    ? ""
+                    : value.replaceAll("<[^>]*>", "").replace("*", "").trim();
+            return clean.isBlank() ? "Photo" : clean;
+        }
     }
 
     public static JPanel createRightFormPanel() {

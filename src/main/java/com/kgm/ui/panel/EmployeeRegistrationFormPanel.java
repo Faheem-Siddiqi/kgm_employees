@@ -293,14 +293,7 @@ public class EmployeeRegistrationFormPanel extends JPanel {
             }
 
             selectedImage = file;
-            int padding = 4;
-            Image scaled = img.getScaledInstance(
-                    EmployeeRegistrationFormPanelHelper.PHOTO_SIZE - padding,
-                    EmployeeRegistrationFormPanelHelper.PHOTO_SIZE - padding,
-                    Image.SCALE_SMOOTH
-            );
-            photoPreview.setIcon(new ImageIcon(scaled));
-            photoPreview.setText("");
+            setPhotoPreviewImage(img);
             if (photoUploadCard != null) {
                 photoUploadCard.setStatus(file.getName());
             }
@@ -434,8 +427,7 @@ public class EmployeeRegistrationFormPanel extends JPanel {
         if (photoUploadCard != null) {
             photoUploadCard.setStatus("");
         }
-        photoPreview.setIcon(null);
-        photoPreview.setText(photoPreviewText());
+        clearPhotoPreview();
         requestInitialFocus();
         revalidate();
         repaint();
@@ -456,6 +448,24 @@ public class EmployeeRegistrationFormPanel extends JPanel {
 
     private String photoPreviewText() {
         return profileImageRequired ? requiredLabel("Photo") : "Photo";
+    }
+
+    private void setPhotoPreviewImage(BufferedImage image) {
+        if (photoPreview instanceof EmployeeRegistrationFormPanelHelper.PhotoPreviewLabel preview) {
+            preview.setPreviewImage(image);
+            return;
+        }
+        photoPreview.setIcon(new ImageIcon(image));
+        photoPreview.setText("");
+    }
+
+    private void clearPhotoPreview() {
+        if (photoPreview instanceof EmployeeRegistrationFormPanelHelper.PhotoPreviewLabel preview) {
+            preview.clearPreviewImage(photoPreviewText());
+            return;
+        }
+        photoPreview.setIcon(null);
+        photoPreview.setText(photoPreviewText());
     }
 
     private String requiredLabel(String text) {

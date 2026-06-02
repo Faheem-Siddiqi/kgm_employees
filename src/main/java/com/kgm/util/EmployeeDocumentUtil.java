@@ -5,9 +5,19 @@ import com.kgm.model.EmployeeFieldDefinition;
 
 import com.kgm.config.AppConfig;
 
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,6 +26,9 @@ import java.util.Map;
 import java.util.Set;
 
 public final class EmployeeDocumentUtil {
+    private static final float MIN_JPEG_QUALITY = 0.55f;
+    private static final float MAX_JPEG_QUALITY = 0.92f;
+    private static final float QUALITY_STEP = 0.05f;
     private static volatile List<DocumentType> cachedDocumentTypes;
     private static volatile Set<String> cachedRequiredDocumentColumns;
     private static final Set<String> DEFAULT_REQUIRED_DOCUMENT_COLUMNS = Set.of(
@@ -293,9 +306,8 @@ public final class EmployeeDocumentUtil {
             return "This item is not a valid file.";
         }
 
-        String name = file.getName().toLowerCase();
-        if (!(name.endsWith(".jpg") || name.endsWith(".jpeg"))) {
-            return "Only JPG or JPEG files can be uploaded.";
+        if (!isJpegFile(file)) {
+            return "Unsupported file type. Please upload a JPG or JPEG image.";
         }
 
         if (file.length() > maxUploadSizeBytes()) {
@@ -303,6 +315,103 @@ public final class EmployeeDocumentUtil {
         }
 
         return null;
+    }
+
+    public static PreparedUploadFile prepareImageForUpload(File file) {
+        String validationMessage = validateImageType(file);
+        if (validationMessage != null) {
+            return PreparedUploadFile.rejected(file, validationMessage);
+        }
+        if (file.length() <= maxUploadSizeBytes()) {
+            return PreparedUploadFile.ready(file, file, false, null);
+        }
+
+        try {
+            File compressed = compressJpegWithinLimit(file, maxUploadSizeBytes());
+            if (compressed == null) {
+                return PreparedUploadFile.rejected(file, sizeLimitMessage(file.length()));
+            }
+            return PreparedUploadFile.ready(
+                    file,
+                    compressed,
+                    true,
+                    "Compressed " + file.getName() + " from " + formatSize(file.length())
+                            + " to " + formatSize(compressed.length()) + "."
+            );
+        } catch (IOException | RuntimeException exception) {
+            return PreparedUploadFile.rejected(
+                    file,
+                    "This JPG/JPEG image is " + formatSize(file.length())
+                            + ", above the " + maxUploadSizeLabel()
+                            + " limit, and could not be compressed safely."
+            );
+        }
+    }
+
+    private static String validateImageType(File file) {
+        if (file == null || !file.isFile()) {
+            return "This item is not a valid file.";
+        }
+        if (!isJpegFile(file)) {
+            return "Unsupported file type. Please upload a JPG or JPEG image.";
+        }
+        return null;
+    }
+
+    private static String sizeLimitMessage(long bytes) {
+        return "File size is " + formatSize(bytes) + "; the limit is " + maxUploadSizeLabel() + ".";
+    }
+
+    private static boolean isJpegFile(File file) {
+        String name = file == null || file.getName() == null ? "" : file.getName().toLowerCase(Locale.ROOT);
+        return name.endsWith(".jpg") || name.endsWith(".jpeg");
+    }
+
+    private static File compressJpegWithinLimit(File source, long maxBytes) throws IOException {
+        BufferedImage image = ImageIO.read(source);
+        if (image == null) {
+            throw new IOException("Selected file is not a readable JPG/JPEG image.");
+        }
+
+        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
+        if (!writers.hasNext()) {
+            throw new IOException("No JPEG writer is available.");
+        }
+
+        String suffix = source.getName().toLowerCase(Locale.ROOT).endsWith(".jpeg") ? ".jpeg" : ".jpg";
+        Path temp = Files.createTempFile("kgm-upload-", suffix);
+        File best = null;
+
+        ImageWriter writer = writers.next();
+        try {
+            for (float quality = MAX_JPEG_QUALITY; quality >= MIN_JPEG_QUALITY; quality -= QUALITY_STEP) {
+                writeJpeg(image, temp.toFile(), writer, quality);
+                File candidate = temp.toFile();
+                if (candidate.length() <= maxBytes) {
+                    best = candidate;
+                    break;
+                }
+            }
+        } finally {
+            writer.dispose();
+        }
+
+        if (best == null) {
+            Files.deleteIfExists(temp);
+            return null;
+        }
+        best.deleteOnExit();
+        return best;
+    }
+
+    private static void writeJpeg(BufferedImage image, File target, ImageWriter writer, float quality) throws IOException {
+        ImageWriteParam params = writer.getDefaultWriteParam();
+        params.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+        params.setCompressionQuality(Math.max(MIN_JPEG_QUALITY, Math.min(MAX_JPEG_QUALITY, quality)));
+        try (ImageOutputStream output = ImageIO.createImageOutputStream(target)) {
+            writer.setOutput(output);
+            writer.write(null, new IIOImage(image, null, null), params);
+        }
     }
 
     public static long maxUploadSizeBytes() {
@@ -322,9 +431,9 @@ public final class EmployeeDocumentUtil {
         }
 
         for (File file : selectedFiles) {
-            String validationMessage = validateImageFile(file);
-            if (validationMessage != null) {
-                result.discard(fileName(file) + " - " + validationMessage);
+            PreparedUploadFile prepared = prepareImageForUpload(file);
+            if (!prepared.ready()) {
+                result.discard(fileName(file) + " - " + prepared.message());
                 continue;
             }
 
@@ -348,7 +457,13 @@ public final class EmployeeDocumentUtil {
 
             int documentIndex = match.documentIndex();
             matchedThisBatch.add(documentIndex);
-            result.uploaded(new BulkUploadItem(documentIndex, file, cleanDocumentLabel(documentIndex)));
+            result.uploaded(new BulkUploadItem(
+                    documentIndex,
+                    prepared.file(),
+                    cleanDocumentLabel(documentIndex),
+                    prepared.originalFile(),
+                    prepared.compressed()
+            ));
         }
 
         return result;
@@ -467,7 +582,23 @@ public final class EmployeeDocumentUtil {
         }
     }
 
-    public record BulkUploadItem(int documentIndex, File file, String documentLabel) {
+    public record PreparedUploadFile(File originalFile, File file, boolean ready, boolean compressed, String message) {
+        private static PreparedUploadFile ready(File originalFile, File file, boolean compressed, String message) {
+            return new PreparedUploadFile(originalFile, file, true, compressed, message);
+        }
+
+        private static PreparedUploadFile rejected(File originalFile, String message) {
+            return new PreparedUploadFile(originalFile, null, false, false, message);
+        }
+    }
+
+    public record BulkUploadItem(
+            int documentIndex,
+            File file,
+            String documentLabel,
+            File originalFile,
+            boolean compressed
+    ) {
     }
 
     public static final class DocumentMatch {

@@ -204,6 +204,7 @@ The project follows a layered desktop-application architecture:
 | Path | Functionality |
 | --- | --- |
 | **images/** | Static UI images such as logo, header, login background, and login foreground artwork. |
+| **resources/Labels.txt** | Optional document label/alias reference used by Upload All and bulk document matching so user-facing filenames can map to the correct document field. |
 | **resources/employees/** | Runtime employee file storage for profile images and uploaded documents. The folder is created when needed and ignored by Git except for `.gitkeep`. |
 | **%APPDATA%/KGM Ex-Employee Management/employee_field_metadata.json** | Latest user-change metadata backup. It is written after the DB update succeeds and is used first after a database drop/reset. |
 | **%LOCALAPPDATA%/KGM Ex-Employee Management/cache/employee_field_metadata.cache.json** | Metadata cache for fast reload only. It is ignored whenever its schema version or DB checksum is not fresh. |
@@ -439,7 +440,7 @@ Additional styling colors used in the document upload interface:
 - Document fields are record-safe: if a document path already exists in the database, that document remains marked `Locked`, can be viewed from the detail screen, and cannot be replaced.
 - If a document field is empty or a placeholder, the detail screen allows upload. The file is copied under `KGM_EMPLOYEE_STORAGE_DIR` and the logical database path is saved as `employees/{employeeCode}/documents/{file}` on Update.
 - Profile image follows the same safety rule: it can be uploaded only when `EMP_IMG` is empty or a placeholder.
-- Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be JPG/JPEG, must be within `KGM_DOCUMENT_UPLOAD_MAX_BYTES`, and must match a document label, Employee field name, or storage filename after normalizing spaces, underscores, punctuation, and case.
+- Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be JPG/JPEG, must be within `KGM_DOCUMENT_UPLOAD_MAX_BYTES`, and must match a document label, Employee field name, storage filename, or supported alias from `resources/Labels.txt` after normalizing spaces, underscores, punctuation, and case.
 - Upload matching accepts database-style names such as `SS_CARD` and user-facing names such as `Social Security Card`; files are saved using the configured storage filename for the matching document type.
 - Detail document upload keeps saved DB document records locked. If `Upload All` includes a file matching an already-saved document, the file is skipped and the dialog explains that the document already exists in DB and cannot be replaced.
 - After a bulk upload attempt, the user receives a summary showing how many documents are ready to save and which files were discarded with the reason.
