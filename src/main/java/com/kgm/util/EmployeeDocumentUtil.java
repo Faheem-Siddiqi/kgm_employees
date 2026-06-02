@@ -7,8 +7,10 @@ import com.kgm.config.AppConfig;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
 import javax.swing.ImageIcon;
 import java.awt.Graphics2D;
@@ -298,7 +300,7 @@ public final class EmployeeDocumentUtil {
 
     public static String formatSize(long bytes) {
         if (bytes < 1024) {
-        return bytes + " B";
+            return bytes + " B";
         }
         if (bytes < 1024 * 1024) {
             return (bytes / 1024) + " KB";
@@ -381,10 +383,7 @@ public final class EmployeeDocumentUtil {
     }
 
     private static boolean isReadableJpegFile(File file) throws IOException {
-        if (hasJpegSignature(file)) {
-            return true;
-        }
-        return readJpegImageLenient(file) != null;
+        return readJpegImageInfo(file) != null;
     }
 
     private static boolean hasJpegSignature(File file) throws IOException {
@@ -409,57 +408,60 @@ public final class EmployeeDocumentUtil {
 
         String suffix = source.getName().toLowerCase(Locale.ROOT).endsWith(".jpeg") ? ".jpeg" : ".jpg";
         Path temp = Files.createTempFile(UPLOAD_TEMP_PREFIX, suffix);
-        Path bestTemp = Files.createTempFile(UPLOAD_TEMP_PREFIX + "best-", suffix);
-        File best = null;
+        boolean keepTemp = false;
 
         ImageWriter writer = writers.next();
         try {
             writeJpeg(image, temp.toFile(), writer, MAX_JPEG_QUALITY);
             if (temp.toFile().length() <= maxBytes) {
-                Files.move(temp, bestTemp, StandardCopyOption.REPLACE_EXISTING);
-                best = bestTemp.toFile();
+                keepTemp = true;
             } else {
                 writeJpeg(image, temp.toFile(), writer, MIN_JPEG_QUALITY);
                 if (temp.toFile().length() > maxBytes) {
-                    Files.deleteIfExists(temp);
-                    Files.deleteIfExists(bestTemp);
                     return null;
                 }
-                Files.copy(temp, bestTemp, StandardCopyOption.REPLACE_EXISTING);
-                best = bestTemp.toFile();
 
                 float low = MIN_JPEG_QUALITY;
                 float high = MAX_JPEG_QUALITY;
+                float bestQuality = MIN_JPEG_QUALITY;
+                boolean tempContainsBest = true;
                 while (high - low > QUALITY_PRECISION) {
                     float quality = (low + high) / 2.0f;
                     writeJpeg(image, temp.toFile(), writer, quality);
                     if (temp.toFile().length() <= maxBytes) {
-                        Files.copy(temp, bestTemp, StandardCopyOption.REPLACE_EXISTING);
-                        best = bestTemp.toFile();
+                        bestQuality = quality;
+                        tempContainsBest = true;
                         low = quality;
                     } else {
+                        tempContainsBest = false;
                         high = quality;
                     }
                 }
+                if (!tempContainsBest) {
+                    writeJpeg(image, temp.toFile(), writer, bestQuality);
+                }
+                if (temp.toFile().length() > maxBytes) {
+                    return null;
+                }
+                keepTemp = true;
             }
         } finally {
             writer.dispose();
-            Files.deleteIfExists(temp);
+            if (!keepTemp) {
+                Files.deleteIfExists(temp);
+            }
         }
 
-        if (best == null) {
-            Files.deleteIfExists(bestTemp);
-            return null;
-        }
-        BufferedImage compressedImage = ImageIO.read(best);
-        if (compressedImage == null
-                || compressedImage.getWidth() != originalInfo.width()
-                || compressedImage.getHeight() != originalInfo.height()) {
-            Files.deleteIfExists(bestTemp);
+        File compressed = temp.toFile();
+        JpegImageInfo compressedInfo = readJpegImageInfo(compressed);
+        if (compressedInfo == null
+                || compressedInfo.width() != originalInfo.width()
+                || compressedInfo.height() != originalInfo.height()) {
+            Files.deleteIfExists(temp);
             throw new IOException("Compressed image dimensions changed.");
         }
-        best.deleteOnExit();
-        return best;
+        compressed.deleteOnExit();
+        return compressed;
     }
 
     private static void writeJpeg(BufferedImage image, File target, ImageWriter writer, float quality) throws IOException {
@@ -496,6 +498,47 @@ public final class EmployeeDocumentUtil {
         } catch (IOException | RuntimeException ignored) {
         }
         return image == null ? readJpegImageWithIconFallback(file) : image;
+    }
+
+    private static JpegImageInfo readJpegImageInfo(File file) throws IOException {
+        if (!hasJpegSignature(file)) {
+            return null;
+        }
+        try (ImageInputStream input = ImageIO.createImageInputStream(file)) {
+            if (input == null) {
+                return readJpegImageInfoWithIconFallback(file);
+            }
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            while (readers.hasNext()) {
+                ImageReader reader = readers.next();
+                try {
+                    reader.setInput(input, true, true);
+                    int width = reader.getWidth(0);
+                    int height = reader.getHeight(0);
+                    if (width > 0 && height > 0) {
+                        return new JpegImageInfo(width, height);
+                    }
+                } catch (IOException | RuntimeException ignored) {
+                } finally {
+                    reader.dispose();
+                }
+                input.seek(0L);
+            }
+        }
+        return readJpegImageInfoWithIconFallback(file);
+    }
+
+    private static JpegImageInfo readJpegImageInfoWithIconFallback(File file) {
+        ImageIcon icon;
+        try {
+            icon = new ImageIcon(Files.readAllBytes(file.toPath()));
+        } catch (IOException exception) {
+            return null;
+        }
+        if (icon.getIconWidth() <= 0 || icon.getIconHeight() <= 0) {
+            return null;
+        }
+        return new JpegImageInfo(icon.getIconWidth(), icon.getIconHeight());
     }
 
     private static BufferedImage readJpegImageWithIconFallback(File file) {

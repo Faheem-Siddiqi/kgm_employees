@@ -81,6 +81,18 @@ class EmployeeDocumentUtilTest {
     }
 
     @Test
+    void prepareImageForUploadRejectsCorruptJpegSignature() throws IOException {
+        File corruptJpeg = tempDir.resolve("CNIC_FRONT.jpg").toFile();
+        Files.write(corruptJpeg.toPath(), new byte[]{(byte) 0xFF, (byte) 0xD8, 0x00, 0x00});
+        System.setProperty(DOCUMENT_UPLOAD_PROPERTY, Long.toString(corruptJpeg.length() + 1024));
+
+        EmployeeDocumentUtil.PreparedUploadFile prepared = EmployeeDocumentUtil.prepareImageForUpload(corruptJpeg);
+
+        assertFalse(prepared.ready());
+        assertEquals("Please select a valid JPG or JPEG image.", prepared.message());
+    }
+
+    @Test
     void prepareImageForUploadCompressesLargeJpegWithoutChangingDimensions() throws IOException {
         File source = writeJpeg(tempDir.resolve("CNIC_FRONT.jpg"), 900, 700, 1.0f);
         long limit = Math.max(1L, source.length() - 1L);

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -79,11 +80,12 @@ public class BulkFolderDocumentImportService {
             summary.error(folder, "Employee record has no employee code.");
             return;
         }
+        summary.employee(employeeCode, employee.getEMP_NAME(), folder);
 
         reportFolderStep(progressListener, "Reading files inside " + folderKey + "...", folderIndex, totalFolders, 2, 4);
         List<File> files = documentFiles(folder, summary, folderKey);
         if (files.isEmpty()) {
-            summary.error(folder, "No document files found.");
+            summary.failed(employeeCode, "No document files found", folderKey);
             return;
         }
 
@@ -102,30 +104,29 @@ public class BulkFolderDocumentImportService {
                     fileIndex,
                     files.size()
             );
-            String prefix = file.getName() + " - ";
             String typeValidation = EmployeeDocumentUtil.validateUploadImageType(file);
             if (typeValidation != null) {
-                summary.error(folder, prefix + typeValidation);
+                summary.failed(employeeCode, failureReason(typeValidation), file.getName());
                 continue;
             }
 
             EmployeeDocumentUtil.DocumentMatch match = EmployeeDocumentUtil.matchDocumentForFile(file);
             if (!match.matched()) {
-                summary.error(folder, prefix + "No document label matched this file name.");
+                summary.noMatch(employeeCode, file.getName());
                 continue;
             }
             if (match.ambiguous()) {
-                summary.error(folder, prefix + "The name matches more than one document. Rename it to the exact document label and try again.");
+                summary.failed(employeeCode, "Ambiguous document label", file.getName());
                 continue;
             }
             int documentIndex = match.documentIndex();
             String documentLabel = EmployeeDocumentUtil.cleanDocumentLabel(documentIndex);
             if (EmployeeDocumentUtil.hasStoredPath(EmployeeDocumentUtil.documentPath(employee, documentIndex))) {
-                summary.error(folder, prefix + documentLabel + " already exists in DB, so it was not uploaded.");
+                summary.alreadyExists(employeeCode, documentLabel);
                 continue;
             }
             if (matchedThisFolder.contains(documentIndex)) {
-                summary.error(folder, prefix + "Another file in this folder already matched " + documentLabel + ".");
+                summary.failed(employeeCode, "Duplicate document label in selected folder", documentLabel);
                 continue;
             }
             if (EmployeeDocumentUtil.shouldCompressBeforeUpload(file)) {
@@ -140,7 +141,7 @@ public class BulkFolderDocumentImportService {
             }
             EmployeeDocumentUtil.PreparedUploadFile prepared = EmployeeDocumentUtil.prepareImageForUpload(file);
             if (!prepared.ready()) {
-                summary.error(folder, prefix + prepared.message());
+                summary.failed(employeeCode, failureReason(prepared.message()), file.getName());
                 continue;
             }
 
@@ -159,7 +160,7 @@ public class BulkFolderDocumentImportService {
                 uploadedForEmployee++;
                 summary.uploadedDocument(employeeCode, documentLabel);
             } catch (IOException exception) {
-                summary.error(folder, prefix + "Upload failed: " + exception.getMessage());
+                summary.failed(employeeCode, failureReason("Upload failed: " + exception.getMessage()), file.getName());
             } finally {
                 if (prepared.compressed()) {
                     EmployeeDocumentUtil.deleteTemporaryUpload(prepared.file());
@@ -175,9 +176,33 @@ public class BulkFolderDocumentImportService {
             reportFolderStep(progressListener, "Saving database updates for " + employeeCode + "...", folderIndex, totalFolders, 3, 4);
             dao.updateEmployeeDynamic(update);
         } catch (Exception exception) {
-            summary.rollbackUploadedForEmployee(employeeCode);
-            summary.error(folder, "Database update failed after copying files: " + exception.getMessage());
+            summary.rollbackUploadedForEmployee(
+                    employeeCode,
+                    failureReason("Database update failed after copying files: " + exception.getMessage())
+            );
         }
+    }
+
+    private String failureReason(String message) {
+        if (message == null || message.isBlank()) {
+            return "Failed";
+        }
+        String clean = message.trim();
+        String lower = clean.toLowerCase();
+        if (lower.contains("compress") || lower.contains("size")) {
+            return "Failed due to size/compression issue";
+        }
+        if (lower.contains("unsupported file type")) {
+            return "Unsupported file type";
+        }
+        if (lower.contains("valid jpg") || lower.contains("valid jpeg") || lower.contains("valid file")) {
+            return "Invalid file";
+        }
+        clean = clean.replaceAll("\\s+", " ");
+        while (clean.endsWith(".")) {
+            clean = clean.substring(0, clean.length() - 1);
+        }
+        return clean.isBlank() ? "Failed" : clean;
     }
 
     private EmployeeFolder findEmployeeFolder(File folder, EmployeeRecordDao dao) {
@@ -274,18 +299,22 @@ public class BulkFolderDocumentImportService {
 
     public record ImportResult(
             List<UploadedEmployee> uploadedEmployees,
-            List<FolderError> folderErrors
+            List<FolderError> folderErrors,
+            List<EmployeeUploadSummary> employeeSummaries
     ) {
         public int uploadedCount() {
             int count = 0;
-            for (UploadedEmployee employee : uploadedEmployees) {
-                count += employee.labels().size();
+            for (EmployeeUploadSummary employee : employeeSummaries) {
+                count += employee.uploadedLabels().size();
             }
             return count;
         }
 
         public int skippedCount() {
             int count = 0;
+            for (EmployeeUploadSummary employee : employeeSummaries) {
+                count += employee.skippedCount();
+            }
             for (FolderError folderError : folderErrors) {
                 count += folderError.messages().size();
             }
@@ -299,15 +328,63 @@ public class BulkFolderDocumentImportService {
     public record FolderError(String folderName, File folder, List<String> messages) {
     }
 
+    public record EmployeeUploadSummary(
+            String employeeCode,
+            String employeeName,
+            File folder,
+            List<String> uploadedLabels,
+            List<String> alreadyExistingLabels,
+            List<String> noMatchFiles,
+            Map<String, List<String>> failedByReason
+    ) {
+        public String displayName() {
+            if (employeeName == null || employeeName.isBlank()) {
+                return employeeCode;
+            }
+            return employeeCode + " - " + employeeName;
+        }
+
+        public int skippedCount() {
+            int count = alreadyExistingLabels.size() + noMatchFiles.size();
+            for (List<String> items : failedByReason.values()) {
+                count += items.size();
+            }
+            return count;
+        }
+
+        public boolean hasDetails() {
+            return !uploadedLabels.isEmpty()
+                    || !alreadyExistingLabels.isEmpty()
+                    || !noMatchFiles.isEmpty()
+                    || !failedByReason.isEmpty();
+        }
+    }
+
     private record EmployeeFolder(File folder, Employee employee) {
     }
 
     private static final class ImportSummary {
-        private final Map<String, List<String>> uploadedByEmployee = new LinkedHashMap<>();
+        private final Map<String, EmployeeSummaryBuilder> employeesByCode = new LinkedHashMap<>();
         private final Map<String, FolderErrorBuilder> errorsByFolder = new LinkedHashMap<>();
 
+        private void employee(String employeeCode, String employeeName, File folder) {
+            employee(employeeCode).update(employeeName, folder);
+        }
+
         private void uploadedDocument(String employeeCode, String label) {
-            uploadedByEmployee.computeIfAbsent(employeeCode, key -> new ArrayList<>()).add(label);
+            employee(employeeCode).uploaded(label);
+        }
+
+        private void alreadyExists(String employeeCode, String label) {
+            employee(employeeCode).alreadyExists(label);
+        }
+
+        private void noMatch(String employeeCode, String fileName) {
+            employee(employeeCode).noMatch(fileName);
+        }
+
+        private void failed(String employeeCode, String reason, String item) {
+            employee(employeeCode).failed(reason, item);
         }
 
         private void error(File folder, String message) {
@@ -316,21 +393,112 @@ public class BulkFolderDocumentImportService {
             errorsByFolder.computeIfAbsent(key, ignored -> new FolderErrorBuilder(folderName, folder)).messages.add(message);
         }
 
-        private void rollbackUploadedForEmployee(String employeeCode) {
-            uploadedByEmployee.remove(employeeCode);
+        private void rollbackUploadedForEmployee(String employeeCode, String reason) {
+            employee(employeeCode).rollbackUploaded(reason);
         }
 
         private ImportResult toResult() {
+            List<EmployeeUploadSummary> employeeSummaries = new ArrayList<>();
             List<UploadedEmployee> uploadedEmployees = new ArrayList<>();
-            for (Map.Entry<String, List<String>> entry : uploadedByEmployee.entrySet()) {
-                uploadedEmployees.add(new UploadedEmployee(entry.getKey(), List.copyOf(entry.getValue())));
+            for (EmployeeSummaryBuilder builder : employeesByCode.values()) {
+                EmployeeUploadSummary summary = builder.toSummary();
+                if (!summary.hasDetails()) {
+                    continue;
+                }
+                employeeSummaries.add(summary);
+                if (!summary.uploadedLabels().isEmpty()) {
+                    uploadedEmployees.add(new UploadedEmployee(summary.employeeCode(), summary.uploadedLabels()));
+                }
             }
 
             List<FolderError> folderErrors = new ArrayList<>();
             for (FolderErrorBuilder builder : errorsByFolder.values()) {
                 folderErrors.add(new FolderError(builder.folderName, builder.folder, List.copyOf(builder.messages)));
             }
-            return new ImportResult(List.copyOf(uploadedEmployees), List.copyOf(folderErrors));
+            return new ImportResult(
+                    List.copyOf(uploadedEmployees),
+                    List.copyOf(folderErrors),
+                    List.copyOf(employeeSummaries)
+            );
+        }
+
+        private EmployeeSummaryBuilder employee(String employeeCode) {
+            return employeesByCode.computeIfAbsent(employeeCode, EmployeeSummaryBuilder::new);
+        }
+
+        private static void addUnique(List<String> values, String value) {
+            if (value == null || value.isBlank() || values.contains(value)) {
+                return;
+            }
+            values.add(value);
+        }
+
+        private static final class EmployeeSummaryBuilder {
+            private final String employeeCode;
+            private String employeeName;
+            private File folder;
+            private final List<String> uploadedLabels = new ArrayList<>();
+            private final List<String> alreadyExistingLabels = new ArrayList<>();
+            private final List<String> noMatchFiles = new ArrayList<>();
+            private final Map<String, List<String>> failedByReason = new LinkedHashMap<>();
+
+            private EmployeeSummaryBuilder(String employeeCode) {
+                this.employeeCode = employeeCode;
+            }
+
+            private void update(String employeeName, File folder) {
+                if (employeeName != null && !employeeName.isBlank()) {
+                    this.employeeName = employeeName.trim();
+                }
+                if (folder != null) {
+                    this.folder = folder;
+                }
+            }
+
+            private void uploaded(String label) {
+                addUnique(uploadedLabels, label);
+            }
+
+            private void alreadyExists(String label) {
+                addUnique(alreadyExistingLabels, label);
+            }
+
+            private void noMatch(String fileName) {
+                addUnique(noMatchFiles, fileName);
+            }
+
+            private void failed(String reason, String item) {
+                String cleanReason = reason == null || reason.isBlank() ? "Failed" : reason.trim();
+                addUnique(failedByReason.computeIfAbsent(cleanReason, key -> new ArrayList<>()), item);
+            }
+
+            private void rollbackUploaded(String reason) {
+                if (uploadedLabels.isEmpty()) {
+                    return;
+                }
+                String cleanReason = reason == null || reason.isBlank() ? "Database update failed" : reason.trim();
+                List<String> failedItems = failedByReason.computeIfAbsent(cleanReason, key -> new ArrayList<>());
+                for (String label : uploadedLabels) {
+                    addUnique(failedItems, label);
+                }
+                uploadedLabels.clear();
+            }
+
+            private EmployeeUploadSummary toSummary() {
+                Map<String, List<String>> copiedFailures = new LinkedHashMap<>();
+                for (Map.Entry<String, List<String>> entry : failedByReason.entrySet()) {
+                    copiedFailures.put(entry.getKey(), List.copyOf(entry.getValue()));
+                }
+                return new EmployeeUploadSummary(
+                        employeeCode,
+                        employeeName,
+                        folder,
+                        List.copyOf(uploadedLabels),
+                        List.copyOf(alreadyExistingLabels),
+                        List.copyOf(noMatchFiles),
+                        Collections.unmodifiableMap(copiedFailures)
+                );
+            }
         }
 
         private static final class FolderErrorBuilder {

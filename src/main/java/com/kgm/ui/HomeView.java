@@ -12,7 +12,6 @@ import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.ChartsPanel;
 import com.kgm.ui.panel.EmployeeTablePanel;
-import com.kgm.ui.panel.ExcelImportButton;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.KPIRowsPanel;
@@ -38,8 +37,8 @@ public class HomeView extends JFrame {
     private KPIRowsPanel kpiPanel;
     private ChartsPanel chartsPanel;
     private JScrollPane mainScrollPane;
-    private ExcelImportButton excelBtn;
-    private JButton bulkDocumentBtn;
+    private JMenuItem excelBtn;
+    private JMenuItem bulkDocumentBtn;
     private JButton refreshBtn;
     private boolean bulkDocumentActionRunning;
     private boolean homeDataLoading;
@@ -66,17 +65,14 @@ public class HomeView extends JFrame {
                 HomeViewHelper.styleRefreshButton(refreshBtn);
             } else {
                 refreshBtn.setText("Clear Filter (" + filterLabel + ")");
-                refreshBtn.setBackground(new Color(180, 60, 50));
-                refreshBtn.setForeground(Color.WHITE);
-                refreshBtn.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-                refreshBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                HomeViewHelper.styleActiveFilterButton(refreshBtn);
             }
         });
 
         JPanel top = HomeViewHelper.createTopPanel();
-        top.add(new HeaderPanel("Home Dashboard"), BorderLayout.NORTH);
+        top.add(new HeaderPanel("Dashboard"), BorderLayout.NORTH);
 
-        JPanel searchRow = HomeViewHelper.createSearchRow();
+        JPanel commandBar = HomeViewHelper.createCommandBar();
         JTextField searchField = HomeViewHelper.createSearchField("Search Employee Code");
 
         JButton searchBtn = new JButton("Search");
@@ -125,13 +121,12 @@ public class HomeView extends JFrame {
             HomeViewHelper.setTextButtonEnabled(clearBtn, false);
         });
 
-        HomeViewHelper.addSearchControls(searchRow, searchField, searchBtn, clearBtn);
+        HomeViewHelper.addSearchControls(commandBar, searchField, searchBtn, clearBtn);
 
-        JPanel btnRow = HomeViewHelper.createButtonRow();
-        excelBtn = new ExcelImportButton(this::showExcelImportActions);
+        excelBtn = HomeViewHelper.createServicesMenuItem("Excel Services");
+        excelBtn.addActionListener(e -> showExcelImportActions());
 
-        bulkDocumentBtn = new JButton("Bulk Documents");
-        HomeViewHelper.styleBulkDocumentButton(bulkDocumentBtn);
+        bulkDocumentBtn = HomeViewHelper.createServicesMenuItem("Bulk Documents");
         bulkDocumentBtn.addActionListener(e -> chooseBulkDocumentFolders());
 
         JButton addBtn = new JButton("Add Employee");
@@ -152,20 +147,22 @@ public class HomeView extends JFrame {
             }
         });
 
-        JButton settingsBtn = new JButton("Settings");
-        HomeViewHelper.styleAddButton(settingsBtn);
+        JMenuItem settingsBtn = HomeViewHelper.createServicesMenuItem("Settings");
         settingsBtn.addActionListener(e -> {
             new FieldManagementView();
             dispose();
         });
 
-        btnRow.add(excelBtn);
-        btnRow.add(bulkDocumentBtn);
-        btnRow.add(addBtn);
-        btnRow.add(settingsBtn);
-        btnRow.add(refreshBtn);
+        JButton servicesBtn = HomeViewHelper.createServicesMenuButton();
+        JPopupMenu servicesMenu = HomeViewHelper.createServicesMenu(excelBtn, bulkDocumentBtn, settingsBtn);
+        servicesBtn.addActionListener(e -> {
+            Dimension menuSize = servicesMenu.getPreferredSize();
+            int menuX = Math.max(0, servicesBtn.getWidth() - menuSize.width);
+            servicesMenu.show(servicesBtn, menuX, servicesBtn.getHeight() + 4);
+        });
+        HomeViewHelper.addCommandActions(commandBar, addBtn, refreshBtn, servicesBtn);
 
-        // Build layout: Header > KPIs > Search > Buttons > Table > Charts
+        // Build layout: Header > KPIs > Command Bar > Table > Charts
         JPanel mainContent = new JPanel();
         mainContent.setLayout(new BoxLayout(mainContent, BoxLayout.Y_AXIS));
         mainContent.setOpaque(false);
@@ -179,8 +176,7 @@ public class HomeView extends JFrame {
         kpiWrapper.add(kpiPanel, BorderLayout.CENTER);
         mainContent.add(kpiWrapper);
         
-        mainContent.add(searchRow);
-        mainContent.add(btnRow);
+        mainContent.add(commandBar);
         
         // Wrap table panel with left/right margins (28px) to match filter
         JPanel tableWrapper = new JPanel(new BorderLayout());
@@ -480,9 +476,9 @@ public class HomeView extends JFrame {
         body.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
 
         body.add(summaryCard(result));
-        if (!result.uploadedEmployees().isEmpty()) {
+        if (!result.employeeSummaries().isEmpty()) {
             body.add(Box.createVerticalStrut(10));
-            body.add(uploadedEmployeesCard(result.uploadedEmployees()));
+            body.add(employeeSummariesCard(result.employeeSummaries()));
         }
         if (!result.folderErrors().isEmpty()) {
             body.add(Box.createVerticalStrut(10));
@@ -520,7 +516,7 @@ public class HomeView extends JFrame {
         JPanel card = resultCard(new Color(248, 250, 252), new Color(220, 226, 232));
         JLabel heading = sectionHeading("Summary");
         JLabel text = new JLabel(result.uploadedCount() + " document" + plural(result.uploadedCount())
-                + " uploaded, " + result.skippedCount() + " issue" + plural(result.skippedCount()) + " found.");
+                + " uploaded, " + result.skippedCount() + " file" + plural(result.skippedCount()) + " skipped/failed.");
         text.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         text.setForeground(new Color(35, 43, 54));
         text.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -530,19 +526,37 @@ public class HomeView extends JFrame {
         return card;
     }
 
-    private JPanel uploadedEmployeesCard(java.util.List<BulkFolderDocumentImportService.UploadedEmployee> employees) {
+    private JPanel employeeSummariesCard(java.util.List<BulkFolderDocumentImportService.EmployeeUploadSummary> employees) {
         JPanel card = resultCard(new Color(248, 255, 250), new Color(187, 247, 208));
-        card.add(sectionHeading("Updated"));
-        for (BulkFolderDocumentImportService.UploadedEmployee employee : employees) {
+        card.add(sectionHeading("Employee Results"));
+        for (BulkFolderDocumentImportService.EmployeeUploadSummary employee : employees) {
             card.add(Box.createVerticalStrut(10));
-            JLabel code = new JLabel("Employee Code - " + employee.employeeCode());
-            code.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
-            code.setForeground(new Color(35, 43, 54));
-            code.setAlignmentX(Component.LEFT_ALIGNMENT);
-            card.add(code);
-            card.add(wrappedText(String.join(", ", employee.labels()), new Color(248, 255, 250)));
+            card.add(folderLink("Employee: " + employee.displayName(), employee.folder()));
+            addSummaryParagraph(card, "Uploaded", employee.uploadedLabels(), new Color(248, 255, 250));
+            addSummaryParagraph(
+                    card,
+                    "Already exists in DB, not uploaded",
+                    employee.alreadyExistingLabels(),
+                    new Color(248, 255, 250)
+            );
+            addSummaryParagraph(
+                    card,
+                    "No matching document label found",
+                    employee.noMatchFiles(),
+                    new Color(248, 255, 250)
+            );
+            for (Map.Entry<String, java.util.List<String>> failure : employee.failedByReason().entrySet()) {
+                addSummaryParagraph(card, failure.getKey(), failure.getValue(), new Color(248, 255, 250));
+            }
         }
         return card;
+    }
+
+    private void addSummaryParagraph(JPanel card, String label, java.util.List<String> values, Color background) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+        card.add(wrappedText(label + ": " + String.join(", ", values), background));
     }
 
     private JPanel folderErrorsCard(java.util.List<BulkFolderDocumentImportService.FolderError> errors) {
@@ -792,6 +806,7 @@ public class HomeView extends JFrame {
         chartsPanel.setStats(null);
         if (refreshBtn != null) {
             refreshBtn.setText("Loading...");
+            HomeViewHelper.styleRefreshButton(refreshBtn);
             refreshBtn.setEnabled(true);
         }
 
@@ -1391,6 +1406,7 @@ public class HomeView extends JFrame {
         excelBtn.setEnabled(false);
         excelBtn.setText(text);
         excelBtn.setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+        HomeViewHelper.styleServicesMenuItem(excelBtn);
     }
 
     private void setExcelButtonReady() {
@@ -1400,6 +1416,7 @@ public class HomeView extends JFrame {
         excelBtn.setEnabled(true);
         excelBtn.setText("Excel Services");
         excelBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        HomeViewHelper.styleServicesMenuItem(excelBtn);
     }
 
     private void setBulkDocumentButtonOpening() {
@@ -1407,7 +1424,7 @@ public class HomeView extends JFrame {
             return;
         }
         bulkDocumentBtn.setText("Opening...");
-        HomeViewHelper.styleBulkDocumentButton(bulkDocumentBtn);
+        HomeViewHelper.styleServicesMenuItem(bulkDocumentBtn);
     }
 
     private void setBulkDocumentButtonBusy() {
@@ -1415,7 +1432,7 @@ public class HomeView extends JFrame {
             return;
         }
         bulkDocumentBtn.setText("Uploading...");
-        HomeViewHelper.styleBulkDocumentButton(bulkDocumentBtn);
+        HomeViewHelper.styleServicesMenuItem(bulkDocumentBtn);
     }
 
     private void setBulkDocumentButtonReady() {
@@ -1423,7 +1440,7 @@ public class HomeView extends JFrame {
             return;
         }
         bulkDocumentBtn.setText("Bulk Documents");
-        HomeViewHelper.styleBulkDocumentButton(bulkDocumentBtn);
+        HomeViewHelper.styleServicesMenuItem(bulkDocumentBtn);
     }
 
     private record HomeTableData(
