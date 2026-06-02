@@ -16,16 +16,13 @@ import com.kgm.ui.styling.AppTabsHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDetailViewHelper;
 import com.kgm.util.EmployeeBasicFieldUtil;
+import com.kgm.util.EmployeeDocumentUtil;
 import com.kgm.util.EmployeeFieldDefinitionCache;
-import com.kgm.util.EmployeeStorageUtil;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -697,10 +694,7 @@ public class EmployeeDetailView extends JFrame {
     }
 
     private String copyProfileImage(File source, String employeeCode) throws IOException {
-        Path employeeDir = EmployeeStorageUtil.ensureEmployeeDirectory(employeeCode);
-        Path destination = employeeDir.resolve("EMP_IMG.jpg");
-        Files.copy(source.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
-        return EmployeeStorageUtil.profileImagePath(employeeCode);
+        return EmployeeDocumentUtil.copyProfileImageToEmployeeStorage(employeeCode, source);
     }
 
     private void downloadEmployeeReport() {

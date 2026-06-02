@@ -150,7 +150,7 @@ public class FileUploadCard extends JPanel {
     }
 
     public static FileFilterSpec jpegImages() {
-        return new FileFilterSpec("JPEG Images (*.jpg, *.jpeg)", "jpg", "jpeg");
+        return new FileFilterSpec("JPEG Images (*.jpg, *.jpeg, *.jpe, *.jfif)", "jpg", "jpeg", "jpe", "jfif");
     }
 
     public static FileFilterSpec excelWorkbooks() {

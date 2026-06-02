@@ -14,14 +14,10 @@ import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
-import com.kgm.util.EmployeeStorageUtil;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -216,13 +212,8 @@ public class EmployeeRegistrationView extends JFrame {
             File selectedImage,
             String[] selectedDocuments
     ) throws Exception {
-        Path empDir = EmployeeStorageUtil.ensureEmployeeDirectory(empCode);
-        Path docDir = EmployeeStorageUtil.ensureDocumentDirectory(empCode);
-
         if (selectedImage != null) {
-            Path dest = empDir.resolve("EMP_IMG.jpg");
-            Files.copy(selectedImage.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
-            emp.setEMP_IMG(EmployeeStorageUtil.profileImagePath(empCode));
+            emp.setEMP_IMG(EmployeeDocumentUtil.copyProfileImageToEmployeeStorage(empCode, selectedImage));
         }
 
         if (selectedDocuments != null) {
@@ -232,17 +223,7 @@ public class EmployeeRegistrationView extends JFrame {
                 }
 
                 File src = new File(selectedDocuments[i]);
-                String storageName = EmployeeDocumentUtil.documentType(i).storageName();
-                Path dest;
-                String dbPath;
-                if (EmployeeDocumentUtil.isProfileImageDocument(i)) {
-                    dest = empDir.resolve(storageName);
-                    dbPath = EmployeeStorageUtil.profileImagePath(empCode);
-                } else {
-                    dest = docDir.resolve(storageName);
-                    dbPath = EmployeeStorageUtil.documentPath(empCode, storageName);
-                }
-                Files.copy(src.toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
+                String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage(empCode, i, src);
                 EmployeeDocumentUtil.setDocumentPath(emp, i, dbPath);
             }
         }

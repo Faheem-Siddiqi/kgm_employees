@@ -7,7 +7,6 @@ import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.util.EmployeeDocumentUtil;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -32,6 +31,8 @@ public class EmployeeDocumentUploadPanel extends JPanel {
     private DefaultTableModel model;
     private File[] files;
     private String[] filePaths;
+    private String[] displayFileNames;
+    private boolean[] temporaryUploadFiles;
     private boolean[] requiredDocuments;
     private JTextField searchField;
     private JButton clearSearchButton;
@@ -44,6 +45,8 @@ public class EmployeeDocumentUploadPanel extends JPanel {
 
         files = new File[EmployeeDocumentUtil.documentCount()];
         filePaths = new String[EmployeeDocumentUtil.documentCount()];
+        displayFileNames = new String[EmployeeDocumentUtil.documentCount()];
+        temporaryUploadFiles = new boolean[EmployeeDocumentUtil.documentCount()];
         requiredDocuments = EmployeeDocumentUtil.requiredDocumentFlags();
 
         JPanel topPanel = EmployeeDocumentUploadPanelHelper.createTopPanel();
@@ -170,7 +173,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
     private void addDocumentRow(int documentIndex) {
         File file = files[documentIndex];
         boolean required = isRequiredDocument(documentIndex);
-        String fileText = file == null ? "-" : file.getName();
+        String fileText = file == null ? "-" : selectedFileName(documentIndex);
         String statusText = file == null
                 ? required ? "Missing required" : "Not Uploaded"
                 : readyToSaveStatus(file);
@@ -210,6 +213,9 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         File file = files[documentIndex];
         if (file != null) {
             searchableValues.add(file.getName());
+        }
+        if (displayFileNames[documentIndex] != null) {
+            searchableValues.add(displayFileNames[documentIndex]);
         }
 
         int bestScore = 2;
@@ -261,7 +267,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
     }
 
     private void prepareSingleFile(int documentIndex, File selectedFile) {
-        if (selectedFile.length() <= EmployeeDocumentUtil.maxUploadSizeBytes()) {
+        if (!EmployeeDocumentUtil.shouldCompressBeforeUpload(selectedFile)) {
             applySingleFile(documentIndex, EmployeeDocumentUtil.prepareImageForUpload(selectedFile));
             return;
         }
@@ -299,8 +305,11 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         }
 
         File file = prepared.file();
+        discardTemporaryUpload(documentIndex, file);
         files[documentIndex] = file;
         filePaths[documentIndex] = file.getAbsolutePath();
+        displayFileNames[documentIndex] = prepared.originalFile().getName();
+        temporaryUploadFiles[documentIndex] = prepared.compressed();
         notifyProfileImageUpload(documentIndex, file);
 
         int modelRow = findModelRowByDocumentIndex(documentIndex);
@@ -323,10 +332,47 @@ public class EmployeeDocumentUploadPanel extends JPanel {
             return;
         }
 
-        EmployeeDocumentUtil.BulkUploadResult summary = EmployeeDocumentUtil.matchBulkFiles(selectedFiles, null);
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Preparing Upload All",
+                "Checking selected JPG/JPEG documents..."
+        );
+        SwingWorker<EmployeeDocumentUtil.BulkUploadResult, Void> worker = new SwingWorker<>() {
+            @Override
+            protected EmployeeDocumentUtil.BulkUploadResult doInBackground() {
+                return EmployeeDocumentUtil.matchBulkFiles(
+                        selectedFiles,
+                        null,
+                        (message, completedFiles, totalFiles, percent) -> SwingUtilities.invokeLater(() -> {
+                            loader.setMessage(message);
+                            loader.setProgress(percent);
+                        })
+                );
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                try {
+                    applyBulkUploadSummary(get());
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    DialogHelper.warning(EmployeeDocumentUploadPanel.this, "Upload Stopped", "Upload preparation was interrupted.");
+                } catch (ExecutionException exception) {
+                    DialogHelper.warning(EmployeeDocumentUploadPanel.this, "Cannot Prepare Uploads", "Selected files could not be prepared.");
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void applyBulkUploadSummary(EmployeeDocumentUtil.BulkUploadResult summary) {
         for (EmployeeDocumentUtil.BulkUploadItem item : summary.uploadedDocuments()) {
+            discardTemporaryUpload(item.documentIndex(), item.file());
             files[item.documentIndex()] = item.file();
             filePaths[item.documentIndex()] = item.file().getAbsolutePath();
+            displayFileNames[item.documentIndex()] = item.originalFile().getName();
+            temporaryUploadFiles[item.documentIndex()] = item.compressed();
             notifyProfileImageUpload(item.documentIndex(), item.file());
         }
 
@@ -363,7 +409,7 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         }
 
         try {
-            BufferedImage img = ImageIO.read(files[documentIndex]);
+            BufferedImage img = EmployeeDocumentUtil.readJpegImage(files[documentIndex]);
             if (img == null) {
                 DialogHelper.error(this, "Cannot Open File", "Cannot open file.");
                 return;
@@ -496,8 +542,11 @@ public class EmployeeDocumentUploadPanel extends JPanel {
         if (documentIndex < 0 || file == null) {
             return;
         }
+        discardTemporaryUpload(documentIndex, file);
         files[documentIndex] = file;
         filePaths[documentIndex] = file.getAbsolutePath();
+        displayFileNames[documentIndex] = file.getName();
+        temporaryUploadFiles[documentIndex] = EmployeeDocumentUtil.isTemporaryUploadFile(file);
         refreshDocumentRows();
         updateCount();
         model.fireTableDataChanged();
@@ -538,8 +587,13 @@ public class EmployeeDocumentUploadPanel extends JPanel {
             table.getCellEditor().stopCellEditing();
         }
 
+        for (int index = 0; index < files.length; index++) {
+            discardTemporaryUpload(index, null);
+        }
         Arrays.fill(files, null);
         Arrays.fill(filePaths, null);
+        Arrays.fill(displayFileNames, null);
+        Arrays.fill(temporaryUploadFiles, false);
         searchField.setText("");
         EmployeeDocumentUploadPanelHelper.updateClearButtonState(clearSearchButton, false);
         refreshDocumentRows();
@@ -551,6 +605,34 @@ public class EmployeeDocumentUploadPanel extends JPanel {
 
         revalidate();
         repaint();
+    }
+
+    private String selectedFileName(int documentIndex) {
+        String displayName = displayFileNames[documentIndex];
+        return displayName == null || displayName.isBlank()
+                ? files[documentIndex].getName()
+                : displayName;
+    }
+
+    private void discardTemporaryUpload(int documentIndex, File replacement) {
+        if (documentIndex < 0
+                || documentIndex >= temporaryUploadFiles.length
+                || !temporaryUploadFiles[documentIndex]) {
+            return;
+        }
+        File current = files[documentIndex];
+        temporaryUploadFiles[documentIndex] = false;
+        if (current != null && !sameFile(current, replacement)) {
+            EmployeeDocumentUtil.deleteTemporaryUpload(current);
+        }
+    }
+
+    private boolean sameFile(File first, File second) {
+        if (first == null || second == null) {
+            return false;
+        }
+        return first.toPath().toAbsolutePath().normalize()
+                .equals(second.toPath().toAbsolutePath().normalize());
     }
 
     private static class PlaceholderTextField extends JTextField {

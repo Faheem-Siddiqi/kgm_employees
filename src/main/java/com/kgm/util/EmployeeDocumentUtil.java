@@ -10,12 +10,16 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
+import javax.swing.ImageIcon;
+import java.awt.Graphics2D;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.HashSet;
@@ -26,9 +30,10 @@ import java.util.Map;
 import java.util.Set;
 
 public final class EmployeeDocumentUtil {
-    private static final float MIN_JPEG_QUALITY = 0.55f;
+    private static final String UPLOAD_TEMP_PREFIX = "kgm-upload-";
+    private static final float MIN_JPEG_QUALITY = 0.01f;
     private static final float MAX_JPEG_QUALITY = 0.92f;
-    private static final float QUALITY_STEP = 0.05f;
+    private static final float QUALITY_PRECISION = 0.01f;
     private static volatile List<DocumentType> cachedDocumentTypes;
     private static volatile Set<String> cachedRequiredDocumentColumns;
     private static final Set<String> DEFAULT_REQUIRED_DOCUMENT_COLUMNS = Set.of(
@@ -301,26 +306,33 @@ public final class EmployeeDocumentUtil {
         return (bytes / (1024 * 1024)) + " MB";
     }
 
+    @Deprecated
     public static String validateImageFile(File file) {
-        if (file == null || !file.isFile()) {
-            return "This item is not a valid file.";
+        String typeValidation = validateUploadImageType(file);
+        if (typeValidation != null) {
+            return typeValidation;
         }
-
-        if (!isJpegFile(file)) {
-            return "Unsupported file type. Please upload a JPG or JPEG image.";
+        try {
+            if (!isReadableJpegFile(file)) {
+                return "Please select a valid JPG or JPEG image.";
+            }
+            return null;
+        } catch (IOException exception) {
+            return "Please select a valid JPG or JPEG image.";
         }
-
-        if (file.length() > maxUploadSizeBytes()) {
-            return "File size is " + formatSize(file.length()) + "; the limit is " + maxUploadSizeLabel() + ".";
-        }
-
-        return null;
     }
 
     public static PreparedUploadFile prepareImageForUpload(File file) {
-        String validationMessage = validateImageType(file);
+        String validationMessage = validateUploadImageType(file);
         if (validationMessage != null) {
             return PreparedUploadFile.rejected(file, validationMessage);
+        }
+        try {
+            if (!isReadableJpegFile(file)) {
+                return PreparedUploadFile.rejected(file, "Please select a valid JPG or JPEG image.");
+            }
+        } catch (IOException exception) {
+            return PreparedUploadFile.rejected(file, "Please select a valid JPG or JPEG image.");
         }
         if (file.length() <= maxUploadSizeBytes()) {
             return PreparedUploadFile.ready(file, file, false, null);
@@ -329,7 +341,7 @@ public final class EmployeeDocumentUtil {
         try {
             File compressed = compressJpegWithinLimit(file, maxUploadSizeBytes());
             if (compressed == null) {
-                return PreparedUploadFile.rejected(file, sizeLimitMessage(file.length()));
+                return PreparedUploadFile.rejected(file, compressionLimitMessage());
             }
             return PreparedUploadFile.ready(
                     file,
@@ -341,14 +353,12 @@ public final class EmployeeDocumentUtil {
         } catch (IOException | RuntimeException exception) {
             return PreparedUploadFile.rejected(
                     file,
-                    "This JPG/JPEG image is " + formatSize(file.length())
-                            + ", above the " + maxUploadSizeLabel()
-                            + " limit, and could not be compressed safely."
+                    compressionLimitMessage()
             );
         }
     }
 
-    private static String validateImageType(File file) {
+    public static String validateUploadImageType(File file) {
         if (file == null || !file.isFile()) {
             return "This item is not a valid file.";
         }
@@ -358,20 +368,39 @@ public final class EmployeeDocumentUtil {
         return null;
     }
 
-    private static String sizeLimitMessage(long bytes) {
-        return "File size is " + formatSize(bytes) + "; the limit is " + maxUploadSizeLabel() + ".";
+    private static String compressionLimitMessage() {
+        return "This JPG/JPEG image could not be compressed under the configured upload limit.";
     }
 
     private static boolean isJpegFile(File file) {
         String name = file == null || file.getName() == null ? "" : file.getName().toLowerCase(Locale.ROOT);
-        return name.endsWith(".jpg") || name.endsWith(".jpeg");
+        return name.endsWith(".jpg")
+                || name.endsWith(".jpeg")
+                || name.endsWith(".jpe")
+                || name.endsWith(".jfif");
+    }
+
+    private static boolean isReadableJpegFile(File file) throws IOException {
+        if (hasJpegSignature(file)) {
+            return true;
+        }
+        return readJpegImageLenient(file) != null;
+    }
+
+    private static boolean hasJpegSignature(File file) throws IOException {
+        if (file == null || !file.isFile() || file.length() < 2) {
+            return false;
+        }
+        try (FileInputStream input = new FileInputStream(file)) {
+            int first = input.read();
+            int second = input.read();
+            return first == 0xFF && second == 0xD8;
+        }
     }
 
     private static File compressJpegWithinLimit(File source, long maxBytes) throws IOException {
-        BufferedImage image = ImageIO.read(source);
-        if (image == null) {
-            throw new IOException("Selected file is not a readable JPG/JPEG image.");
-        }
+        BufferedImage image = readJpegImage(source);
+        JpegImageInfo originalInfo = new JpegImageInfo(image.getWidth(), image.getHeight());
 
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
         if (!writers.hasNext()) {
@@ -379,26 +408,55 @@ public final class EmployeeDocumentUtil {
         }
 
         String suffix = source.getName().toLowerCase(Locale.ROOT).endsWith(".jpeg") ? ".jpeg" : ".jpg";
-        Path temp = Files.createTempFile("kgm-upload-", suffix);
+        Path temp = Files.createTempFile(UPLOAD_TEMP_PREFIX, suffix);
+        Path bestTemp = Files.createTempFile(UPLOAD_TEMP_PREFIX + "best-", suffix);
         File best = null;
 
         ImageWriter writer = writers.next();
         try {
-            for (float quality = MAX_JPEG_QUALITY; quality >= MIN_JPEG_QUALITY; quality -= QUALITY_STEP) {
-                writeJpeg(image, temp.toFile(), writer, quality);
-                File candidate = temp.toFile();
-                if (candidate.length() <= maxBytes) {
-                    best = candidate;
-                    break;
+            writeJpeg(image, temp.toFile(), writer, MAX_JPEG_QUALITY);
+            if (temp.toFile().length() <= maxBytes) {
+                Files.move(temp, bestTemp, StandardCopyOption.REPLACE_EXISTING);
+                best = bestTemp.toFile();
+            } else {
+                writeJpeg(image, temp.toFile(), writer, MIN_JPEG_QUALITY);
+                if (temp.toFile().length() > maxBytes) {
+                    Files.deleteIfExists(temp);
+                    Files.deleteIfExists(bestTemp);
+                    return null;
+                }
+                Files.copy(temp, bestTemp, StandardCopyOption.REPLACE_EXISTING);
+                best = bestTemp.toFile();
+
+                float low = MIN_JPEG_QUALITY;
+                float high = MAX_JPEG_QUALITY;
+                while (high - low > QUALITY_PRECISION) {
+                    float quality = (low + high) / 2.0f;
+                    writeJpeg(image, temp.toFile(), writer, quality);
+                    if (temp.toFile().length() <= maxBytes) {
+                        Files.copy(temp, bestTemp, StandardCopyOption.REPLACE_EXISTING);
+                        best = bestTemp.toFile();
+                        low = quality;
+                    } else {
+                        high = quality;
+                    }
                 }
             }
         } finally {
             writer.dispose();
+            Files.deleteIfExists(temp);
         }
 
         if (best == null) {
-            Files.deleteIfExists(temp);
+            Files.deleteIfExists(bestTemp);
             return null;
+        }
+        BufferedImage compressedImage = ImageIO.read(best);
+        if (compressedImage == null
+                || compressedImage.getWidth() != originalInfo.width()
+                || compressedImage.getHeight() != originalInfo.height()) {
+            Files.deleteIfExists(bestTemp);
+            throw new IOException("Compressed image dimensions changed.");
         }
         best.deleteOnExit();
         return best;
@@ -408,10 +466,70 @@ public final class EmployeeDocumentUtil {
         ImageWriteParam params = writer.getDefaultWriteParam();
         params.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
         params.setCompressionQuality(Math.max(MIN_JPEG_QUALITY, Math.min(MAX_JPEG_QUALITY, quality)));
+        Files.deleteIfExists(target.toPath());
         try (ImageOutputStream output = ImageIO.createImageOutputStream(target)) {
             writer.setOutput(output);
             writer.write(null, new IIOImage(image, null, null), params);
         }
+    }
+
+    public static BufferedImage readJpegImage(File file) throws IOException {
+        String typeValidation = validateUploadImageType(file);
+        if (typeValidation != null) {
+            throw new IOException(typeValidation);
+        }
+
+        BufferedImage image = readJpegImageLenient(file);
+        if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0) {
+            throw new IOException("Please select a valid JPG or JPEG image.");
+        }
+        return rgbImage(image);
+    }
+
+    private static BufferedImage readJpegImageLenient(File file) throws IOException {
+        if (file == null || !file.isFile()) {
+            return null;
+        }
+        BufferedImage image = null;
+        try {
+            image = ImageIO.read(file);
+        } catch (IOException | RuntimeException ignored) {
+        }
+        return image == null ? readJpegImageWithIconFallback(file) : image;
+    }
+
+    private static BufferedImage readJpegImageWithIconFallback(File file) {
+        ImageIcon icon;
+        try {
+            icon = new ImageIcon(Files.readAllBytes(file.toPath()));
+        } catch (IOException exception) {
+            return null;
+        }
+        if (icon.getIconWidth() <= 0 || icon.getIconHeight() <= 0) {
+            return null;
+        }
+        BufferedImage image = new BufferedImage(icon.getIconWidth(), icon.getIconHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = image.createGraphics();
+        try {
+            graphics.drawImage(icon.getImage(), 0, 0, null);
+        } finally {
+            graphics.dispose();
+        }
+        return image;
+    }
+
+    private static BufferedImage rgbImage(BufferedImage source) {
+        if (source.getType() == BufferedImage.TYPE_INT_RGB) {
+            return source;
+        }
+        BufferedImage rgb = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = rgb.createGraphics();
+        try {
+            graphics.drawImage(source, 0, 0, null);
+        } finally {
+            graphics.dispose();
+        }
+        return rgb;
     }
 
     public static long maxUploadSizeBytes() {
@@ -422,7 +540,72 @@ public final class EmployeeDocumentUtil {
         return formatSize(maxUploadSizeBytes());
     }
 
+    public static boolean shouldCompressBeforeUpload(File file) {
+        return file != null && file.isFile() && isJpegFile(file) && file.length() > maxUploadSizeBytes();
+    }
+
+    public static boolean isTemporaryUploadFile(File file) {
+        if (file == null || file.getName() == null || !file.getName().startsWith(UPLOAD_TEMP_PREFIX)) {
+            return false;
+        }
+        try {
+            Path tempDir = Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize();
+            Path path = file.toPath().toAbsolutePath().normalize();
+            return path.getParent() != null && path.getParent().equals(tempDir);
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    public static void deleteTemporaryUpload(File file) {
+        if (!isTemporaryUploadFile(file)) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(file.toPath());
+        } catch (IOException ignored) {
+        }
+    }
+
+    public static String copyProfileImageToEmployeeStorage(String employeeCode, File file) throws IOException {
+        if (file == null || !file.isFile()) {
+            throw new IOException("Prepared upload file is missing.");
+        }
+        Path destination = EmployeeStorageUtil.ensureEmployeeDirectory(employeeCode).resolve("EMP_IMG.jpg");
+        Files.copy(file.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+        return EmployeeStorageUtil.profileImagePath(employeeCode);
+    }
+
+    public static String copyDocumentToEmployeeStorage(String employeeCode, int documentIndex, File file) throws IOException {
+        if (file == null || !file.isFile()) {
+            throw new IOException("Prepared upload file is missing.");
+        }
+        String storageName = documentType(documentIndex).storageName();
+        if (isProfileImageDocument(documentIndex)) {
+            Path destination = EmployeeStorageUtil.ensureEmployeeDirectory(employeeCode).resolve(storageName);
+            Files.copy(file.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+            return EmployeeStorageUtil.profileImagePath(employeeCode);
+        }
+
+        Path destination = EmployeeStorageUtil.ensureDocumentDirectory(employeeCode).resolve(storageName);
+        Files.copy(file.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+        return EmployeeStorageUtil.documentPath(employeeCode, storageName);
+    }
+
+    @FunctionalInterface
+    public interface UploadPreparationListener {
+        void onProgress(String message, int completedFiles, int totalFiles, int percent);
+    }
+
     public static BulkUploadResult matchBulkFiles(File[] selectedFiles, boolean[] lockedDocuments) {
+        return matchBulkFiles(selectedFiles, lockedDocuments, null);
+    }
+
+    public static BulkUploadResult matchBulkFiles(
+            File[] selectedFiles,
+            boolean[] lockedDocuments,
+            UploadPreparationListener listener
+    ) {
         BulkUploadResult result = new BulkUploadResult();
         Set<Integer> matchedThisBatch = new HashSet<>();
 
@@ -430,10 +613,12 @@ public final class EmployeeDocumentUtil {
             return result;
         }
 
-        for (File file : selectedFiles) {
-            PreparedUploadFile prepared = prepareImageForUpload(file);
-            if (!prepared.ready()) {
-                result.discard(fileName(file) + " - " + prepared.message());
+        for (int index = 0; index < selectedFiles.length; index++) {
+            File file = selectedFiles[index];
+            notifyPreparation(listener, "Checking " + fileName(file) + "...", index, selectedFiles.length);
+            String typeValidation = validateUploadImageType(file);
+            if (typeValidation != null) {
+                result.discard(fileName(file) + " - " + typeValidation);
                 continue;
             }
 
@@ -456,6 +641,15 @@ public final class EmployeeDocumentUtil {
             }
 
             int documentIndex = match.documentIndex();
+            if (shouldCompressBeforeUpload(file)) {
+                notifyPreparation(listener, "Compressing " + cleanDocumentLabel(documentIndex) + "...", index, selectedFiles.length);
+            }
+            PreparedUploadFile prepared = prepareImageForUpload(file);
+            if (!prepared.ready()) {
+                result.discard(fileName(file) + " - " + prepared.message());
+                continue;
+            }
+
             matchedThisBatch.add(documentIndex);
             result.uploaded(new BulkUploadItem(
                     documentIndex,
@@ -464,9 +658,26 @@ public final class EmployeeDocumentUtil {
                     prepared.originalFile(),
                     prepared.compressed()
             ));
+            notifyPreparation(listener, "Prepared " + cleanDocumentLabel(documentIndex) + ".", index + 1, selectedFiles.length);
         }
 
+        notifyPreparation(listener, "Finished preparing selected files.", selectedFiles.length, selectedFiles.length);
         return result;
+    }
+
+    private static void notifyPreparation(
+            UploadPreparationListener listener,
+            String message,
+            int completedFiles,
+            int totalFiles
+    ) {
+        if (listener == null) {
+            return;
+        }
+        int percent = totalFiles <= 0
+                ? 100
+                : Math.min(100, Math.max(0, (int) Math.round(completedFiles * 100.0 / totalFiles)));
+        listener.onProgress(message, completedFiles, totalFiles, percent);
     }
 
     public static DocumentMatch matchDocumentForFile(File file) {
@@ -590,6 +801,9 @@ public final class EmployeeDocumentUtil {
         private static PreparedUploadFile rejected(File originalFile, String message) {
             return new PreparedUploadFile(originalFile, null, false, false, message);
         }
+    }
+
+    private record JpegImageInfo(int width, int height) {
     }
 
     public record BulkUploadItem(

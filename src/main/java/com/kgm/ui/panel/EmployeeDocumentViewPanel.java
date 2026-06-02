@@ -7,9 +7,6 @@ import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDocumentViewPanelHelper;
 import com.kgm.ui.styling.TablePaginationHelper;
 import com.kgm.util.EmployeeDocumentUtil;
-import com.kgm.util.EmployeeStorageUtil;
-
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -23,9 +20,6 @@ import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -39,6 +33,8 @@ public class EmployeeDocumentViewPanel extends JPanel {
     private DefaultTableModel model;
     private File[] files;
     private String[] filePaths;
+    private String[] displayFileNames;
+    private boolean[] temporaryUploadFiles;
     private boolean[] lockedDocuments;
     private JLabel uploadedCountLabel;
     private JTextField searchField;
@@ -56,6 +52,8 @@ public class EmployeeDocumentViewPanel extends JPanel {
 
         files = new File[EmployeeDocumentUtil.documentCount()];
         filePaths = new String[EmployeeDocumentUtil.documentCount()];
+        displayFileNames = new String[EmployeeDocumentUtil.documentCount()];
+        temporaryUploadFiles = new boolean[EmployeeDocumentUtil.documentCount()];
         lockedDocuments = new boolean[EmployeeDocumentUtil.documentCount()];
 
         JPanel topPanel = EmployeeDocumentViewPanelHelper.createTopPanel();
@@ -197,7 +195,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
         if (file == null) {
             model.addRow(new Object[]{documentLabel, "-", "Not Uploaded", "Upload", documentIndex});
         } else {
-            model.addRow(new Object[]{documentLabel, file.getName(), "Ready to Save (" + EmployeeDocumentUtil.formatSize(file.length()) + ")", "View", documentIndex});
+            model.addRow(new Object[]{documentLabel, selectedFileName(documentIndex), "Ready to Save (" + EmployeeDocumentUtil.formatSize(file.length()) + ")", "View", documentIndex});
         }
     }
 
@@ -228,6 +226,9 @@ public class EmployeeDocumentViewPanel extends JPanel {
         String path = filePaths[documentIndex];
         if (EmployeeDocumentUtil.hasStoredPath(path)) {
             searchableValues.add(EmployeeDocumentUtil.fileNameFromPath(path));
+        }
+        if (displayFileNames[documentIndex] != null) {
+            searchableValues.add(displayFileNames[documentIndex]);
         }
 
         int bestScore = 2;
@@ -343,7 +344,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
     }
 
     private void prepareSingleFile(int documentIndex, File selectedFile) {
-        if (selectedFile.length() <= EmployeeDocumentUtil.maxUploadSizeBytes()) {
+        if (!EmployeeDocumentUtil.shouldCompressBeforeUpload(selectedFile)) {
             applySingleFile(documentIndex, EmployeeDocumentUtil.prepareImageForUpload(selectedFile));
             return;
         }
@@ -381,8 +382,11 @@ public class EmployeeDocumentViewPanel extends JPanel {
         }
 
         File file = prepared.file();
+        discardTemporaryUpload(documentIndex, file);
         files[documentIndex] = file;
         filePaths[documentIndex] = file.getAbsolutePath();
+        displayFileNames[documentIndex] = prepared.originalFile().getName();
+        temporaryUploadFiles[documentIndex] = prepared.compressed();
         notifyProfileImageUpload(documentIndex, file);
         int modelRow = findModelRowByDocumentIndex(documentIndex);
         if (modelRow >= 0) {
@@ -404,11 +408,47 @@ public class EmployeeDocumentViewPanel extends JPanel {
             return;
         }
 
-        EmployeeDocumentUtil.BulkUploadResult summary =
-                EmployeeDocumentUtil.matchBulkFiles(selectedFiles, lockedDocuments);
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Preparing Upload All",
+                "Checking selected JPG/JPEG documents..."
+        );
+        SwingWorker<EmployeeDocumentUtil.BulkUploadResult, Void> worker = new SwingWorker<>() {
+            @Override
+            protected EmployeeDocumentUtil.BulkUploadResult doInBackground() {
+                return EmployeeDocumentUtil.matchBulkFiles(
+                        selectedFiles,
+                        lockedDocuments,
+                        (message, completedFiles, totalFiles, percent) -> SwingUtilities.invokeLater(() -> {
+                            loader.setMessage(message);
+                            loader.setProgress(percent);
+                        })
+                );
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                try {
+                    applyBulkUploadSummary(get());
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    DialogHelper.warning(EmployeeDocumentViewPanel.this, "Upload Stopped", "Upload preparation was interrupted.");
+                } catch (ExecutionException exception) {
+                    DialogHelper.warning(EmployeeDocumentViewPanel.this, "Cannot Prepare Uploads", "Selected files could not be prepared.");
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void applyBulkUploadSummary(EmployeeDocumentUtil.BulkUploadResult summary) {
         for (EmployeeDocumentUtil.BulkUploadItem item : summary.uploadedDocuments()) {
+            discardTemporaryUpload(item.documentIndex(), item.file());
             files[item.documentIndex()] = item.file();
             filePaths[item.documentIndex()] = item.file().getAbsolutePath();
+            displayFileNames[item.documentIndex()] = item.originalFile().getName();
+            temporaryUploadFiles[item.documentIndex()] = item.compressed();
             notifyProfileImageUpload(item.documentIndex(), item.file());
         }
 
@@ -451,7 +491,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
         }
 
         try {
-            BufferedImage img = ImageIO.read(file);
+            BufferedImage img = EmployeeDocumentUtil.readJpegImage(file);
             if (img == null) {
                 DialogHelper.error(this, "Cannot Open File", "Cannot open file.");
                 return;
@@ -491,8 +531,11 @@ public class EmployeeDocumentViewPanel extends JPanel {
         if (documentIndex < 0 || file == null || lockedDocuments[documentIndex]) {
             return;
         }
+        discardTemporaryUpload(documentIndex, file);
         files[documentIndex] = file;
         filePaths[documentIndex] = file.getAbsolutePath();
+        displayFileNames[documentIndex] = file.getName();
+        temporaryUploadFiles[documentIndex] = EmployeeDocumentUtil.isTemporaryUploadFile(file);
         refreshDocumentRows();
         updateCount();
         model.fireTableDataChanged();
@@ -537,22 +580,12 @@ public class EmployeeDocumentViewPanel extends JPanel {
             return update;
         }
 
-        Path employeeDir = EmployeeStorageUtil.ensureEmployeeDirectory(empCode);
-        Path docDir = EmployeeStorageUtil.ensureDocumentDirectory(empCode);
-
         for (int index = 0; index < files.length; index++) {
             if (lockedDocuments[index] || files[index] == null) {
                 continue;
             }
 
-            String storageName = EmployeeDocumentUtil.documentType(index).storageName();
-            Path dest = EmployeeDocumentUtil.isProfileImageDocument(index)
-                    ? employeeDir.resolve(storageName)
-                    : docDir.resolve(storageName);
-            Files.copy(files[index].toPath(), dest, StandardCopyOption.REPLACE_EXISTING);
-            String dbPath = EmployeeDocumentUtil.isProfileImageDocument(index)
-                    ? EmployeeStorageUtil.profileImagePath(empCode)
-                    : EmployeeStorageUtil.documentPath(empCode, storageName);
+            String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage(empCode, index, files[index]);
             EmployeeDocumentUtil.setDocumentPath(update, index, dbPath);
         }
         return update;
@@ -573,6 +606,34 @@ public class EmployeeDocumentViewPanel extends JPanel {
 
     private boolean rowHasPendingFile(int row) {
         return !lockedDocuments[row] && files[row] != null;
+    }
+
+    private String selectedFileName(int documentIndex) {
+        String displayName = displayFileNames[documentIndex];
+        return displayName == null || displayName.isBlank()
+                ? files[documentIndex].getName()
+                : displayName;
+    }
+
+    private void discardTemporaryUpload(int documentIndex, File replacement) {
+        if (documentIndex < 0
+                || documentIndex >= temporaryUploadFiles.length
+                || !temporaryUploadFiles[documentIndex]) {
+            return;
+        }
+        File current = files[documentIndex];
+        temporaryUploadFiles[documentIndex] = false;
+        if (current != null && !sameFile(current, replacement)) {
+            EmployeeDocumentUtil.deleteTemporaryUpload(current);
+        }
+    }
+
+    private boolean sameFile(File first, File second) {
+        if (first == null || second == null) {
+            return false;
+        }
+        return first.toPath().toAbsolutePath().normalize()
+                .equals(second.toPath().toAbsolutePath().normalize());
     }
 
     class ActionRenderer extends JPanel implements TableCellRenderer {

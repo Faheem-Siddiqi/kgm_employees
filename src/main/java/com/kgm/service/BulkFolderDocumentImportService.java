@@ -3,13 +3,11 @@ package com.kgm.service;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.model.Employee;
 import com.kgm.util.EmployeeDocumentUtil;
-import com.kgm.util.EmployeeStorageUtil;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -105,9 +103,9 @@ public class BulkFolderDocumentImportService {
                     files.size()
             );
             String prefix = file.getName() + " - ";
-            String validationMessage = EmployeeDocumentUtil.validateImageFile(file);
-            if (validationMessage != null) {
-                summary.error(folder, prefix + validationMessage);
+            String typeValidation = EmployeeDocumentUtil.validateUploadImageType(file);
+            if (typeValidation != null) {
+                summary.error(folder, prefix + typeValidation);
                 continue;
             }
 
@@ -130,6 +128,21 @@ public class BulkFolderDocumentImportService {
                 summary.error(folder, prefix + "Another file in this folder already matched " + documentLabel + ".");
                 continue;
             }
+            if (EmployeeDocumentUtil.shouldCompressBeforeUpload(file)) {
+                reportFileStep(
+                        progressListener,
+                        "Compressing " + employeeCode + " / " + documentLabel + "...",
+                        folderIndex,
+                        totalFolders,
+                        fileIndex,
+                        files.size()
+                );
+            }
+            EmployeeDocumentUtil.PreparedUploadFile prepared = EmployeeDocumentUtil.prepareImageForUpload(file);
+            if (!prepared.ready()) {
+                summary.error(folder, prefix + prepared.message());
+                continue;
+            }
 
             try {
                 reportFileStep(
@@ -140,13 +153,17 @@ public class BulkFolderDocumentImportService {
                         fileIndex,
                         files.size()
                 );
-                String dbPath = copyDocument(employeeCode, documentIndex, file);
+                String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage(employeeCode, documentIndex, prepared.file());
                 EmployeeDocumentUtil.setDocumentPath(update, documentIndex, dbPath);
                 matchedThisFolder.add(documentIndex);
                 uploadedForEmployee++;
                 summary.uploadedDocument(employeeCode, documentLabel);
             } catch (IOException exception) {
                 summary.error(folder, prefix + "Upload failed: " + exception.getMessage());
+            } finally {
+                if (prepared.compressed()) {
+                    EmployeeDocumentUtil.deleteTemporaryUpload(prepared.file());
+                }
             }
         }
 
@@ -176,22 +193,6 @@ public class BulkFolderDocumentImportService {
             candidate = candidate.getParentFile();
         }
         return null;
-    }
-
-    private String copyDocument(String employeeCode, int documentIndex, File file) throws IOException {
-        String storageName = EmployeeDocumentUtil.documentType(documentIndex).storageName();
-        Path employeeDir = EmployeeStorageUtil.ensureEmployeeDirectory(employeeCode);
-        Path destination;
-        String dbPath;
-        if (EmployeeDocumentUtil.isProfileImageDocument(documentIndex)) {
-            destination = employeeDir.resolve(storageName);
-            dbPath = EmployeeStorageUtil.profileImagePath(employeeCode);
-        } else {
-            destination = EmployeeStorageUtil.ensureDocumentDirectory(employeeCode).resolve(storageName);
-            dbPath = EmployeeStorageUtil.documentPath(employeeCode, storageName);
-        }
-        Files.copy(file.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
-        return dbPath;
     }
 
     private List<File> validFolders(File[] selectedFolders) {

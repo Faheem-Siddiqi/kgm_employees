@@ -5,6 +5,7 @@ import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.DropdownFieldSupport;
 import com.kgm.ui.component.FileUploadCard;
+import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.component.UniversalDatePicker;
 import com.kgm.ui.component.UniversalTextArea;
 import com.kgm.ui.styling.DialogHelper;
@@ -16,7 +17,6 @@ import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
 import com.kgm.util.PhoneFormatter;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.LineBorder;
 import javax.swing.event.DocumentEvent;
@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
@@ -336,7 +337,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
                 return;
             }
 
-            BufferedImage img = ImageIO.read(imgFile);
+            BufferedImage img = EmployeeDocumentUtil.readJpegImage(imgFile);
             if (img == null) {
                 lockProfileImageUpload();
                 return;
@@ -378,29 +379,61 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             return;
         }
 
-        applySelectedImage(file, true);
+        prepareSelectedImage(file, true);
     }
 
     public void setSelectedImageFromDocumentUpload(File file) {
-        applySelectedImage(file, false);
+        prepareSelectedImage(file, false);
     }
 
     public void setSelectedImageListener(Consumer<File> selectedImageListener) {
         this.selectedImageListener = selectedImageListener;
     }
 
-    private void applySelectedImage(File file, boolean notifyListener) {
+    private void prepareSelectedImage(File file, boolean notifyListener) {
         if (file == null || !selectedImageCanChange()) {
             return;
         }
 
-        String validationMessage = EmployeeDocumentUtil.validateImageFile(file);
-        if (validationMessage != null) {
-            DialogHelper.warning(this, "Invalid Image", validationMessage);
+        if (!EmployeeDocumentUtil.shouldCompressBeforeUpload(file)) {
+            applySelectedImage(EmployeeDocumentUtil.prepareImageForUpload(file), notifyListener);
+            return;
+        }
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Preparing Photo",
+                "Compressing JPG/JPEG photo to fit the upload limit..."
+        );
+        SwingWorker<EmployeeDocumentUtil.PreparedUploadFile, Void> worker = new SwingWorker<>() {
+            @Override
+            protected EmployeeDocumentUtil.PreparedUploadFile doInBackground() {
+                return EmployeeDocumentUtil.prepareImageForUpload(file);
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                try {
+                    applySelectedImage(get(), notifyListener);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    DialogHelper.warning(EmployeeBasicDetailsPanel.this, "Upload Stopped", "Photo preparation was interrupted.");
+                } catch (ExecutionException exception) {
+                    DialogHelper.warning(EmployeeBasicDetailsPanel.this, "Invalid Image", "The selected photo could not be prepared.");
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void applySelectedImage(EmployeeDocumentUtil.PreparedUploadFile prepared, boolean notifyListener) {
+        if (!prepared.ready()) {
+            DialogHelper.warning(this, "Invalid Image", prepared.message());
             return;
         }
         try {
-            BufferedImage img = ImageIO.read(file);
+            File file = prepared.file();
+            BufferedImage img = EmployeeDocumentUtil.readJpegImage(file);
             if (img == null) {
                 DialogHelper.warning(this, "Invalid Image", "Please select a valid JPEG image.");
                 return;
@@ -408,7 +441,7 @@ public class EmployeeBasicDetailsPanel extends JPanel {
             selectedImage = file;
             setPhotoPreviewImage(img);
             if (photoUploadCard != null) {
-                photoUploadCard.setStatus(file.getName());
+                photoUploadCard.setStatus(prepared.originalFile().getName());
             }
             if (notifyListener && selectedImageListener != null) {
                 selectedImageListener.accept(file);

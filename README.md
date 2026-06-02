@@ -192,7 +192,7 @@ The project follows a layered desktop-application architecture:
 | **EmployeeAdditionalFieldDefaults.java** | Seeds the 43 ERP/detail custom fields with database columns, Field Management categories, date/dropdown behavior, and Excel sample values. |
 | **EmployeeFieldDefinitionCache.java** | Keeps field metadata in memory for the current app session so screens reuse one loaded catalog. It is refreshed only at startup warm-up or after Field Management changes. |
 | **EmployeeFieldMetadataStore.java** | Reads/writes validated metadata JSON snapshots for external AppData backup, backup-copy recovery, bundled factory defaults, and local cache refresh. |
-| **EmployeeDocumentUtil.java** | Shared document metadata, validation, path handling, filename matching, and bulk-upload matching for the 22 required document fields. |
+| **EmployeeDocumentUtil.java** | Shared document metadata, validation, JPEG upload preparation/compression, path handling, filename matching, and bulk-upload matching for the required document fields. |
 | **FileUtil.java** | Reserved file utility boundary for shared file handling logic. |
 | **FilterUtil.java** | Reserved filtering utility boundary for reusable search/filter behavior. |
 | **ValidationUtil.java** | Reserved validation utility boundary for shared input validation rules. |
@@ -237,7 +237,7 @@ The project follows a layered desktop-application architecture:
    -> EmployeeRecordDao.updateEmployeeDynamic -> MySQL
 
 7. Document Handling
-   EmployeeDocumentUploadPanel -> dynamic search, single upload, or Upload All filename matching for the 22 configured document fields
+   EmployeeDocumentUploadPanel -> dynamic search, single upload, or Upload All filename matching for the configured document fields
    -> configured local employee storage, saved in DB as employees/{employeeCode}/documents paths
    EmployeeDocumentViewPanel -> searchable saved documents, locked-document checks, single or Upload All upload for missing documents
    -> missing documents uploaded through detail update
@@ -279,7 +279,7 @@ Key schema areas:
 - Payroll and banking: salary, pay categories, bank account, SS/EOBI/tax/PF fields.
 - Contact: phone, addresses, email, emergency number.
 - Compliance and benefits: clearance, verification, wellness, vaccination.
-- Documents: 22 required document path columns plus the employee profile image path. Database columns use uppercase underscore names; UI labels use readable business names.
+- Documents: configured document path columns plus the employee profile image path. Database columns use uppercase underscore names; UI labels use readable business names.
 - Field metadata: category headings, labels, Core/detail/document behavior, custom origin, date/dropdown behavior, variable-option behavior, dropdown options, and custom fields are stored separately so Field Management changes appear throughout forms, detail views, document panels, reports, and Excel import.
 
 ### Required Basic Employee Fields
@@ -440,7 +440,12 @@ Additional styling colors used in the document upload interface:
 - Document fields are record-safe: if a document path already exists in the database, that document remains marked `Locked`, can be viewed from the detail screen, and cannot be replaced.
 - If a document field is empty or a placeholder, the detail screen allows upload. The file is copied under `KGM_EMPLOYEE_STORAGE_DIR` and the logical database path is saved as `employees/{employeeCode}/documents/{file}` on Update.
 - Profile image follows the same safety rule: it can be uploaded only when `EMP_IMG` is empty or a placeholder.
-- Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be JPG/JPEG, must be within `KGM_DOCUMENT_UPLOAD_MAX_BYTES`, and must match a document label, Employee field name, storage filename, or supported alias from `resources/Labels.txt` after normalizing spaces, underscores, punctuation, and case.
+- Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be a real JPG/JPEG image and must match a document label, Employee field name, storage filename, or supported alias from `resources/Labels.txt` after normalizing spaces, underscores, punctuation, and case.
+- Document/photo upload size is controlled by `AppConfig.documentUploadMaxBytes()`, which reads `kgm.document.upload.max.bytes`, then `KGM_DOCUMENT_UPLOAD_MAX_BYTES`, then `.env`, then defaults to `409600` bytes (400 KB). Commas and underscores are accepted in the value, for example `614,400` or `1_024_000`.
+- If a selected JPG/JPEG is above the configured upload limit, the app dynamically searches for the best JPEG quality that fits before saving. It does not resize, crop, rotate, or scale the image, and it verifies that the compressed width and height match the original image.
+- Compression applies to employee photo uploads, Add Employee document uploads, View Employee Details document uploads, `Upload All`, single upload/replace for missing documents, and the Home dashboard bulk folder document upload. Excel import/export is not part of this flow.
+- Bulk upload saves time by rejecting unsupported file types, unmatched names, locked DB documents, and duplicate matches before compression work starts. Compressed temp files are cleaned after home bulk copies and when pending panel uploads are replaced or cleared.
+- If a JPG/JPEG cannot be compressed under the configured limit without keeping the same dimensions, the file is rejected and the user sees the normal upload warning.
 - Upload matching accepts database-style names such as `SS_CARD` and user-facing names such as `Social Security Card`; files are saved using the configured storage filename for the matching document type.
 - Detail document upload keeps saved DB document records locked. If `Upload All` includes a file matching an already-saved document, the file is skipped and the dialog explains that the document already exists in DB and cannot be replaced.
 - After a bulk upload attempt, the user receives a summary showing how many documents are ready to save and which files were discarded with the reason.
@@ -493,6 +498,7 @@ Settings can be passed through JVM properties, OS environment variables, or `.en
 | `KGM_ADMIN_USER` | `kgm.admin.user` | Application admin username |
 | `KGM_ADMIN_PASSWORD` | `kgm.admin.password` | Application admin password |
 | `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local folder for employee photos and documents |
+| `KGM_DOCUMENT_UPLOAD_MAX_BYTES` | `kgm.document.upload.max.bytes` | Maximum prepared JPG/JPEG document/photo upload size in bytes; files above it use the best JPEG quality that fits |
 
 ### Startup
 
@@ -627,4 +633,4 @@ Internal use only - Kohinoor Textile Mills Gujar Khan Ltd.
 
 ---
 
-**Last Updated**: May 2026
+**Last Updated**: June 2026
