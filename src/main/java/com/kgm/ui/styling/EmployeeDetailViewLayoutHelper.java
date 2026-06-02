@@ -5,14 +5,28 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 
 public final class EmployeeDetailViewLayoutHelper {
-    private static final int HEADER_CTA_GAP = 18;
+    private static final int HEADER_CTA_GAP = 10;
 
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color NAVY = new Color(0, 38, 77);
-    private static final Color LINK_BLUE = new Color(0, 102, 204);
-    private static final Color SUCCESS_GREEN = new Color(15, 139, 76);
+    private static final Color DASHBOARD_BLUE = new Color(37, 99, 235);
+    private static final Color DASHBOARD_BLUE_HOVER = new Color(29, 78, 216);
+    private static final Color DASHBOARD_BLUE_PRESSED = new Color(30, 64, 175);
+    private static final Color DOWNLOAD_GREEN = new Color(22, 163, 74);
+    private static final Color DOWNLOAD_GREEN_HOVER = new Color(21, 128, 61);
+    private static final Color DOWNLOAD_GREEN_PRESSED = new Color(22, 101, 52);
     private static final Color EMPLOYEE_NAME = new Color(100, 100, 100);
     private static final Color EMPLOYEE_CODE = new Color(90, 90, 90);
+    private static final HeaderButtonStyle DASHBOARD_BUTTON_STYLE = new HeaderButtonStyle(
+            DASHBOARD_BLUE,
+            DASHBOARD_BLUE_HOVER,
+            DASHBOARD_BLUE_PRESSED
+    );
+    private static final HeaderButtonStyle DOWNLOAD_BUTTON_STYLE = new HeaderButtonStyle(
+            DOWNLOAD_GREEN,
+            DOWNLOAD_GREEN_HOVER,
+            DOWNLOAD_GREEN_PRESSED
+    );
 
     private EmployeeDetailViewLayoutHelper() {
     }
@@ -50,7 +64,7 @@ public final class EmployeeDetailViewLayoutHelper {
     ) {
         JPanel header = new JPanel(new GridBagLayout());
         header.setBackground(PAGE_BACKGROUND);
-        header.setBorder(new EmptyBorder(25, 28, 0, 28));
+        header.setBorder(new EmptyBorder(25, 28, 18, 28));
 
         JPanel titleBlock = new JPanel();
         titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
@@ -112,22 +126,7 @@ public final class EmployeeDetailViewLayoutHelper {
     private static JButton createDownloadReportButton() {
         JButton button = new JButton("Download Profile");
         button.setAlignmentX(Component.LEFT_ALIGNMENT);
-        button.setBorderPainted(false);
-        button.setContentAreaFilled(true);
-        button.setFocusPainted(false);
-        button.setOpaque(true);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setBackground(new Color(22, 163, 74));
-        button.setForeground(Color.WHITE);
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
-        button.setMargin(new Insets(0, 0, 0, 0));
-        button.setBorder(new EmptyBorder(7, 16, 7, 16));
-        Dimension size = new Dimension(154, 34);
-        button.setMinimumSize(size);
-        button.setPreferredSize(size);
-        button.setMaximumSize(size);
-        button.setVerticalAlignment(SwingConstants.CENTER);
-        ButtonStateHelper.install(button);
+        styleHeaderCtaButton(button, new Dimension(156, 36), DOWNLOAD_BUTTON_STYLE);
         return button;
     }
 
@@ -138,17 +137,26 @@ public final class EmployeeDetailViewLayoutHelper {
     }
 
     public static void styleBackButton(JButton button) {
+        styleHeaderCtaButton(button, new Dimension(116, 36), DASHBOARD_BUTTON_STYLE);
+    }
+
+    private static void styleHeaderCtaButton(JButton button, Dimension size, HeaderButtonStyle style) {
         button.setBorderPainted(false);
         button.setContentAreaFilled(false);
         button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(new Color(99, 115, 129));
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
-        Dimension size = new Dimension(112, 34);
+        button.setOpaque(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setForeground(Color.WHITE);
+        button.setBackground(style.background());
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        button.setBorder(new EmptyBorder(7, 14, 7, 14));
+        button.setMargin(new Insets(0, 0, 0, 0));
         button.setMinimumSize(size);
         button.setPreferredSize(size);
         button.setMaximumSize(size);
         button.setVerticalAlignment(SwingConstants.CENTER);
+        ButtonStateHelper.installRounded(button, 8);
+        ButtonStateHelper.setHoverBackground(button, style.hoverBackground(), style.pressedBackground());
     }
 
     public static JPanel createEmployeeSummaryPanel() {
@@ -190,6 +198,9 @@ public final class EmployeeDetailViewLayoutHelper {
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         button.setForeground(Color.WHITE);
         button.setBackground(NAVY);
+    }
+
+    private record HeaderButtonStyle(Color background, Color hoverBackground, Color pressedBackground) {
     }
 }
 

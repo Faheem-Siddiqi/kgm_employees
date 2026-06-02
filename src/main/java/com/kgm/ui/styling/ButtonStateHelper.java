@@ -10,6 +10,10 @@ public final class ButtonStateHelper {
     private static final String ENABLED_BACKGROUND = "kgm.buttonState.enabledBackground";
     private static final String ENABLED_FOREGROUND = "kgm.buttonState.enabledForeground";
     private static final String ENABLED_CURSOR = "kgm.buttonState.enabledCursor";
+    private static final String ROUND_RADIUS = "kgm.buttonState.roundRadius";
+    private static final String HOVER_BACKGROUND = "kgm.buttonState.hoverBackground";
+    private static final String PRESSED_BACKGROUND = "kgm.buttonState.pressedBackground";
+    private static final String PAINT_ROUNDED_BACKGROUND = "kgm.buttonState.paintRoundedBackground";
     private static final Color FILLED_BUTTON_TEXT = Color.WHITE;
     private static final Color PLAIN_BUTTON_TEXT = new Color(99, 115, 129);
     private static final Color DISABLED_FILLED_TEXT = Color.WHITE;
@@ -35,6 +39,27 @@ public final class ButtonStateHelper {
         applyState(button);
     }
 
+    public static void installRounded(AbstractButton button, int radius) {
+        if (button == null) {
+            return;
+        }
+        button.putClientProperty(PAINT_ROUNDED_BACKGROUND, true);
+        button.putClientProperty(ROUND_RADIUS, Math.max(0, radius));
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setRolloverEnabled(true);
+        install(button);
+    }
+
+    public static void setHoverBackground(AbstractButton button, Color hoverBackground, Color pressedBackground) {
+        if (button == null) {
+            return;
+        }
+        button.putClientProperty(HOVER_BACKGROUND, hoverBackground);
+        button.putClientProperty(PRESSED_BACKGROUND, pressedBackground);
+        button.repaint();
+    }
+
     public static void setEnabled(AbstractButton button, boolean enabled) {
         install(button);
         button.setEnabled(enabled);
@@ -57,7 +82,7 @@ public final class ButtonStateHelper {
         Color background = colorProperty(button, ENABLED_BACKGROUND, button.getBackground());
         Color foreground = colorProperty(button, ENABLED_FOREGROUND, button.getForeground());
         Cursor cursor = cursorProperty(button, ENABLED_CURSOR);
-        boolean filled = button.isContentAreaFilled() && !isLight(background);
+        boolean filled = isFilledButton(button, background);
 
         button.setForeground(button.isEnabled()
                 ? textColorFor(button, background, foreground)
@@ -100,7 +125,7 @@ public final class ButtonStateHelper {
     }
 
     private static Color textColorFor(AbstractButton button, Color background, Color foreground) {
-        if (!button.isContentAreaFilled() || isLight(background)) {
+        if (!isFilledButton(button, background)) {
             return foreground == null || Color.WHITE.equals(foreground) ? PLAIN_BUTTON_TEXT : foreground;
         }
         return FILLED_BUTTON_TEXT;
@@ -116,11 +141,33 @@ public final class ButtonStateHelper {
                 && relativeLuminance(color) >= 0.78;
     }
 
+    private static boolean isFilledButton(AbstractButton button, Color background) {
+        return (button.isContentAreaFilled() || Boolean.TRUE.equals(button.getClientProperty(PAINT_ROUNDED_BACKGROUND)))
+                && !isLight(background);
+    }
+
     private static double relativeLuminance(Color color) {
         return (0.2126 * color.getRed() + 0.7152 * color.getGreen() + 0.0722 * color.getBlue()) / 255.0;
     }
 
     private static class ReadableButtonUI extends BasicButtonUI {
+        @Override
+        public void update(Graphics graphics, JComponent component) {
+            if (paintsRoundedBackground(component)) {
+                paint(graphics, component);
+                return;
+            }
+            super.update(graphics, component);
+        }
+
+        @Override
+        public void paint(Graphics graphics, JComponent component) {
+            if (component instanceof AbstractButton button && paintsRoundedBackground(component)) {
+                paintRoundedBackground(graphics, button);
+            }
+            super.paint(graphics, component);
+        }
+
         @Override
         protected void paintText(Graphics graphics, AbstractButton button, Rectangle textRect, String text) {
             ButtonModel model = button.getModel();
@@ -138,6 +185,35 @@ public final class ButtonStateHelper {
                 int underlineWidth = metrics.charWidth(text.charAt(mnemonicIndex));
                 graphics.fillRect(underlineX, underlineY, underlineWidth, 1);
             }
+        }
+
+        private static boolean paintsRoundedBackground(JComponent component) {
+            return Boolean.TRUE.equals(component.getClientProperty(PAINT_ROUNDED_BACKGROUND));
+        }
+
+        private static void paintRoundedBackground(Graphics graphics, AbstractButton button) {
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color fill = button.getBackground();
+            ButtonModel model = button.getModel();
+            if (button.isEnabled()) {
+                if (model.isPressed() && model.isArmed()) {
+                    fill = colorProperty(button, PRESSED_BACKGROUND, fill);
+                } else if (model.isRollover()) {
+                    fill = colorProperty(button, HOVER_BACKGROUND, fill);
+                }
+            }
+
+            int radius = intProperty(button, ROUND_RADIUS, 8);
+            g2.setColor(fill);
+            g2.fillRoundRect(0, 0, button.getWidth(), button.getHeight(), radius, radius);
+            g2.dispose();
+        }
+
+        private static int intProperty(AbstractButton button, String key, int fallback) {
+            Object value = button.getClientProperty(key);
+            return value instanceof Number number ? number.intValue() : fallback;
         }
     }
 }

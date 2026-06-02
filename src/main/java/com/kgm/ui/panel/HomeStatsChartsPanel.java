@@ -2,6 +2,7 @@ package com.kgm.ui.panel;
 
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.ui.MissingDataView;
+import com.kgm.ui.styling.ButtonStateHelper;
 import com.kgm.ui.styling.HomeStatsChartHelper;
 
 import javax.swing.*;
@@ -226,6 +227,8 @@ public class HomeStatsChartsPanel extends JPanel {
         button.setForeground(HomeStatsChartHelper.TEXT_PRIMARY);
         button.setBackground(HomeStatsChartHelper.SURFACE);
         button.setBorder(HomeStatsChartHelper.buttonBorder());
+        ButtonStateHelper.installRounded(button, 8);
+        ButtonStateHelper.setHoverBackground(button, HomeStatsChartHelper.MUTED_SURFACE, new Color(241, 245, 249));
     }
 
     private void configureDepartmentChart() {
@@ -565,11 +568,7 @@ public class HomeStatsChartsPanel extends JPanel {
         scrollPane.getViewport().setOpaque(false);
         scrollPane.setWheelScrollingEnabled(false);
         installChartWheelForwarding(scrollPane, chart);
-        scrollPane.getHorizontalScrollBar().setUnitIncrement(HomeStatsChartHelper.CHART_SCROLL_UNIT);
-        scrollPane.getHorizontalScrollBar().setBlockIncrement(Math.max(
-                HomeStatsChartHelper.CHART_SCROLL_UNIT,
-                HomeStatsChartHelper.CHART_MIN_WIDTH - HomeStatsChartHelper.CHART_SCROLL_BLOCK_GAP
-        ));
+        HomeStatsChartHelper.styleHorizontalScrollBar(scrollPane.getHorizontalScrollBar());
         return scrollPane;
     }
 
@@ -1002,8 +1001,8 @@ public class HomeStatsChartsPanel extends JPanel {
         }
 
         private void drawEmptyState(Graphics2D g2) {
-            g2.setColor(new Color(246, 248, 251));
-            g2.fillRoundRect(18, 18, Math.max(0, getWidth() - 36), Math.max(0, getHeight() - 36), 18, 18);
+            g2.setColor(HomeStatsChartHelper.MUTED_SURFACE);
+            g2.fillRoundRect(18, 18, Math.max(0, getWidth() - 36), Math.max(0, getHeight() - 36), 8, 8);
             g2.setColor(HomeStatsChartHelper.TEXT_SECONDARY);
             g2.setFont(HomeStatsChartHelper.EMPTY_FONT);
             String text = "No data available";
@@ -1389,7 +1388,7 @@ public class HomeStatsChartsPanel extends JPanel {
         }
 
         private void drawEmptyState(Graphics2D g2) {
-            g2.setColor(new Color(246, 248, 251));
+            g2.setColor(HomeStatsChartHelper.MUTED_SURFACE);
             g2.fillRoundRect(18, 18, Math.max(0, getWidth() - 36), Math.max(0, getHeight() - 36), 8, 8);
             g2.setColor(HomeStatsChartHelper.TEXT_SECONDARY);
             g2.setFont(HomeStatsChartHelper.EMPTY_FONT);
