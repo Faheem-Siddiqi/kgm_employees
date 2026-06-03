@@ -7,8 +7,8 @@ import com.kgm.ui.panel.GenericRecordTablePanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.styling.AppWindowStateHelper;
 import com.kgm.ui.styling.AppTabsHelper;
-import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.ui.styling.HomeViewHelper;
+import com.kgm.ui.styling.ScreenHeaderStyleHelper;
 import com.kgm.util.DateDisplayFormatter;
 
 import javax.swing.*;
@@ -123,36 +123,15 @@ public class MissingDataView extends JFrame {
     }
 
     private JPanel createTitleRow() {
-        JPanel row = new JPanel(new BorderLayout(18, 0));
-        row.setBackground(Color.WHITE);
+        JPanel row = ScreenHeaderStyleHelper.screenHeader(
+                "Employees Missing Required Data",
+                "Review employees with missing required fields or required documents.",
+                () -> {
+                    new HomeView();
+                    dispose();
+                }
+        );
         row.setBorder(BorderFactory.createEmptyBorder(0, 0, 18, 0));
-
-        JPanel textBlock = new JPanel();
-        textBlock.setLayout(new BoxLayout(textBlock, BoxLayout.Y_AXIS));
-        textBlock.setBackground(Color.WHITE);
-
-        JLabel title = new JLabel("Employees Missing Required Data");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        title.setForeground(new Color(17, 24, 39));
-
-        JLabel subtitle = new JLabel("Review employees with missing required fields or required documents.");
-        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        subtitle.setForeground(new Color(99, 115, 129));
-
-        textBlock.add(title);
-        textBlock.add(Box.createVerticalStrut(4));
-        textBlock.add(subtitle);
-
-        JButton dashboard = new JButton("Dashboard");
-        EmployeeRegistrationViewHelper.styleBackButton(dashboard);
-        dashboard.addActionListener(event -> {
-            new HomeView();
-            dispose();
-        });
-
-        row.add(textBlock, BorderLayout.WEST);
-        row.add(dashboard, BorderLayout.EAST);
-
         return row;
     }
 

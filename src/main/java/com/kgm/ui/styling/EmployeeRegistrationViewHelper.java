@@ -37,12 +37,7 @@ public final class EmployeeRegistrationViewHelper {
     }
 
     public static void styleBackButton(JButton button) {
-        button.setBorderPainted(false);
-        button.setContentAreaFilled(false);
-        button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(TEXT_SECONDARY);
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
+        ScreenHeaderStyleHelper.styleDashboardButton(button);
     }
 
     public static JPanel createCenterWrapper() {
@@ -80,34 +75,11 @@ public final class EmployeeRegistrationViewHelper {
     }
 
     public static JPanel screenHeader(Runnable onBack) {
-        JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(PAGE_BACKGROUND);
-        header.setBorder(new EmptyBorder(25, TAB_CONTENT_INSET, 0, TAB_CONTENT_INSET));
-
-        JPanel titleBlock = new JPanel();
-        titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
-        titleBlock.setBackground(PAGE_BACKGROUND);
-
-        JLabel title = new JLabel("Add Record");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        title.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel subtitle = new JLabel("Enter employee details and upload documents");
-        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        subtitle.setForeground(new Color(100, 100, 100));
-        subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        titleBlock.add(title);
-        titleBlock.add(Box.createVerticalStrut(3));
-        titleBlock.add(subtitle);
-
-        JButton back = new JButton("Dashboard");
-        styleBackButton(back);
-        back.addActionListener(e -> onBack.run());
-
-        header.add(titleBlock, BorderLayout.WEST);
-        header.add(back, BorderLayout.EAST);
-        return header;
+        return ScreenHeaderStyleHelper.screenHeader(
+                "Add Record",
+                "Enter employee details and upload documents",
+                onBack
+        );
     }
 
     public static JPanel createActionRow() {

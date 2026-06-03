@@ -219,6 +219,7 @@ public class FieldManagementView extends JFrame {
         tablePanel.setPreferredColumnWidthLimit(FIELD_COLUMN, 190);
         tablePanel.setPreferredColumnWidthLimit(FIELD_LABEL, 190);
         tablePanel.setPreferredColumnWidthLimit(FIELD_HEADING, 210);
+        tablePanel.setHugColumn(FIELD_ORIGIN);
         return tablePanel;
     }
 

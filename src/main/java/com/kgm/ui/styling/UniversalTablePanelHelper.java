@@ -130,13 +130,17 @@ public final class UniversalTablePanelHelper {
     public static void stylePagingButton(JButton button, boolean enabled) {
         button.setFocusPainted(false);
         button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
-        button.setBorder(new EmptyBorder(8, 14, 8, 14));
+        button.setBorder(new CompoundBorder(
+                new RoundedButtonBorder(enabled ? TableThemeHelper.BORDER : new Color(235, 239, 244), 8),
+                new EmptyBorder(7, 13, 7, 13)
+        ));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setBackground(TableThemeHelper.PRIMARY);
-        button.setForeground(Color.WHITE);
+        button.setBackground(Color.WHITE);
+        button.setForeground(enabled ? TableThemeHelper.PRIMARY : TableThemeHelper.TEXT_SECONDARY);
         button.setOpaque(true);
         button.setContentAreaFilled(true);
-        button.setBorderPainted(false);
+        button.setBorderPainted(true);
+        ButtonStateHelper.setEnabledForeground(button, TableThemeHelper.PRIMARY);
         ButtonStateHelper.setEnabled(button, enabled);
     }
 
@@ -271,6 +275,28 @@ public final class UniversalTablePanelHelper {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(TableThemeHelper.BORDER);
             g2.drawRoundRect(x, y, width - 1, height - 1, 8, 8);
+            g2.dispose();
+        }
+
+        public Insets getBorderInsets(Component component) {
+            return new Insets(1, 1, 1, 1);
+        }
+    }
+
+    private static class RoundedButtonBorder extends AbstractBorder {
+        private final Color color;
+        private final int radius;
+
+        RoundedButtonBorder(Color color, int radius) {
+            this.color = color;
+            this.radius = radius;
+        }
+
+        public void paintBorder(Component component, Graphics g, int x, int y, int width, int height) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
             g2.dispose();
         }
 

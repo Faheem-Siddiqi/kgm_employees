@@ -195,9 +195,6 @@ public class EmployeeTablePanel extends JPanel {
                 if (empValue == null || empValue.trim().isEmpty() || empValue.equalsIgnoreCase("N/A")) {
                     empValue = emp.getDynamicField("SECTION");
                 }
-                if ("Unassigned".equalsIgnoreCase(value)) {
-                    return isMissingFilterValue(empValue);
-                }
                 break;
             case "GRADE":
                 empValue = emp.getGRADE();
@@ -212,6 +209,10 @@ public class EmployeeTablePanel extends JPanel {
                 return true;
         }
 
+        if (isUnassignedFilterValue(value)) {
+            return isMissingFilterValue(empValue);
+        }
+
         if ("RESIGN_REASON".equalsIgnoreCase(columnName)) {
             return resignReasonMatches(empValue, value);
         }
@@ -221,6 +222,10 @@ public class EmployeeTablePanel extends JPanel {
         }
 
         return empValue.trim().equalsIgnoreCase(value.trim());
+    }
+
+    private boolean isUnassignedFilterValue(String value) {
+        return value != null && value.trim().equalsIgnoreCase("Unassigned");
     }
 
     private boolean isMissingFilterValue(String value) {

@@ -704,14 +704,11 @@ public class EmployeeBasicDetailsPanel extends JPanel {
     }
 
     private void styleFieldBorder(JComponent component, boolean missing) {
-        component.setBorder(BorderFactory.createCompoundBorder(
-                new LineBorder(missing ? MISSING_BORDER : FIELD_BORDER),
-                BorderFactory.createEmptyBorder(6, 8, 6, 8)
-        ));
+        component.setBorder(EmployeeRegistrationFormPanelHelper.inputBorder(missing ? MISSING_BORDER : FIELD_BORDER));
     }
 
     private void styleAreaBorder(UniversalTextArea area, boolean missing) {
-        area.setBorder(new LineBorder(missing ? MISSING_BORDER : FIELD_BORDER));
+        area.setBorder(EmployeeRegistrationFormPanelHelper.inputBorder(missing ? MISSING_BORDER : FIELD_BORDER));
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

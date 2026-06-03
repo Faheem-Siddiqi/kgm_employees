@@ -6,7 +6,6 @@ import javax.swing.*;
 import javax.swing.border.AbstractBorder;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
 import javax.swing.plaf.basic.BasicArrowButton;
 import javax.swing.plaf.basic.BasicComboBoxUI;
 import java.awt.*;
@@ -20,11 +19,15 @@ public final class EmployeeRegistrationFormPanelHelper {
     public static final Font INPUT_FONT = new Font("Segoe UI", Font.PLAIN, 13);
 
     private static final int TAB_CONTENT_INSET = 28;
+    private static final int INPUT_WIDTH = 320;
+    private static final int INPUT_MIN_WIDTH = 210;
+    private static final int INPUT_HEIGHT = 38;
     private static final Color PAGE_BACKGROUND = Color.WHITE;
-    private static final Color PHOTO_BORDER = new Color(210, 210, 210);
-    private static final Color CARD_BORDER = new Color(220, 220, 220);
-    private static final Color FIELD_BORDER = new Color(200, 200, 200);
-    private static final Color LABEL_TEXT = new Color(70, 70, 70);
+    private static final Color PHOTO_BORDER = new Color(203, 213, 225);
+    private static final Color CARD_BORDER = new Color(226, 232, 240);
+    private static final Color FIELD_BORDER = new Color(203, 213, 225);
+    private static final Color FIELD_BACKGROUND = new Color(255, 255, 255);
+    private static final Color LABEL_TEXT = new Color(51, 65, 85);
     private static final Color LINK_BLUE = new Color(0, 102, 204);
 
     private EmployeeRegistrationFormPanelHelper() {
@@ -38,7 +41,7 @@ public final class EmployeeRegistrationFormPanelHelper {
     public static JComponent createFormContent(JComponent form) {
         JPanel content = new JPanel(new BorderLayout());
         content.setBackground(PAGE_BACKGROUND);
-        content.setBorder(new EmptyBorder(14, TAB_CONTENT_INSET, 0, TAB_CONTENT_INSET));
+        content.setBorder(new EmptyBorder(12, TAB_CONTENT_INSET, 0, TAB_CONTENT_INSET));
         content.add(form, BorderLayout.NORTH);
         return content;
     }
@@ -47,17 +50,17 @@ public final class EmployeeRegistrationFormPanelHelper {
         JPanel root = new JPanel(new GridBagLayout());
         root.setBackground(PAGE_BACKGROUND);
         root.setBorder(new CompoundBorder(
-                new RoundedBorder(16),
-                new EmptyBorder(18, 18, 18, 18)
+                new RoundedBorder(8),
+                new EmptyBorder(18, 18, 20, 18)
         ));
         return root;
     }
 
     public static JPanel createPhotoPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setPreferredSize(new Dimension(218, 278));
+        panel.setPreferredSize(new Dimension(218, 282));
         panel.setBackground(PAGE_BACKGROUND);
-        panel.setBorder(new EmptyBorder(2, 0, 2, 12));
+        panel.setBorder(new EmptyBorder(2, 0, 2, 14));
         return panel;
     }
 
@@ -227,11 +230,12 @@ public Insets getBorderInsets(Component c) {
 
     public static JScrollPane createAddressScrollPane(JTextArea textArea) {
         JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setBorder(new LineBorder(FIELD_BORDER));
+        scrollPane.setBorder(inputBorder(FIELD_BORDER));
         scrollPane.setPreferredSize(new Dimension(300, 96));
         scrollPane.setMinimumSize(new Dimension(240, 84));
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.getViewport().setBackground(FIELD_BACKGROUND);
         return scrollPane;
     }
 
@@ -242,22 +246,26 @@ public Insets getBorderInsets(Component c) {
 
     public static JLabel createFieldLabel(String text) {
         JLabel label = new JLabel(text);
-        label.setFont(LABEL_FONT);
+        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         label.setForeground(LABEL_TEXT);
         return label;
     }
 
     public static void styleInput(JComponent input) {
         input.setFont(INPUT_FONT);
-        input.setPreferredSize(new Dimension(300, 34));
-        input.setMinimumSize(new Dimension(240, 34));
-        input.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
-        input.setBackground(PAGE_BACKGROUND);
+        input.setPreferredSize(new Dimension(INPUT_WIDTH, INPUT_HEIGHT));
+        input.setMinimumSize(new Dimension(INPUT_MIN_WIDTH, INPUT_HEIGHT));
+        input.setMaximumSize(new Dimension(Integer.MAX_VALUE, INPUT_HEIGHT));
+        input.setBackground(FIELD_BACKGROUND);
 
         if (input instanceof JScrollPane) {
-            input.setPreferredSize(new Dimension(300, 96));
-            input.setMinimumSize(new Dimension(240, 84));
-            input.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120));
+            input.setPreferredSize(new Dimension(INPUT_WIDTH, 104));
+            input.setMinimumSize(new Dimension(INPUT_MIN_WIDTH, 88));
+            input.setMaximumSize(new Dimension(Integer.MAX_VALUE, 132));
+            input.setBorder(inputBorder(FIELD_BORDER));
+            if (input instanceof JScrollPane scrollPane) {
+                scrollPane.getViewport().setBackground(FIELD_BACKGROUND);
+            }
             return;
         }
 
@@ -268,13 +276,13 @@ public Insets getBorderInsets(Component c) {
         }
 
         if (input instanceof JTextField) {
-            input.setBorder(fieldBorder());
+            input.setBorder(inputBorder(FIELD_BORDER));
         }
     }
 
-    private static CompoundBorder fieldBorder() {
+    public static CompoundBorder inputBorder(Color borderColor) {
         return new CompoundBorder(
-                new LineBorder(FIELD_BORDER),
+                new RoundedFieldBorder(borderColor == null ? FIELD_BORDER : borderColor, 8),
                 new EmptyBorder(6, 8, 6, 8)
         );
     }
@@ -304,10 +312,10 @@ public Insets getBorderInsets(Component c) {
             protected JButton createArrowButton() {
                 JButton button = new BasicArrowButton(
                         BasicArrowButton.SOUTH,
-                        PAGE_BACKGROUND,
+                        FIELD_BACKGROUND,
                         FIELD_BORDER,
-                        new Color(90, 90, 90),
-                        PAGE_BACKGROUND
+                        new Color(71, 85, 105),
+                        FIELD_BACKGROUND
                 );
                 button.setBorder(new EmptyBorder(0, 0, 0, 0));
                 button.setContentAreaFilled(false);
@@ -316,12 +324,12 @@ public Insets getBorderInsets(Component c) {
             }
 
             public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
-                g.setColor(PAGE_BACKGROUND);
+                g.setColor(FIELD_BACKGROUND);
                 g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
             }
         });
-        comboBox.setBorder(fieldBorder());
-        comboBox.setBackground(PAGE_BACKGROUND);
+        comboBox.setBorder(inputBorder(FIELD_BORDER));
+        comboBox.setBackground(FIELD_BACKGROUND);
         comboBox.setOpaque(true);
         comboBox.setFocusable(comboBox.isEditable());
         comboBox.setRequestFocusEnabled(comboBox.isEditable());
@@ -330,7 +338,7 @@ public Insets getBorderInsets(Component c) {
             editor.setFocusable(true);
             editor.setRequestFocusEnabled(true);
             editor.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 0));
-            editor.setBackground(PAGE_BACKGROUND);
+            editor.setBackground(FIELD_BACKGROUND);
         }
         comboBox.setRenderer(new DefaultListCellRenderer() {
             public Component getListCellRendererComponent(
@@ -348,7 +356,7 @@ public Insets getBorderInsets(Component c) {
                         cellHasFocus
                 );
                 label.setBorder(new EmptyBorder(0, 8, 0, 8));
-                label.setBackground(isSelected ? new Color(235, 244, 255) : PAGE_BACKGROUND);
+                label.setBackground(isSelected ? new Color(235, 244, 255) : FIELD_BACKGROUND);
                 label.setForeground(new Color(35, 43, 54));
                 return label;
             }
@@ -361,6 +369,28 @@ public Insets getBorderInsets(Component c) {
     @SuppressWarnings("unchecked")
     private static void installEditableDropdownSupport(JComboBox<?> comboBox) {
         DropdownFieldSupport.configure((JComboBox<String>) comboBox, true);
+    }
+
+    private static class RoundedFieldBorder extends AbstractBorder {
+        private final Color color;
+        private final int radius;
+
+        RoundedFieldBorder(Color color, int radius) {
+            this.color = color;
+            this.radius = radius;
+        }
+
+        public void paintBorder(Component component, Graphics g, int x, int y, int width, int height) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
+            g2.dispose();
+        }
+
+        public Insets getBorderInsets(Component component) {
+            return new Insets(1, 1, 1, 1);
+        }
     }
 
 }

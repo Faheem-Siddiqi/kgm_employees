@@ -156,7 +156,7 @@ public final class HomeViewHelper {
         button.setContentAreaFilled(false);
         button.setFocusPainted(false);
         button.setOpaque(false);
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         button.setForeground(CLEAR_RED);
         button.setBorder(new EmptyBorder(7, 8, 7, 8));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));

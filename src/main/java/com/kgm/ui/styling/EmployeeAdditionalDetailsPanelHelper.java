@@ -244,8 +244,7 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         container.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
         container.setBorder(new EmptyBorder(14, 0, 0, 0));
 
-        JButton link = createBreadcrumbLink("Return to top");
-        link.addActionListener(e -> action.run());
+        JButton link = ScreenHeaderStyleHelper.returnToTopButton(action);
         container.add(link);
         return container;
     }

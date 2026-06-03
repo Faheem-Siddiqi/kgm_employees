@@ -1,8 +1,9 @@
 package com.kgm.ui.component;
 
+import com.kgm.ui.styling.EmployeeRegistrationFormPanelHelper;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
 import java.awt.*;
 
 public class UniversalTextArea extends JScrollPane {
@@ -25,7 +26,7 @@ public class UniversalTextArea extends JScrollPane {
         textArea.setBorder(new EmptyBorder(8, 8, 8, 8));
         textArea.setBackground(BACKGROUND);
 
-        setBorder(new LineBorder(BORDER));
+        setBorder(EmployeeRegistrationFormPanelHelper.inputBorder(BORDER));
         setBackground(BACKGROUND);
         getViewport().setBackground(BACKGROUND);
         setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
