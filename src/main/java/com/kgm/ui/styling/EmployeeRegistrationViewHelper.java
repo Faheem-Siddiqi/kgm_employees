@@ -88,7 +88,7 @@ public final class EmployeeRegistrationViewHelper {
         titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
         titleBlock.setBackground(PAGE_BACKGROUND);
 
-        JLabel title = new JLabel("Employee Registration");
+        JLabel title = new JLabel("Add Record");
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
         title.setAlignmentX(Component.LEFT_ALIGNMENT);
 

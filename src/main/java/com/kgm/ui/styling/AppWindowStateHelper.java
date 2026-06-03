@@ -18,6 +18,7 @@ public final class AppWindowStateHelper {
 
         frame.setResizable(true);
         frame.setExtendedState(frame.getExtendedState() | JFrame.MAXIMIZED_BOTH);
+        SwingUtilities.invokeLater(() -> maximizeIfVisible(frame));
 
         if (Boolean.TRUE.equals(frame.getRootPane().getClientProperty(FULL_SIZE_INITIALIZED_KEY))) {
             return;

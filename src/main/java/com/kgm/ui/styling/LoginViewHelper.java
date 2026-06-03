@@ -7,31 +7,31 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
 
 public final class LoginViewHelper {
     private static final String LOGIN_BACKGROUND_PATH = "images/LoginBG.png";
     private static final String LOGIN_LOGO_PATH = "images/LoginTransparent.png";
     private static final String LOGIN_IMAGE_CREDIT = "Made with \u2665 by Faheem Siddiqi";
-    private static final int WINDOW_WIDTH = 920;
-    private static final int WINDOW_HEIGHT = 640;
-    private static final int FORM_WIDTH = 300;
-    private static final int FIELD_HEIGHT = 42;
-    private static final int BUTTON_HEIGHT = 44;
-    private static final int LOGO_MARGIN = 24;
-    private static final int LOGO_WIDTH = 70;
+    private static final int WINDOW_WIDTH = 1040;
+    private static final int WINDOW_HEIGHT = 680;
+    private static final int FORM_WIDTH = 340;
+    private static final int FIELD_HEIGHT = 40;
+    private static final int BUTTON_HEIGHT = 40;
+    private static final int LOGO_MARGIN = 30;
+    private static final int LOGO_WIDTH = 76;
     private static final Color PAGE_BACKGROUND = Color.WHITE;
-    private static final Color TEXT_PRIMARY = new Color(24, 32, 43);
-    private static final Color HEADING_GREY = new Color(38, 45, 56);
-    private static final Color TEXT_SECONDARY = new Color(92, 106, 124);
-    private static final Color LABEL_TEXT = new Color(64, 76, 92);
-    private static final Color PLACEHOLDER_TEXT = new Color(132, 145, 162);
-    private static final Color BORDER = new Color(221, 228, 238);
-    private static final Color FOCUS_BORDER = new Color(0, 112, 210);
-    private static final Color PRIMARY = new Color(0, 112, 210);
-    private static final Color PRIMARY_HOVER = new Color(0, 92, 176);
+    private static final Color TEXT_PRIMARY = new Color(15, 23, 42);
+    private static final Color HEADING_GREY = new Color(17, 24, 39);
+    private static final Color TEXT_SECONDARY = new Color(100, 116, 139);
+    private static final Color LABEL_TEXT = new Color(51, 65, 85);
+    private static final Color PLACEHOLDER_TEXT = new Color(148, 163, 184);
+    private static final Color FIELD_BACKGROUND = new Color(248, 250, 252);
+    private static final Color BORDER = new Color(226, 232, 240);
+    private static final Color FOCUS_BORDER = new Color(37, 99, 235);
+    private static final Color PRIMARY = new Color(37, 99, 235);
+    private static final Color PRIMARY_HOVER = new Color(29, 78, 216);
+    private static final Color PRIMARY_PRESSED = new Color(30, 64, 175);
 
     private LoginViewHelper() {
     }
@@ -60,7 +60,7 @@ public final class LoginViewHelper {
     public static JPanel createOuterPanel() {
         JPanel outer = new JPanel(new GridBagLayout());
         outer.setBackground(PAGE_BACKGROUND);
-        outer.setBorder(new EmptyBorder(40, 54, 40, 54));
+        outer.setBorder(new EmptyBorder(48, 60, 48, 60));
         return outer;
     }
 
@@ -68,8 +68,8 @@ public final class LoginViewHelper {
         JPanel form = new JPanel();
         form.setOpaque(false);
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
-        form.setPreferredSize(new Dimension(FORM_WIDTH, 344));
-        form.setMaximumSize(new Dimension(FORM_WIDTH, 344));
+        form.setPreferredSize(new Dimension(FORM_WIDTH, 360));
+        form.setMaximumSize(new Dimension(FORM_WIDTH, 360));
         return form;
     }
 
@@ -83,7 +83,7 @@ public final class LoginViewHelper {
 
     public static JLabel createWelcomeLabel(String text) {
         JLabel label = new JLabel(text);
-        label.setFont(new Font("Segoe UI", Font.BOLD, 32));
+        label.setFont(new Font("Segoe UI", Font.BOLD, 30));
         label.setForeground(HEADING_GREY);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
         return label;
@@ -110,7 +110,7 @@ public final class LoginViewHelper {
     }
 
     public static JButton createPrimaryButton(String text) {
-        JButton button = new PrimaryButton(text);
+        JButton button = new JButton(text);
         styleButton(button);
         return button;
     }
@@ -120,8 +120,8 @@ public final class LoginViewHelper {
         block.setOpaque(false);
         block.setLayout(new BoxLayout(block, BoxLayout.Y_AXIS));
         block.setAlignmentX(Component.LEFT_ALIGNMENT);
-        block.setPreferredSize(new Dimension(FORM_WIDTH, 68));
-        block.setMaximumSize(new Dimension(FORM_WIDTH, 68));
+        block.setPreferredSize(new Dimension(FORM_WIDTH, 64));
+        block.setMaximumSize(new Dimension(FORM_WIDTH, 64));
 
         JLabel label = new JLabel(labelText);
         label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
@@ -130,7 +130,7 @@ public final class LoginViewHelper {
         field.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         block.add(label);
-        block.add(Box.createVerticalStrut(8));
+        block.add(Box.createVerticalStrut(7));
         block.add(field);
         return block;
     }
@@ -139,8 +139,8 @@ public final class LoginViewHelper {
         field.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         field.setForeground(TEXT_PRIMARY);
         field.setCaretColor(PRIMARY);
-        field.setOpaque(false);
-        field.setBackground(PAGE_BACKGROUND);
+        field.setOpaque(true);
+        field.setBackground(FIELD_BACKGROUND);
         field.setBorder(createFieldBorder(BORDER));
         field.addFocusListener(new FocusAdapter() {
             @Override
@@ -160,20 +160,26 @@ public final class LoginViewHelper {
 
     private static CompoundBorder createFieldBorder(Color color) {
         return new CompoundBorder(
-                new RoundedBorder(8, color),
-                new EmptyBorder(0, 16, 0, 16));
+                new RoundedBorder(6, color),
+                new EmptyBorder(0, 12, 0, 12));
     }
 
     private static void styleButton(JButton button) {
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false);
         button.setFocusPainted(false);
+        button.setOpaque(false);
         button.setForeground(Color.WHITE);
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 15));
-        button.setBorder(new EmptyBorder(0, 16, 0, 16));
+        button.setBackground(PRIMARY);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 14));
+        button.setBorder(new EmptyBorder(0, 14, 0, 14));
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         button.setAlignmentX(Component.LEFT_ALIGNMENT);
         button.setPreferredSize(new Dimension(FORM_WIDTH, BUTTON_HEIGHT));
         button.setMinimumSize(new Dimension(FORM_WIDTH, BUTTON_HEIGHT));
         button.setMaximumSize(new Dimension(FORM_WIDTH, BUTTON_HEIGHT));
+        ButtonStateHelper.installRounded(button, 6);
+        ButtonStateHelper.setHoverBackground(button, PRIMARY_HOVER, PRIMARY_PRESSED);
     }
 
     private static class ImagePanel extends JPanel {
@@ -201,21 +207,32 @@ public final class LoginViewHelper {
 
             int width = getWidth();
             int height = getHeight();
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             if (image != null) {
-                g.drawImage(image, 0, 0, this);
+                paintCoverImage(g2, image, width, height);
             } else {
-                Graphics2D g2 = (Graphics2D) g.create();
                 GradientPaint fallback = new GradientPaint(0, 0, PRIMARY, width, height, new Color(11, 31, 55));
                 g2.setPaint(fallback);
                 g2.fillRect(0, 0, width, height);
-                g2.dispose();
             }
+            g2.setPaint(new GradientPaint(
+                    0,
+                    0,
+                    new Color(15, 23, 42, 18),
+                    width,
+                    height,
+                    new Color(15, 23, 42, 118)
+            ));
+            g2.fillRect(0, 0, width, height);
+            g2.dispose();
 
             if (logo != null) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-                g2.drawImage(logo, LOGO_MARGIN, LOGO_MARGIN, logoWidth, logoHeight, this);
-                g2.dispose();
+                Graphics2D logoGraphics = (Graphics2D) g.create();
+                logoGraphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                logoGraphics.drawImage(logo, LOGO_MARGIN, LOGO_MARGIN, logoWidth, logoHeight, this);
+                logoGraphics.dispose();
             }
 
             Graphics2D text = (Graphics2D) g.create();
@@ -226,6 +243,21 @@ public final class LoginViewHelper {
             int textY = getHeight() - LOGO_MARGIN - fm.getDescent();
             text.drawString(LOGIN_IMAGE_CREDIT, LOGO_MARGIN, textY);
             text.dispose();
+        }
+
+        private void paintCoverImage(Graphics2D graphics, Image source, int width, int height) {
+            int sourceWidth = source.getWidth(this);
+            int sourceHeight = source.getHeight(this);
+            if (sourceWidth <= 0 || sourceHeight <= 0 || width <= 0 || height <= 0) {
+                return;
+            }
+
+            double scale = Math.max(width / (double) sourceWidth, height / (double) sourceHeight);
+            int drawWidth = (int) Math.round(sourceWidth * scale);
+            int drawHeight = (int) Math.round(sourceHeight * scale);
+            int x = (width - drawWidth) / 2;
+            int y = (height - drawHeight) / 2;
+            graphics.drawImage(source, x, y, drawWidth, drawHeight, this);
         }
     }
 
@@ -255,65 +287,6 @@ public final class LoginViewHelper {
         @Override
         public boolean isBorderOpaque() {
             return false;
-        }
-    }
-
-    private static class PrimaryButton extends JButton {
-        private boolean hovered;
-
-        PrimaryButton(String text) {
-            super(text);
-            setContentAreaFilled(false);
-            setBorderPainted(false);
-            setOpaque(false);
-            addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseEntered(MouseEvent e) {
-                    hovered = true;
-                    repaint();
-                }
-
-                @Override
-                public void mouseExited(MouseEvent e) {
-                    hovered = false;
-                    repaint();
-                }
-            });
-            addFocusListener(new FocusAdapter() {
-                @Override
-                public void focusGained(FocusEvent e) {
-                    repaint();
-                }
-
-                @Override
-                public void focusLost(FocusEvent e) {
-                    repaint();
-                }
-            });
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            Color start = new Color(25, 147, 238);
-            Color end = PRIMARY;
-            if (isFocusOwner()) {
-                start = new Color(14, 133, 229);
-                end = new Color(0, 78, 158);
-            } else if (hovered) {
-                start = new Color(0, 130, 224);
-                end = PRIMARY_HOVER;
-            }
-
-            g2.setPaint(new GradientPaint(0, 0, start, getWidth(), getHeight(), end));
-            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
-            if (isFocusOwner()) {
-                g2.setColor(new Color(255, 255, 255, 80));
-                g2.drawRoundRect(2, 2, getWidth() - 5, getHeight() - 5, 13, 13);
-            }
-            g2.dispose();
-            super.paintComponent(g);
         }
     }
 

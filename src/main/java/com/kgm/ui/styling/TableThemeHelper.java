@@ -15,22 +15,23 @@ public final class TableThemeHelper {
     public static final int CONTENT_WIDTH = 860;
     public static final Color PAGE_BACKGROUND = Color.WHITE;
     public static final Color CARD_BACKGROUND = Color.WHITE;
-    public static final Color TEXT_PRIMARY = new Color(35, 43, 54);
-    public static final Color TEXT_SECONDARY = new Color(99, 115, 129);
-    public static final Color BORDER = new Color(220, 226, 232);
-    public static final Color TABLE_HEADER = Color.WHITE;
-    public static final Color ROW_SELECTION = new Color(229, 242, 255);
-    public static final Color PRIMARY = new Color(0, 112, 210);
-    public static final Color DANGER = new Color(180, 60, 45);
+    public static final Color TEXT_PRIMARY = new Color(15, 23, 42);
+    public static final Color TEXT_SECONDARY = new Color(100, 116, 139);
+    public static final Color BORDER = new Color(226, 232, 240);
+    public static final Color CELL_DIVIDER = new Color(226, 232, 240);
+    public static final Color TABLE_HEADER = new Color(37, 99, 235);
+    public static final Color TABLE_HEADER_DIVIDER = new Color(59, 130, 246);
+    public static final Color ROW_SELECTION = new Color(219, 234, 254);
+    public static final Color PRIMARY = new Color(37, 99, 235);
+    public static final Color DANGER = new Color(185, 28, 28);
 
     private TableThemeHelper() {
     }
 
     public static void styleTable(JTable table) {
-        Color cellDivider = new Color(232, 236, 240);
-
         table.setRowHeight(44);
         table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        table.setBackground(PAGE_BACKGROUND);
         table.setShowGrid(false);
         table.setIntercellSpacing(new Dimension(0, 0));
         table.setSelectionBackground(ROW_SELECTION);
@@ -45,12 +46,12 @@ public final class TableThemeHelper {
         table.getTableHeader().setReorderingAllowed(false);
 
         JTableHeader header = table.getTableHeader();
-        header.setPreferredSize(new Dimension(header.getPreferredSize().width, 42));
-        Font tableHeaderFont = new Font("Segoe UI", Font.BOLD, 12);
+        header.setPreferredSize(new Dimension(header.getPreferredSize().width, 40));
+        Font tableHeaderFont = new Font("Segoe UI Semibold", Font.PLAIN, 12);
         header.setFont(tableHeaderFont);
         header.setForeground(Color.WHITE);
-        header.setBackground(PRIMARY);
-        header.setBorder(new LineBorder(new Color(190, 204, 218)));
+        header.setBackground(TABLE_HEADER);
+        header.setBorder(new MatteBorder(0, 0, 1, 0, TABLE_HEADER_DIVIDER));
         header.setDefaultRenderer(new DefaultTableCellRenderer() {
             public Component getTableCellRendererComponent(
                     JTable table,
@@ -62,11 +63,11 @@ public final class TableThemeHelper {
             ) {
                 JLabel label = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                 label.setHorizontalAlignment(SwingConstants.CENTER);
-                label.setBackground(PRIMARY);
+                label.setBackground(TABLE_HEADER);
                 label.setForeground(Color.WHITE);
                 label.setFont(tableHeaderFont);
                 label.setBorder(new CompoundBorder(
-                        new MatteBorder(0, 0, 1, 1, Color.WHITE),
+                        new MatteBorder(0, 0, 1, column == table.getColumnCount() - 1 ? 0 : 1, TABLE_HEADER_DIVIDER),
                         new EmptyBorder(0, 14, 0, 14)
                 ));
                 label.setOpaque(true);
@@ -89,9 +90,10 @@ public final class TableThemeHelper {
                 label.setForeground(TEXT_PRIMARY);
                 label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
                 label.setBorder(new CompoundBorder(
-                        new MatteBorder(0, 0, 1, 1, cellDivider),
+                        new MatteBorder(0, 0, 1, 0, CELL_DIVIDER),
                         new EmptyBorder(0, 16, 0, 14)
                 ));
+                label.setOpaque(true);
                 return label;
             }
         };
@@ -124,7 +126,7 @@ public final class TableThemeHelper {
         label.setBackground(selected ? ROW_SELECTION : Color.WHITE);
         label.setFont(new Font(highlighted ? "Segoe UI Semibold" : "Segoe UI", Font.PLAIN, 13));
         label.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 1, new Color(232, 236, 240)),
+                BorderFactory.createMatteBorder(0, 0, 1, 0, CELL_DIVIDER),
                 new EmptyBorder(0, 16, 0, 14)
         ));
     }

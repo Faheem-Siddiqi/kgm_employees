@@ -85,11 +85,11 @@ public final class HomeViewHelper {
         actionControls.setOpaque(false);
         actionControls.setMinimumSize(new Dimension(0, SEARCH_CONTROL_HEIGHT));
 
-        JPanel card = new ResponsiveCommandBar(searchControls, actionControls);
+        JPanel commandRow = new ResponsiveCommandBar(searchControls, actionControls);
 
         wrapper.putClientProperty(SEARCH_CONTROLS, searchControls);
         wrapper.putClientProperty(ACTION_CONTROLS, actionControls);
-        wrapper.add(card, BorderLayout.CENTER);
+        wrapper.add(commandRow, BorderLayout.CENTER);
         return wrapper;
     }
 
@@ -393,7 +393,6 @@ public final class HomeViewHelper {
     }
 
     private static class ResponsiveCommandBar extends JPanel {
-        private static final int CARD_RADIUS = 8;
         private static final int HORIZONTAL_GAP = 18;
         private static final int VERTICAL_GAP = 12;
 
@@ -405,9 +404,7 @@ public final class HomeViewHelper {
             this.searchControls = searchControls;
             this.actionControls = actionControls;
             setOpaque(false);
-            setBorder(new CompoundBorder(
-                    new RoundedBorder(CARD_RADIUS, BORDER),
-                    new EmptyBorder(12, 14, 12, 14)));
+            setBorder(new EmptyBorder(0, 0, 0, 0));
             setAlignmentX(Component.LEFT_ALIGNMENT);
             add(searchControls);
             add(actionControls);
@@ -415,11 +412,6 @@ public final class HomeViewHelper {
 
         @Override
         protected void paintComponent(Graphics graphics) {
-            Graphics2D g2 = (Graphics2D) graphics.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(PAGE_BACKGROUND);
-            g2.fillRoundRect(0, 0, getWidth(), getHeight(), CARD_RADIUS, CARD_RADIUS);
-            g2.dispose();
             super.paintComponent(graphics);
         }
 

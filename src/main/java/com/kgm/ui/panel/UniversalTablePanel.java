@@ -173,7 +173,7 @@ public class UniversalTablePanel extends JPanel {
             JPanel panel = new JPanel(new GridBagLayout());
             panel.setOpaque(true);
             panel.setBackground(isSelected ? TableThemeHelper.ROW_SELECTION : Color.WHITE);
-            panel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, new Color(232, 236, 240)));
+            panel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, TableThemeHelper.CELL_DIVIDER));
 
             JCheckBox checkbox = new JCheckBox();
             checkbox.setOpaque(false);
@@ -840,7 +840,7 @@ public class UniversalTablePanel extends JPanel {
             setForeground(TableThemeHelper.TEXT_PRIMARY);
             setBackground(isSelected ? TableThemeHelper.ROW_SELECTION : Color.WHITE);
             setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createMatteBorder(0, 0, 1, 1, new Color(232, 236, 240)),
+                    BorderFactory.createMatteBorder(0, 0, 1, 0, TableThemeHelper.CELL_DIVIDER),
                     BorderFactory.createEmptyBorder(8, 16, 8, 14)));
             setToolTipText(getText().isBlank() ? null : getText());
             return this;

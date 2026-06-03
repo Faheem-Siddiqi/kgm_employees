@@ -9,10 +9,6 @@ import java.awt.*;
 import java.awt.event.MouseWheelListener;
 
 public final class UniversalTablePanelHelper {
-    private static final Color CELL_DIVIDER = new Color(232, 236, 240);
-    private static final Color DISABLED_BUTTON = new Color(225, 225, 225);
-    private static final Color DISABLED_TEXT = new Color(145, 145, 145);
-
     private UniversalTablePanelHelper() {
     }
 
@@ -55,18 +51,15 @@ public final class UniversalTablePanelHelper {
         panel.setOpaque(true);
         panel.setPreferredSize(new Dimension(panel.getPreferredSize().width, table.getRowHeight()));
         panel.setBackground(isSelected ? TableThemeHelper.ROW_SELECTION : Color.WHITE);
-        panel.setBorder(new CompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 1, CELL_DIVIDER),
-                new EmptyBorder(12, 16, 0, 14)));
+        panel.setBorder(tableCellBorder(9, 16, 9, 14));
         return panel;
     }
 
     public static JLabel createStatusLabel(String status) {
-        JLabel label = new JLabel(status);
+        JLabel label = new StatusBadgeLabel(status, statusColor(status));
         label.setHorizontalAlignment(SwingConstants.CENTER);
         label.setVerticalAlignment(SwingConstants.CENTER);
-        label.setForeground(statusColor(status));
-        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         label.setOpaque(false);
         return label;
     }
@@ -75,7 +68,7 @@ public final class UniversalTablePanelHelper {
         JLabel label = new JLabel("Delete");
         label.setHorizontalAlignment(SwingConstants.CENTER);
         label.setVerticalAlignment(SwingConstants.CENTER);
-        label.setForeground(new Color(220, 53, 69));
+        label.setForeground(TableThemeHelper.DANGER);
         label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         label.setOpaque(false);
@@ -98,6 +91,7 @@ public final class UniversalTablePanelHelper {
         scrollPane.setBorder(new RoundedTableBorder());
         scrollPane.getViewport().setBackground(Color.WHITE);
         scrollPane.getViewport().setBorder(null);
+        scrollPane.setBackground(Color.WHITE);
         scrollPane.setWheelScrollingEnabled(false);
         scrollPane.addMouseWheelListener(wheelListener);
         scrollPane.getViewport().addMouseWheelListener(wheelListener);
@@ -109,6 +103,7 @@ public final class UniversalTablePanelHelper {
         scrollPane.setPreferredSize(table.getPreferredScrollableViewportSize());
         scrollPane.getHorizontalScrollBar().setUnitIncrement(16);
         scrollPane.getHorizontalScrollBar().setBlockIncrement(96);
+        HomeStatsChartHelper.styleHorizontalScrollBar(scrollPane.getHorizontalScrollBar());
         return scrollPane;
     }
 
@@ -157,9 +152,7 @@ public final class UniversalTablePanelHelper {
         label.setFont(table.getFont().deriveFont(Font.PLAIN));
         label.setEnabled(table.isEnabled());
         label.setComponentOrientation(table.getComponentOrientation());
-        label.setBorder(new CompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 1, CELL_DIVIDER),
-                new EmptyBorder(0, 16, 0, 14)));
+        label.setBorder(tableCellBorder(0, 16, 0, 14));
         label.setHorizontalAlignment(alignment);
         label.setVerticalAlignment(SwingConstants.CENTER);
     }
@@ -263,27 +256,60 @@ public final class UniversalTablePanelHelper {
         label.setBackground(selected ? TableThemeHelper.ROW_SELECTION : Color.WHITE);
         label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        label.setBorder(new CompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 1, CELL_DIVIDER),
-                new EmptyBorder(0, 14, 0, 14)));
+        label.setBorder(tableCellBorder(0, 14, 0, 14));
     }
 
-    private static CompoundBorder tableCellBorder() {
+    private static CompoundBorder tableCellBorder(int top, int left, int bottom, int right) {
         return new CompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 1, CELL_DIVIDER),
-                new EmptyBorder(0, 14, 0, 14));
+                BorderFactory.createMatteBorder(0, 0, 1, 0, TableThemeHelper.CELL_DIVIDER),
+                new EmptyBorder(top, left, bottom, right));
     }
 
     private static class RoundedTableBorder extends AbstractBorder {
         public void paintBorder(Component component, Graphics g, int x, int y, int width, int height) {
-            Graphics2D g2 = (Graphics2D) g;
+            Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(TableThemeHelper.BORDER);
-            g2.drawRoundRect(x, y, width - 1, height - 1, 4, 4);
+            g2.drawRoundRect(x, y, width - 1, height - 1, 8, 8);
+            g2.dispose();
         }
 
         public Insets getBorderInsets(Component component) {
             return new Insets(1, 1, 1, 1);
+        }
+    }
+
+    private static class StatusBadgeLabel extends JLabel {
+        private final Color accent;
+
+        StatusBadgeLabel(String text, Color accent) {
+            super(text);
+            this.accent = accent == null ? TableThemeHelper.TEXT_SECONDARY : accent;
+            setForeground(this.accent);
+            setBorder(new EmptyBorder(3, 9, 4, 9));
+        }
+
+        protected void paintComponent(Graphics graphics) {
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(tint(accent));
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
+            g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 70));
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
+            g2.dispose();
+            super.paintComponent(graphics);
+        }
+
+        private Color tint(Color color) {
+            return new Color(
+                    mix(color.getRed()),
+                    mix(color.getGreen()),
+                    mix(color.getBlue())
+            );
+        }
+
+        private int mix(int value) {
+            return Math.min(255, (int) Math.round(value * 0.12 + 255 * 0.88));
         }
     }
 }

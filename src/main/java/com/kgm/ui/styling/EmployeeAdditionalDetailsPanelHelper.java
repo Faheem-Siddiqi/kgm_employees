@@ -30,6 +30,9 @@ public final class EmployeeAdditionalDetailsPanelHelper {
     private static final String CHIP_HOVER_BG_KEY = "kgm.chip.hoverBg";
     private static final String CHIP_BORDER_KEY = "kgm.chip.border";
     private static final int CHIP_RADIUS = 2;
+    private static final int CHIP_HEIGHT = 28;
+    private static final int CHIP_MIN_WIDTH = 56;
+    private static final int CHIP_HORIZONTAL_PADDING = 12;
 
     private EmployeeAdditionalDetailsPanelHelper() {
     }
@@ -88,11 +91,11 @@ public final class EmployeeAdditionalDetailsPanelHelper {
     }
 
     public static JPanel createBreadcrumbPanel() {
-        JPanel breadcrumb = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        JPanel breadcrumb = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
         breadcrumb.setBackground(PAGE_BACKGROUND);
         breadcrumb.setAlignmentX(Component.LEFT_ALIGNMENT);
-        breadcrumb.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-        breadcrumb.setBorder(new EmptyBorder(0, 0, 2, 0));
+        breadcrumb.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
+        breadcrumb.setBorder(new EmptyBorder(0, 0, 8, 0));
         return breadcrumb;
     }
 
@@ -105,22 +108,31 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
         HomeStatsChartHelper.styleHorizontalScrollBar(scrollPane.getHorizontalScrollBar());
-        scrollPane.setPreferredSize(new Dimension(1, 48));
-        scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+        scrollPane.setPreferredSize(new Dimension(1, 56));
+        scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
         scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
         return scrollPane;
     }
 
     public static JLabel createSearchStatusLabel(String text) {
         JLabel label = new JLabel(text);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
         label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         label.setForeground(TEXT_MUTED);
         return label;
     }
 
     public static JPanel createSearchHeader(JLabel statusLabel, JPanel searchPanel) {
-        JPanel header = EmployeeDocumentUploadPanelHelper.createTopPanel();
-        header.add(EmployeeDocumentUploadPanelHelper.createSummaryPanel(statusLabel, null, null));
+        JPanel header = new JPanel();
+        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+        header.setOpaque(true);
+        header.setBackground(PAGE_BACKGROUND);
+        header.setAlignmentX(Component.LEFT_ALIGNMENT);
+        header.setMaximumSize(new Dimension(Integer.MAX_VALUE, 74));
+
+        statusLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        searchPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        header.add(statusLabel);
         header.add(Box.createVerticalStrut(12));
         header.add(searchPanel);
         return header;
@@ -175,13 +187,14 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         link.setOpaque(false);
         link.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        link.setBorder(new EmptyBorder(6, 14, 6, 14));
+        link.setBorder(new EmptyBorder(5, CHIP_HORIZONTAL_PADDING, 5, CHIP_HORIZONTAL_PADDING));
         link.setMargin(new Insets(0, 0, 0, 0));
+        link.setHorizontalAlignment(SwingConstants.CENTER);
+        link.setVerticalAlignment(SwingConstants.CENTER);
         setChipVisual(link, CHIP_BG, CHIP_TEXT, CHIP_BORDER);
         link.putClientProperty(CHIP_BASE_BG_KEY, CHIP_BG);
         link.putClientProperty(CHIP_HOVER_BG_KEY, CHIP_BG_HOVER);
-        link.setMinimumSize(new Dimension(62, 30));
-        link.setPreferredSize(new Dimension(Math.max(78, link.getPreferredSize().width + 10), 32));
+        refreshChipSize(link);
         installChipHover(link);
         return link;
     }
@@ -194,9 +207,12 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         if (button == null) {
             return;
         }
-        int width = Math.max(78, button.getFontMetrics(button.getFont()).stringWidth(button.getText()) + 34);
-        button.setPreferredSize(new Dimension(width, 32));
-        button.setMinimumSize(new Dimension(Math.min(width, 62), 30));
+        int width = Math.max(
+                CHIP_MIN_WIDTH,
+                button.getFontMetrics(button.getFont()).stringWidth(button.getText()) + (CHIP_HORIZONTAL_PADDING * 2) + 4
+        );
+        button.setPreferredSize(new Dimension(width, CHIP_HEIGHT));
+        button.setMinimumSize(new Dimension(Math.min(width, CHIP_MIN_WIDTH), CHIP_HEIGHT));
     }
 
     public static void setBreadcrumbActive(JButton button, boolean active) {
@@ -210,7 +226,8 @@ public final class EmployeeAdditionalDetailsPanelHelper {
             setChipVisual(button, CHIP_BG, CHIP_TEXT, CHIP_BORDER);
         }
         button.setFont(new Font("Segoe UI Semibold", active ? Font.BOLD : Font.PLAIN, 12));
-        button.setBorder(new EmptyBorder(6, 14, 6, 14));
+        button.setBorder(new EmptyBorder(5, CHIP_HORIZONTAL_PADDING, 5, CHIP_HORIZONTAL_PADDING));
+        refreshChipSize(button);
         button.repaint();
     }
 
