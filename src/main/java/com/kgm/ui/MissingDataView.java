@@ -282,7 +282,7 @@ public class MissingDataView extends JFrame {
         tablePanel.setPreferredColumnWidthLimit(MISSING_COLUMN, 560);
         tablePanel.setPreferredColumnWidthLimit(5, 240);
 
-        tablePanel.setPaginationEnabled(false);
+        tablePanel.setPaginationEnabled(true);
         tablePanel.setHugRows(true);
         tablePanel.setMinimumViewportRows(0);
         tablePanel.setPaginationBottomGap(18);

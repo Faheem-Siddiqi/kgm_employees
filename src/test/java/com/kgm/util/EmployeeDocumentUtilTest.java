@@ -93,6 +93,21 @@ class EmployeeDocumentUtilTest {
     }
 
     @Test
+    void prepareImageForUploadRejectsOversizedCorruptJpegWithValidityMessage() throws IOException {
+        File corruptJpeg = tempDir.resolve("CNIC_FRONT.jpg").toFile();
+        byte[] bytes = new byte[4096];
+        bytes[0] = (byte) 0xFF;
+        bytes[1] = (byte) 0xD8;
+        Files.write(corruptJpeg.toPath(), bytes);
+        System.setProperty(DOCUMENT_UPLOAD_PROPERTY, "10");
+
+        EmployeeDocumentUtil.PreparedUploadFile prepared = EmployeeDocumentUtil.prepareImageForUpload(corruptJpeg);
+
+        assertFalse(prepared.ready());
+        assertEquals("Please select a valid JPG or JPEG image.", prepared.message());
+    }
+
+    @Test
     void prepareImageForUploadCompressesLargeJpegWithoutChangingDimensions() throws IOException {
         File source = writeJpeg(tempDir.resolve("CNIC_FRONT.jpg"), 900, 700, 1.0f);
         long limit = Math.max(1L, source.length() - 1L);

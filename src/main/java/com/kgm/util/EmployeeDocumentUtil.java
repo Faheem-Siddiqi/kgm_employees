@@ -329,19 +329,20 @@ public final class EmployeeDocumentUtil {
         if (validationMessage != null) {
             return PreparedUploadFile.rejected(file, validationMessage);
         }
-        try {
-            if (!isReadableJpegFile(file)) {
+        long maxBytes = maxUploadSizeBytes();
+        if (file.length() <= maxBytes) {
+            try {
+                if (!isReadableJpegFile(file)) {
+                    return PreparedUploadFile.rejected(file, "Please select a valid JPG or JPEG image.");
+                }
+            } catch (IOException exception) {
                 return PreparedUploadFile.rejected(file, "Please select a valid JPG or JPEG image.");
             }
-        } catch (IOException exception) {
-            return PreparedUploadFile.rejected(file, "Please select a valid JPG or JPEG image.");
-        }
-        if (file.length() <= maxUploadSizeBytes()) {
             return PreparedUploadFile.ready(file, file, false, null);
         }
 
         try {
-            File compressed = compressJpegWithinLimit(file, maxUploadSizeBytes());
+            File compressed = compressJpegWithinLimit(file, maxBytes);
             if (compressed == null) {
                 return PreparedUploadFile.rejected(file, compressionLimitMessage());
             }
@@ -355,7 +356,7 @@ public final class EmployeeDocumentUtil {
         } catch (IOException | RuntimeException exception) {
             return PreparedUploadFile.rejected(
                     file,
-                    compressionLimitMessage()
+                    uploadPreparationFailureMessage(exception)
             );
         }
     }
@@ -372,6 +373,19 @@ public final class EmployeeDocumentUtil {
 
     private static String compressionLimitMessage() {
         return "This JPG/JPEG image could not be compressed under the configured upload limit.";
+    }
+
+    private static String uploadPreparationFailureMessage(Exception exception) {
+        String message = exception == null || exception.getMessage() == null
+                ? ""
+                : exception.getMessage().toLowerCase(Locale.ROOT);
+        if (message.contains("valid jpg") || message.contains("valid jpeg")) {
+            return "Please select a valid JPG or JPEG image.";
+        }
+        if (message.contains("unsupported file type")) {
+            return "Unsupported file type. Please upload a JPG or JPEG image.";
+        }
+        return compressionLimitMessage();
     }
 
     private static boolean isJpegFile(File file) {

@@ -4,6 +4,7 @@ import com.kgm.ui.styling.UniversalDialogHelper;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -20,9 +21,12 @@ public final class UniversalDialog {
         Type(Color accent) {
             this.accent = accent;
         }
+
+        public Color accent() {
+            return UniversalDialogHelper.accentFor(this);
+        }
     }
 
-    private static final int WRAP_COLUMNS = 54;
     private static final int SCROLLABLE_SECTION_ROWS = 10;
     public static final String SECTION_SEPARATOR = "\n\n::kgm-dialog-section::\n\n";
 
@@ -42,13 +46,29 @@ public final class UniversalDialog {
             String... secondaryOptions
     ) {
         Window owner = owner(parent);
-        JDialog dialog = new JDialog(owner, title, Dialog.ModalityType.APPLICATION_MODAL);
+        JDialog dialog = new JDialog(
+                owner,
+                UniversalDialogHelper.displayTitle(type, title),
+                Dialog.ModalityType.APPLICATION_MODAL
+        );
         int[] selected = {-1};
+        int dialogWidth = UniversalDialogHelper.dialogWidth(owner);
+        int maxBodyHeight = UniversalDialogHelper.maxBodyHeight(owner);
 
-        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-        dialog.setContentPane(content(dialog, selected, type, title, message, primaryOption, secondaryOptions));
+        prepareDialog(dialog);
+        dialog.setContentPane(content(
+                dialog,
+                selected,
+                type,
+                title,
+                message,
+                primaryOption,
+                secondaryOptions,
+                dialogWidth,
+                maxBodyHeight
+        ));
         dialog.pack();
-        dialog.setMinimumSize(new Dimension(430, 220));
+        dialog.setMinimumSize(new Dimension(Math.min(360, dialogWidth), 196));
         dialog.setLocationRelativeTo(owner);
         dialog.setVisible(true);
         return selected[0];
@@ -63,13 +83,29 @@ public final class UniversalDialog {
             String... secondaryOptions
     ) {
         Window owner = owner(parent);
-        JDialog dialog = new JDialog(owner, title, Dialog.ModalityType.APPLICATION_MODAL);
+        JDialog dialog = new JDialog(
+                owner,
+                UniversalDialogHelper.displayTitle(type, title),
+                Dialog.ModalityType.APPLICATION_MODAL
+        );
         int[] selected = {-1};
+        int dialogWidth = UniversalDialogHelper.dialogWidth(owner);
+        int maxBodyHeight = UniversalDialogHelper.maxBodyHeight(owner);
 
-        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-        dialog.setContentPane(formContent(dialog, selected, type, title, form, primaryOption, secondaryOptions));
+        prepareDialog(dialog);
+        dialog.setContentPane(formContent(
+                dialog,
+                selected,
+                type,
+                title,
+                form,
+                primaryOption,
+                secondaryOptions,
+                dialogWidth,
+                maxBodyHeight
+        ));
         dialog.pack();
-        dialog.setMinimumSize(new Dimension(430, 220));
+        dialog.setMinimumSize(new Dimension(Math.min(360, dialogWidth), 196));
         dialog.setLocationRelativeTo(owner);
         dialog.setVisible(true);
         return selected[0];
@@ -82,13 +118,15 @@ public final class UniversalDialog {
             String title,
             String message,
             String primaryOption,
-            String[] secondaryOptions
+            String[] secondaryOptions,
+            int dialogWidth,
+            int maxBodyHeight
     ) {
         JPanel root = new JPanel(new BorderLayout());
         UniversalDialogHelper.styleRoot(root);
-        root.add(header(title, type.accent), BorderLayout.NORTH);
-        root.add(body(type, message), BorderLayout.CENTER);
-        root.add(footer(dialog, selected, type.accent, primaryOption, secondaryOptions), BorderLayout.SOUTH);
+        root.add(header(dialog, type, title), BorderLayout.NORTH);
+        root.add(body(type, message, dialogWidth, maxBodyHeight), BorderLayout.CENTER);
+        root.add(footer(dialog, selected, type.accent(), primaryOption, secondaryOptions), BorderLayout.SOUTH);
         return root;
     }
 
@@ -99,28 +137,41 @@ public final class UniversalDialog {
             String title,
             JComponent form,
             String primaryOption,
-            String[] secondaryOptions
+            String[] secondaryOptions,
+            int dialogWidth,
+            int maxBodyHeight
     ) {
         JPanel root = new JPanel(new BorderLayout());
         UniversalDialogHelper.styleRoot(root);
-        root.add(header(title, type.accent), BorderLayout.NORTH);
-        root.add(formBody(form), BorderLayout.CENTER);
-        root.add(footer(dialog, selected, type.accent, primaryOption, secondaryOptions), BorderLayout.SOUTH);
+        root.add(header(dialog, type, title), BorderLayout.NORTH);
+        root.add(formBody(form, dialogWidth, maxBodyHeight), BorderLayout.CENTER);
+        root.add(footer(dialog, selected, type.accent(), primaryOption, secondaryOptions), BorderLayout.SOUTH);
         return root;
     }
 
-    private static JPanel header(String title, Color accent) {
-        return UniversalDialogHelper.createHeader(title, accent);
+    private static void prepareDialog(JDialog dialog) {
+        UniversalDialogHelper.styleDialogWindow(dialog);
+        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dialog.getRootPane().registerKeyboardAction(
+                event -> dialog.dispose(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
     }
 
-    private static JComponent body(Type type, String message) {
-        String text = message == null || message.isBlank() ? "-" : message.trim();
+    private static JPanel header(JDialog dialog, Type type, String title) {
+        return UniversalDialogHelper.createHeader(type, title, dialog::dispose);
+    }
+
+    private static JComponent body(Type type, String message, int dialogWidth, int maxBodyHeight) {
+        String text = message == null || message.isBlank() ? "No details were provided." : message.trim();
         List<String> sections = messageSections(text);
 
         JPanel panel = UniversalDialogHelper.createBodyPanel();
+        int alertWidth = UniversalDialogHelper.alertWidth(dialogWidth);
 
         for (int index = 0; index < sections.size(); index++) {
-            JPanel messageBox = messageBox(type, sections.get(index));
+            JPanel messageBox = messageBox(type, sections.get(index), alertWidth);
             messageBox.setAlignmentX(Component.LEFT_ALIGNMENT);
             panel.add(messageBox);
             if (index < sections.size() - 1) {
@@ -128,22 +179,29 @@ public final class UniversalDialog {
             }
         }
 
-        return UniversalDialogHelper.createBodyScroll(panel, preferredMessageHeight(sections));
+        return UniversalDialogHelper.createBodyScroll(
+                panel,
+                preferredMessageHeight(sections, alertWidth),
+                dialogWidth,
+                maxBodyHeight
+        );
     }
 
-    private static JComponent formBody(JComponent form) {
+    private static JComponent formBody(JComponent form, int dialogWidth, int maxBodyHeight) {
         JPanel panel = UniversalDialogHelper.createBodyPanel();
         JComponent content = form == null ? new JPanel() : form;
         content.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(content);
-        int height = Math.min(520, Math.max(160, content.getPreferredSize().height + 48));
-        return UniversalDialogHelper.createBodyScroll(panel, height);
+        int height = UniversalDialogHelper.bodyHeightWithPadding(
+                Math.max(140, content.getPreferredSize().height)
+        );
+        return UniversalDialogHelper.createBodyScroll(panel, height, dialogWidth, maxBodyHeight);
     }
 
-    private static JPanel messageBox(Type type, String message) {
+    private static JPanel messageBox(Type type, String message, int alertWidth) {
         JPanel row = UniversalDialogHelper.createMessageRow(type);
 
-        JLabel badge = UniversalDialogHelper.createBadge(type, type.accent);
+        JLabel badge = UniversalDialogHelper.createBadge(type, type.accent());
 
         String[] parts = headingAndBody(message);
         JPanel textPanel = UniversalDialogHelper.createMessageTextPanel();
@@ -154,7 +212,9 @@ public final class UniversalDialog {
             textPanel.add(Box.createVerticalStrut(4));
         }
 
-        int contentRows = Math.max(1, wrappedRows(parts[1], WRAP_COLUMNS));
+        int textWidth = UniversalDialogHelper.messageTextWidth(alertWidth);
+        int wrapColumns = UniversalDialogHelper.wrapColumns(textWidth);
+        int contentRows = Math.max(1, wrappedRows(parts[1], wrapColumns));
         boolean scrollableText = isScrollableSection(parts[0]) && contentRows > SCROLLABLE_SECTION_ROWS;
         int visibleRows = scrollableText ? SCROLLABLE_SECTION_ROWS : contentRows;
 
@@ -164,23 +224,29 @@ public final class UniversalDialog {
         int textHeight = Math.max(42, visibleRows * lineHeight + 4);
         int contentHeight = Math.max(textHeight, contentRows * lineHeight + 4);
         int headingHeight = parts[0].isEmpty() ? 0 : 22;
-        Dimension textSize = new Dimension(UniversalDialogHelper.MESSAGE_TEXT_WIDTH, contentHeight);
+        Dimension textSize = new Dimension(textWidth, contentHeight);
         UniversalDialogHelper.setFixedSize(text, textSize);
 
         if (scrollableText) {
-            Dimension scrollSize = new Dimension(UniversalDialogHelper.MESSAGE_TEXT_WIDTH, textHeight);
+            Dimension scrollSize = new Dimension(textWidth, UniversalDialogHelper.sectionScrollHeight(textHeight));
             JScrollPane sectionScroll = UniversalDialogHelper.createSectionScroll(text, row.getBackground(), scrollSize);
             textPanel.add(sectionScroll);
         } else {
-            Dimension visibleTextSize = new Dimension(UniversalDialogHelper.MESSAGE_TEXT_WIDTH, textHeight);
+            Dimension visibleTextSize = new Dimension(textWidth, textHeight);
             UniversalDialogHelper.setFixedSize(text, visibleTextSize);
             textPanel.add(text);
         }
-        Dimension panelSize = new Dimension(UniversalDialogHelper.MESSAGE_TEXT_WIDTH, textHeight + headingHeight);
+        Dimension panelSize = new Dimension(
+                textWidth,
+                (scrollableText ? UniversalDialogHelper.sectionScrollHeight(textHeight) : textHeight) + headingHeight
+        );
         UniversalDialogHelper.setFixedSize(textPanel, panelSize);
 
-        int boxHeight = textHeight + headingHeight + 22;
-        Dimension boxSize = new Dimension(UniversalDialogHelper.MESSAGE_BOX_WIDTH, boxHeight);
+        int boxHeight = UniversalDialogHelper.alertHeight(
+                scrollableText ? UniversalDialogHelper.sectionScrollHeight(textHeight) : textHeight,
+                headingHeight
+        );
+        Dimension boxSize = new Dimension(alertWidth, boxHeight);
         UniversalDialogHelper.setFixedSize(row, boxSize);
 
         row.add(badge, BorderLayout.WEST);
@@ -226,20 +292,27 @@ public final class UniversalDialog {
         return UniversalDialogHelper.secondaryButton(text);
     }
 
-    private static int preferredMessageHeight(List<String> sections) {
-        int height = 36;
+    private static int preferredMessageHeight(List<String> sections, int alertWidth) {
+        int height = UniversalDialogHelper.bodyHeightWithPadding(0);
+        int textWidth = UniversalDialogHelper.messageTextWidth(alertWidth);
+        int wrapColumns = UniversalDialogHelper.wrapColumns(textWidth);
         for (String section : sections) {
             String[] parts = headingAndBody(section);
             int headingHeight = parts[0].isEmpty() ? 0 : 22;
-            int rows = visibleRows(parts[0], parts[1]);
-            height += 22 + headingHeight + Math.max(42, rows * 19);
+            int rows = visibleRows(parts[0], parts[1], wrapColumns);
+            int textHeight = Math.max(42, rows * 19);
+            boolean scrollableText = isScrollableSection(parts[0]) && wrappedRows(parts[1], wrapColumns) > SCROLLABLE_SECTION_ROWS;
+            height += UniversalDialogHelper.alertHeight(
+                    scrollableText ? UniversalDialogHelper.sectionScrollHeight(textHeight) : textHeight,
+                    headingHeight
+            );
         }
         height += Math.max(0, sections.size() - 1) * 10;
-        return Math.min(420, height);
+        return height;
     }
 
-    private static int visibleRows(String heading, String body) {
-        int rows = Math.max(1, wrappedRows(body, WRAP_COLUMNS));
+    private static int visibleRows(String heading, String body, int wrapColumns) {
+        int rows = Math.max(1, wrappedRows(body, wrapColumns));
         if (isScrollableSection(heading)) {
             return Math.min(SCROLLABLE_SECTION_ROWS, rows);
         }
@@ -269,7 +342,7 @@ public final class UniversalDialog {
             }
         }
         if (sections.isEmpty()) {
-            sections.add("-");
+            sections.add("No details were provided.");
         }
         return sections;
     }

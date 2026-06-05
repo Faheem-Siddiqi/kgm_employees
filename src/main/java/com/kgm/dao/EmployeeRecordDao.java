@@ -734,15 +734,21 @@ public class EmployeeRecordDao implements AutoCloseable {
 
         try {
             List<String> columns = normalizedProjectionColumns(requestedColumns);
+            String cleanFolderName = folderName.trim();
+            String numericId = numericEmployeeId(cleanFolderName);
+            int parsedId = parseEmployeeId(cleanFolderName);
             String sql = "SELECT " + quotedColumnList(columns)
                     + " FROM employees WHERE TRIM(CAST(EMPLOYEE_CODE AS CHAR)) = ?"
                     + " OR CAST(ID AS CHAR) = ?"
-                    + " OR ID = ? LIMIT 1";
+                    + " OR ID = ?"
+                    + " ORDER BY CASE WHEN TRIM(CAST(EMPLOYEE_CODE AS CHAR)) = ? THEN 0 ELSE 1 END"
+                    + " LIMIT 1";
             try (PreparedStatement ps = con.prepareStatement(sql)) {
                 applyReadQuerySettings(ps);
-                ps.setString(1, folderName.trim());
-                ps.setString(2, numericEmployeeId(folderName));
-                ps.setInt(3, parseEmployeeId(folderName));
+                ps.setString(1, cleanFolderName);
+                ps.setString(2, numericId);
+                ps.setInt(3, parsedId);
+                ps.setString(4, cleanFolderName);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         return mapProjectedEmployee(rs);

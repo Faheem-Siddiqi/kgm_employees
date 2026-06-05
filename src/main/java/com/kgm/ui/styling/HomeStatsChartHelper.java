@@ -19,6 +19,10 @@ public final class HomeStatsChartHelper {
     public static final Color MUTED_SURFACE = new Color(248, 250, 252);
     public static final Color CARD_BORDER = new Color(226, 232, 240);
     public static final Color GRID_LINE = new Color(241, 245, 249);
+    public static final Color GRID_BASELINE = new Color(203, 213, 225);
+    public static final Color SOFT_HOVER = new Color(241, 245, 249);
+    public static final Color FULL_ROW_ACTIVE = new Color(239, 246, 255);
+    public static final Color FULL_ROW_PRESSED = new Color(219, 234, 254);
 
     // ── Text ──
     public static final Color TEXT_PRIMARY = new Color(2, 8, 23);
@@ -34,19 +38,30 @@ public final class HomeStatsChartHelper {
 
     // ── Layout Dimensions ──
     public static final int CARD_GAP = 12;
-    public static final int SINGLE_COLUMN_WIDTH = 760;
-    public static final int FULL_WIDTH_ITEM_LIMIT = 7;
-    public static final int CHART_TOP = 24;
+    public static final int CHART_TOP = 22;
     public static final int CHART_LEFT = 50;
     public static final int CHART_RIGHT = 22;
     public static final int CHART_MIN_WIDTH = 400;
+    public static final int AVERAGE_CHART_HEIGHT = 320;
     public static final int CHART_HORIZONTAL_SCROLLBAR_HEIGHT = 12;
     public static final int CHART_SCROLL_UNIT = 40;
     public static final int CHART_SCROLL_BLOCK_GAP = 72;
+    public static final String FULL_ROW_ICON_PATH = "images/Full Screen.png";
+    public static final int FULL_ROW_BUTTON_SIZE = 28;
+    public static final int FULL_ROW_ICON_SIZE = 16;
 
     // ── Bar Dimensions ──
     public static final int BAR_MIN_WIDTH = 24;
     public static final int BAR_MAX_WIDTH = 48;
+    public static final int BAR_CHART_BASE_HEIGHT = 260;
+    public static final int BAR_CHART_MIN_PLOT_HEIGHT = 96;
+    public static final int BAR_CHART_EXTRA_WIDTH = 28;
+    public static final int BAR_SLOT_FIT_MIN_WIDTH = 44;
+    public static final int BAR_LABEL_MIN_WIDTH = 54;
+    public static final int BAR_LABEL_Y_OFFSET = 22;
+    public static final int BAR_LABEL_BOTTOM_BASE = 42;
+    public static final int BAR_DYNAMIC_SLOT_BASE = 64;
+    public static final int BAR_DYNAMIC_SLOT_PER_CHAR = 5;
     public static final int SLOT_MIN_WIDTH = 64;
     public static final int SLOT_MAX_WIDTH = 100;
     public static final double BAR_WIDTH_RATIO = 0.54;
@@ -54,15 +69,38 @@ public final class HomeStatsChartHelper {
     public static final int MAX_LABEL_LINES = 4;
 
     // ── Pie Dimensions ──
-    public static final int PIE_MIN_SIZE = 138;
-    public static final int PIE_MAX_SIZE = 178;
+    public static final int PIE_MIN_SIZE = 170;
+    public static final int PIE_MAX_SIZE = 230;
     public static final int LEGEND_ROW_HEIGHT = 24;
+    public static final int PIE_TOP = 10;
+    public static final int PIE_BOTTOM = 8;
+    public static final int PIE_LEFT = 16;
+    public static final int PIE_LEGEND_GAP = 20;
+    public static final int PIE_LEGEND_RIGHT = 12;
+    public static final int PIE_LEGEND_MIN_WIDTH = 96;
+    public static final int PIE_LEGEND_TARGET_MIN_WIDTH = 128;
+    public static final int PIE_LEGEND_DOT_SIZE = 10;
+    public static final int PIE_LEGEND_DOT_GAP = 6;
+    public static final int PIE_LEGEND_VALUE_GAP = 8;
+    public static final int PIE_LEGEND_ROW_PAD = 6;
+    public static final int PIE_MIN_LEGEND_ROWS = 2;
+    public static final int PIE_MAX_LEGEND_ROWS = 8;
+
+    // ── Opacity ──
+    public static final int BAR_ALPHA = 220;
+    public static final int BAR_HOVER_ALPHA = 245;
+    public static final int BAR_VALUE_ALPHA = 245;
+    public static final int BAR_VALUE_HOVER_ALPHA = 255;
+    public static final int PIE_SLICE_ALPHA = 220;
+    public static final int PIE_SLICE_HOVER_ALPHA = 245;
+    public static final int PIE_LEGEND_HOVER_ALPHA = 18;
 
     // ── Fonts ──
     public static final Font TITLE_FONT = new Font("Segoe UI", Font.BOLD, 17);
     public static final Font SUBTITLE_FONT = new Font("Segoe UI", Font.PLAIN, 13);
-    public static final Font CARD_TITLE_FONT = new Font("Segoe UI Semibold", Font.PLAIN, 14);
-    public static final Font VALUE_FONT = new Font("Segoe UI", Font.BOLD, 11);
+    public static final Font CARD_TITLE_FONT = new Font("Segoe UI", Font.BOLD, 16);
+    public static final Font CARD_HELPER_FONT = new Font("Segoe UI", Font.PLAIN, 12);
+    public static final Font VALUE_FONT = new Font("Segoe UI Semibold", Font.PLAIN, 12);
     public static final Font LABEL_FONT = new Font("Segoe UI", Font.PLAIN, 12);
     public static final Font LABEL_FONT_HOVER = new Font("Segoe UI", Font.BOLD, 12);
     public static final Font GRID_FONT = new Font("Segoe UI", Font.PLAIN, 11);
@@ -82,10 +120,22 @@ public final class HomeStatsChartHelper {
         return new Color(r, g, b);
     }
 
+    public static Color withAlpha(Color color, int alpha) {
+        if (color == null) {
+            return new Color(0, 0, 0, Math.max(0, Math.min(255, alpha)));
+        }
+        return new Color(
+                color.getRed(),
+                color.getGreen(),
+                color.getBlue(),
+                Math.max(0, Math.min(255, alpha))
+        );
+    }
+
     public static CompoundBorder cardBorder() {
         return new CompoundBorder(
                 new RoundedBorder(8, CARD_BORDER),
-                new EmptyBorder(16, 16, 16, 16)
+                new EmptyBorder(22, 24, 18, 24)
         );
     }
 

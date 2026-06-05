@@ -9,15 +9,24 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class BulkFolderDocumentImportService {
     public static final int MAX_FOLDERS = 50;
+    private static final Pattern DIGIT_SEQUENCE = Pattern.compile("\\d{1,18}");
+    private static final Pattern LABELED_DIGIT_SEQUENCE = Pattern.compile(
+            "(?i)(?:employee|emp|id|code)\\D{0,12}(\\d{1,18})"
+    );
+    private static final Pattern LEADING_DIGIT_SEQUENCE = Pattern.compile("^\\s*(\\d{1,18})");
 
     @FunctionalInterface
     public interface ProgressListener {
@@ -59,14 +68,14 @@ public class BulkFolderDocumentImportService {
     ) {
         String folderKey = folder.getName() == null ? "" : folder.getName().trim();
         if (folderKey.isEmpty()) {
-            summary.error(folder, "No employee found in DB for this folder name.");
+            summary.error(folder, "No employee record matched this folder name.");
             return;
         }
 
         reportFolderStep(progressListener, "Finding employee for folder " + folderKey + "...", folderIndex, totalFolders, 1, 4);
         EmployeeFolder employeeFolder = findEmployeeFolder(folder, dao);
         if (employeeFolder == null) {
-            summary.error(folder, "No employee found in DB for this folder name.");
+            summary.error(folder, "No employee record matched this folder name.");
             return;
         }
         folder = employeeFolder.folder();
@@ -82,10 +91,10 @@ public class BulkFolderDocumentImportService {
         }
         summary.employee(employeeCode, employee.getEMP_NAME(), folder);
 
-        reportFolderStep(progressListener, "Reading files inside " + folderKey + "...", folderIndex, totalFolders, 2, 4);
+        reportFolderStep(progressListener, "Reading files directly inside " + folderKey + "...", folderIndex, totalFolders, 2, 4);
         List<File> files = documentFiles(folder, summary, folderKey);
         if (files.isEmpty()) {
-            summary.failed(employeeCode, "No document files found", folderKey);
+            summary.failed(employeeCode, "No document files found directly inside folder", folderKey);
             return;
         }
 
@@ -116,7 +125,7 @@ public class BulkFolderDocumentImportService {
                 continue;
             }
             if (match.ambiguous()) {
-                summary.failed(employeeCode, "Ambiguous document label", file.getName());
+                summary.failed(employeeCode, "Document label matches more than one field", file.getName());
                 continue;
             }
             int documentIndex = match.documentIndex();
@@ -126,7 +135,7 @@ public class BulkFolderDocumentImportService {
                 continue;
             }
             if (matchedThisFolder.contains(documentIndex)) {
-                summary.failed(employeeCode, "Duplicate document label in selected folder", documentLabel);
+                summary.failed(employeeCode, "Duplicate document label in folder", documentLabel);
                 continue;
             }
             if (EmployeeDocumentUtil.shouldCompressBeforeUpload(file)) {
@@ -207,10 +216,14 @@ public class BulkFolderDocumentImportService {
 
     private EmployeeFolder findEmployeeFolder(File folder, EmployeeRecordDao dao) {
         File candidate = folder;
+        Set<String> attemptedLookupNames = new HashSet<>();
         for (int depth = 0; candidate != null && depth < 5; depth++) {
             String name = candidate.getName() == null ? "" : candidate.getName().trim();
-            if (!name.isEmpty()) {
-                Employee employee = dao.getEmployeeDocumentsByCodeOrId(name);
+            for (String lookupName : employeeFolderLookupNames(name)) {
+                if (!attemptedLookupNames.add(lookupName)) {
+                    continue;
+                }
+                Employee employee = dao.getEmployeeDocumentsByCodeOrId(lookupName);
                 if (employee != null) {
                     return new EmployeeFolder(candidate, employee);
                 }
@@ -218,6 +231,70 @@ public class BulkFolderDocumentImportService {
             candidate = candidate.getParentFile();
         }
         return null;
+    }
+
+    static List<String> employeeFolderLookupNames(String folderName) {
+        String cleanName = folderName == null ? "" : folderName.trim().replaceAll("\\s+", " ");
+        if (cleanName.isEmpty()) {
+            return List.of();
+        }
+
+        LinkedHashSet<String> lookupNames = new LinkedHashSet<>();
+        addLookupName(lookupNames, cleanName);
+        addLabeledDigitLookupNames(lookupNames, cleanName);
+        addPreferredDigitLookupNames(lookupNames, cleanName);
+        addLeadingDigitLookupName(lookupNames, cleanName);
+        addAllDigitLookupNames(lookupNames, cleanName);
+        return List.copyOf(lookupNames);
+    }
+
+    private static void addLabeledDigitLookupNames(Set<String> lookupNames, String folderName) {
+        Matcher matcher = LABELED_DIGIT_SEQUENCE.matcher(folderName);
+        while (matcher.find()) {
+            addLookupName(lookupNames, matcher.group(1));
+        }
+    }
+
+    private static void addPreferredDigitLookupNames(Set<String> lookupNames, String folderName) {
+        Matcher matcher = DIGIT_SEQUENCE.matcher(folderName);
+        while (matcher.find()) {
+            String token = matcher.group();
+            if (token.startsWith("0")) {
+                addLookupName(lookupNames, token);
+            }
+        }
+
+        matcher = DIGIT_SEQUENCE.matcher(folderName);
+        while (matcher.find()) {
+            String token = matcher.group();
+            if (token.length() >= 4) {
+                addLookupName(lookupNames, token);
+            }
+        }
+    }
+
+    private static void addLeadingDigitLookupName(Set<String> lookupNames, String folderName) {
+        Matcher matcher = LEADING_DIGIT_SEQUENCE.matcher(folderName);
+        if (matcher.find()) {
+            addLookupName(lookupNames, matcher.group(1));
+        }
+    }
+
+    private static void addAllDigitLookupNames(Set<String> lookupNames, String folderName) {
+        Matcher matcher = DIGIT_SEQUENCE.matcher(folderName);
+        while (matcher.find()) {
+            addLookupName(lookupNames, matcher.group());
+        }
+    }
+
+    private static void addLookupName(Set<String> lookupNames, String value) {
+        if (value == null) {
+            return;
+        }
+        String clean = value.trim();
+        if (!clean.isEmpty()) {
+            lookupNames.add(clean);
+        }
     }
 
     private List<File> validFolders(File[] selectedFolders) {
@@ -245,13 +322,14 @@ public class BulkFolderDocumentImportService {
     }
 
     private List<File> documentFiles(File folder, ImportSummary summary, String folderKey) {
-        try (var stream = Files.walk(folder.toPath())) {
+        try (var stream = Files.list(folder.toPath())) {
             return stream
                     .filter(Files::isRegularFile)
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
                     .map(Path::toFile)
                     .toList();
         } catch (IOException exception) {
-            summary.error(folder, "Folder could not be scanned: " + exception.getMessage());
+            summary.error(folder, "Folder could not be read: " + exception.getMessage());
             return List.of();
         }
     }

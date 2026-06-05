@@ -15,6 +15,7 @@ import com.kgm.service.EmployeeReportService;
 import com.kgm.ui.styling.AppTabsHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDetailViewHelper;
+import com.kgm.ui.styling.UniversalDialogHelper;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
 import com.kgm.util.EmployeeFieldDefinitionCache;
@@ -202,12 +203,12 @@ public class EmployeeDetailView extends JFrame {
         box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
 
         JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 16));
+        titleLabel.setFont(UniversalDialogHelper.mediumFont(16));
         titleLabel.setForeground(new Color(17, 24, 39));
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         JLabel messageLabel = new JLabel(message);
-        messageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        messageLabel.setFont(UniversalDialogHelper.regularFont(12));
         messageLabel.setForeground(new Color(100, 116, 139));
         messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -228,16 +229,16 @@ public class EmployeeDetailView extends JFrame {
         box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
 
         JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 16));
+        titleLabel.setFont(UniversalDialogHelper.mediumFont(16));
         titleLabel.setForeground(new Color(185, 28, 28));
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         JLabel messageLabel = new JLabel(message);
-        messageLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        messageLabel.setFont(UniversalDialogHelper.regularFont(12));
         messageLabel.setForeground(new Color(100, 116, 139));
         messageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JButton retry = createDialogButton("Retry", true);
+        JButton retry = UniversalDialogHelper.primaryButton("Retry", UniversalDialogHelper.PRIMARY);
         retry.setAlignmentX(Component.CENTER_ALIGNMENT);
         retry.addActionListener(event -> retryAction.run());
 
@@ -809,17 +810,18 @@ public class EmployeeDetailView extends JFrame {
                     String mergedPdfStatus = result.mergedDocumentsPdfFile() == null
                             ? "Not included"
                             : "Saved (" + result.mergedDocumentCount() + " documents)";
-                    String message = "Folder: " + result.folder().getAbsolutePath()
-                            + "\nPDF profile: " + pdfStatus
+                    String message = "Saved folder\n" + result.folder().getAbsolutePath()
+                            + "\n\nPackage contents"
+                            + "\nProfile PDF: " + pdfStatus
                             + "\nAll documents PDF: " + mergedPdfStatus
                             + "\nDocuments copied: " + result.copiedDocumentCount()
                             + " / " + result.totalDocumentCount();
                     int choice = DialogHelper.successOption(
                             EmployeeDetailView.this,
-                            "Download Folder Ready",
+                            "Employee package ready",
                             message,
                             "Open Folder",
-                            "OK"
+                            "Close"
                     );
                     if (choice == 0) {
                         openReportFolder(result.folder());
@@ -857,52 +859,46 @@ public class EmployeeDetailView extends JFrame {
             List<EmployeeReportService.AvailableDocument> availableDocuments
     ) {
         JDialog dialog = new JDialog(this, "Download Employee Report", true);
+        UniversalDialogHelper.styleDialogWindow(dialog);
+        dialog.getRootPane().registerKeyboardAction(
+                event -> dialog.dispose(),
+                KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
         EmployeeReportService.PackageOptions[] selectedOptions = new EmployeeReportService.PackageOptions[1];
 
-        final Color primary = new Color(20, 101, 192);
-        final Color primarySoft = new Color(232, 241, 255);
-        final Color pageBg = new Color(245, 247, 250);
-        final Color cardBg = Color.WHITE;
-        final Color textDark = new Color(17, 24, 39);
-        final Color textMuted = new Color(100, 116, 139);
-        final Color border = new Color(226, 232, 240);
+        final Color primary = UniversalDialogHelper.PRIMARY;
+        final Color primarySoft = UniversalDialogHelper.SURFACE;
+        final Color pageBg = UniversalDialogHelper.BACKGROUND;
+        final Color cardBg = UniversalDialogHelper.BACKGROUND;
+        final Color textDark = UniversalDialogHelper.TEXT_PRIMARY;
+        final Color textMuted = UniversalDialogHelper.MUTED_TEXT;
+        final Color border = UniversalDialogHelper.CARD_BORDER;
         final Color success = new Color(22, 101, 52);
         final Color successSoft = new Color(220, 252, 231);
-        final Color warning = new Color(180, 83, 9);
+        final Color warning = new Color(146, 64, 14);
         final Color warningSoft = new Color(254, 243, 199);
         final Color error = new Color(185, 28, 28);
 
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(pageBg);
-        root.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
+        UniversalDialogHelper.styleRoot(root);
 
-        JPanel header = new JPanel(new BorderLayout(14, 0));
+        JPanel header = new JPanel(new BorderLayout(12, 0));
         header.setBackground(cardBg);
-        header.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, border),
-                BorderFactory.createEmptyBorder(18, 22, 18, 22)
-        ));
-
-        JLabel icon = new JLabel("↓", SwingConstants.CENTER);
-        icon.setOpaque(true);
-        icon.setBackground(primarySoft);
-        icon.setForeground(primary);
-        icon.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 22));
-        icon.setPreferredSize(new Dimension(48, 48));
-        icon.setBorder(new RoundedBorder(primarySoft, 24, 0));
-        header.add(icon, BorderLayout.WEST);
+        header.setBorder(BorderFactory.createEmptyBorder(24, 24, 8, 20));
 
         JPanel headerText = new JPanel();
         headerText.setOpaque(false);
         headerText.setLayout(new BoxLayout(headerText, BoxLayout.Y_AXIS));
 
         JLabel title = new JLabel("Download Employee Report");
-        title.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 20));
+        title.setFont(UniversalDialogHelper.mediumFont(18));
         title.setForeground(textDark);
         title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subtitle = new JLabel(htmlWrap("Build a clean employee package with profile PDF, merged documents PDF, and separate saved files."));
-        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JLabel subtitle = new JLabel(UniversalDialogHelper.htmlWrap("Choose what to include, then select a folder for the employee package."));
+        subtitle.setFont(UniversalDialogHelper.regularFont(13));
         subtitle.setForeground(textMuted);
         subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -911,10 +907,14 @@ public class EmployeeDetailView extends JFrame {
         headerText.add(subtitle);
         header.add(headerText, BorderLayout.CENTER);
 
+        JButton close = UniversalDialogHelper.closeButton();
+        close.addActionListener(event -> dialog.dispose());
+        header.add(close, BorderLayout.EAST);
+
         JPanel body = new JPanel();
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
         body.setBackground(pageBg);
-        body.setBorder(BorderFactory.createEmptyBorder(18, 20, 18, 20));
+        body.setBorder(BorderFactory.createEmptyBorder(14, 24, 18, 24));
 
         JScrollPane bodyScroll = new JScrollPane(body);
         bodyScroll.setBorder(BorderFactory.createEmptyBorder());
@@ -923,21 +923,21 @@ public class EmployeeDetailView extends JFrame {
         bodyScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
         bodyScroll.getVerticalScrollBar().setUnitIncrement(18);
         bodyScroll.getVerticalScrollBar().setBlockIncrement(120);
-        styleModernScrollPane(bodyScroll);
+        UniversalDialogHelper.styleDialogScrollPane(bodyScroll);
 
-        JCheckBox pdfProfile = createDownloadCheckbox("Employee profile PDF", true);
-        JCheckBox allDocumentsPdf = createDownloadCheckbox("All Documents as one PDF", false);
+        JCheckBox pdfProfile = createDownloadCheckbox("Profile PDF", true);
+        JCheckBox allDocumentsPdf = createDownloadCheckbox("All documents PDF", false);
         JCheckBox allDocuments = createDownloadCheckbox("Copy all saved documents", true);
 
-        JPanel optionsCard = createModernCard();
-        optionsCard.add(createSectionHeader(
+        JPanel optionsCard = UniversalDialogHelper.createDialogCard();
+        optionsCard.add(UniversalDialogHelper.createDialogSectionHeader(
                 "Package contents",
-                "Select what should be generated or copied into the employee folder."
+                "Select the files that should be generated or copied into the package."
         ));
         optionsCard.add(Box.createVerticalStrut(12));
         optionsCard.add(createOptionCard(
                 pdfProfile,
-                "Generate a readable employee profile report.",
+                "Create a readable PDF profile from the latest saved employee details.",
                 "Recommended",
                 successSoft,
                 success
@@ -945,7 +945,7 @@ public class EmployeeDetailView extends JFrame {
         optionsCard.add(Box.createVerticalStrut(10));
         optionsCard.add(createOptionCard(
                 allDocumentsPdf,
-                "Combine supported document images into one PDF file.",
+                "Merge supported saved document images into a single PDF.",
                 "Optional",
                 primarySoft,
                 primary
@@ -953,22 +953,23 @@ public class EmployeeDetailView extends JFrame {
         optionsCard.add(Box.createVerticalStrut(10));
         optionsCard.add(createOptionCard(
                 allDocuments,
-                "Copy every available saved document separately. Turn this off to pick specific files.",
+                "Copy every ready saved document separately. Turn this off to choose specific files.",
                 "Files",
                 warningSoft,
                 warning
         ));
 
-        JPanel documentSection = createModernCard();
-        documentSection.add(createSectionHeader(
+        JPanel documentSection = UniversalDialogHelper.createDialogCard();
+        documentSection.add(UniversalDialogHelper.createDialogSectionHeader(
                 "Choose separate documents",
-                "Shown only when Copy all saved documents is off. Missing files stay visible but disabled."
+                "Available when Copy all saved documents is off. Missing files remain visible but disabled."
         ));
         documentSection.add(Box.createVerticalStrut(12));
 
         JPanel documentList = new JPanel();
         documentList.setLayout(new BoxLayout(documentList, BoxLayout.Y_AXIS));
-        documentList.setBackground(cardBg);
+        documentList.setBackground(pageBg);
+        documentList.setBorder(BorderFactory.createEmptyBorder(12, 12, 4, 12));
         documentList.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         Map<String, JCheckBox> documentChecks = new LinkedHashMap<>();
@@ -984,9 +985,9 @@ public class EmployeeDetailView extends JFrame {
         }
 
         if (availableDocuments.isEmpty()) {
-            JPanel empty = createInfoBox(
+            JPanel empty = UniversalDialogHelper.createInfoBox(
                     "No saved documents found",
-                    "This employee has no ready document files to copy. You can still generate the profile PDF.",
+                    "No document files are ready to copy yet. You can still generate the profile PDF.",
                     warningSoft,
                     warning
             );
@@ -994,21 +995,21 @@ public class EmployeeDetailView extends JFrame {
         }
 
         JScrollPane documentListScroll = new JScrollPane(documentList);
-        documentListScroll.setBorder(new RoundedBorder(border, 14, 1));
-        documentListScroll.getViewport().setBackground(cardBg);
+        documentListScroll.setBorder(UniversalDialogHelper.roundedBorder(border, 8, 1));
+        documentListScroll.getViewport().setBackground(pageBg);
         documentListScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         documentListScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
         documentListScroll.getVerticalScrollBar().setUnitIncrement(16);
-        styleModernScrollPane(documentListScroll);
+        UniversalDialogHelper.styleDialogScrollPane(documentListScroll);
         documentListScroll.setAlignmentX(Component.LEFT_ALIGNMENT);
         documentSection.add(documentListScroll);
 
-        JPanel selectionSummary = createInfoBox("Ready", "All ready saved documents will be copied separately.", successSoft, success);
+        JPanel selectionSummary = UniversalDialogHelper.createInfoBox("Ready", "All ready saved documents will be copied separately.", successSoft, success);
         JLabel selectionTitle = (JLabel) selectionSummary.getClientProperty("titleLabel");
         JLabel selectionDescription = (JLabel) selectionSummary.getClientProperty("descriptionLabel");
 
         JLabel validation = new JLabel(" ");
-        validation.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        validation.setFont(UniversalDialogHelper.regularFont(12));
         validation.setForeground(error);
         validation.setBorder(BorderFactory.createEmptyBorder(2, 4, 0, 4));
         validation.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -1031,12 +1032,12 @@ public class EmployeeDetailView extends JFrame {
             long selectedCount = documentChecks.values().stream().filter(JCheckBox::isSelected).count();
 
             if (allDocuments.isSelected()) {
-                selectionTitle.setText("Copy mode: All documents");
+                selectionTitle.setText("Copy mode: all documents");
                 selectionDescription.setText(readyCount == 0
                         ? "No saved document files are ready to copy."
                         : "All ready saved documents will be copied separately: " + readyCount);
             } else {
-                selectionTitle.setText("Copy mode: Specific documents");
+                selectionTitle.setText("Copy mode: selected documents");
                 selectionDescription.setText(selectedCount == 0
                         ? "Choose one or more ready documents, or turn on Copy all saved documents."
                         : "Selected separate documents: " + selectedCount);
@@ -1069,20 +1070,17 @@ public class EmployeeDetailView extends JFrame {
 
         JPanel footer = new JPanel(new BorderLayout(12, 8));
         footer.setBackground(cardBg);
-        footer.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(1, 0, 0, 0, border),
-                BorderFactory.createEmptyBorder(14, 20, 14, 20)
-        ));
+        footer.setBorder(BorderFactory.createEmptyBorder(0, 24, 24, 24));
 
-        JLabel footerHint = new JLabel(htmlWrap("Next step: choose a folder where the package should be saved."));
-        footerHint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JLabel footerHint = new JLabel(UniversalDialogHelper.htmlWrap("Next, choose where to save the package."));
+        footerHint.setFont(UniversalDialogHelper.regularFont(12));
         footerHint.setForeground(textMuted);
         footer.add(footerHint, BorderLayout.CENTER);
 
         JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttonRow.setOpaque(false);
-        JButton cancel = createDialogButton("Cancel", false);
-        JButton chooseFolder = createDialogButton("Choose Folder", true);
+        JButton cancel = UniversalDialogHelper.secondaryButton("Cancel");
+        JButton chooseFolder = UniversalDialogHelper.primaryButton("Choose Folder", UniversalDialogHelper.PRIMARY);
         buttonRow.add(cancel);
         buttonRow.add(chooseFolder);
         footer.add(buttonRow, BorderLayout.EAST);
@@ -1106,12 +1104,12 @@ public class EmployeeDetailView extends JFrame {
                     && hasReadyMergeableDocument(availableDocuments);
 
             if (allDocumentsPdf.isSelected() && !hasMergedDocumentPdfSelection) {
-                validation.setText("No saved document images are available for the All Documents PDF.");
+                validation.setText("No saved document images are available for the all documents PDF.");
                 return;
             }
 
             if (!pdfProfile.isSelected() && !hasDocumentSelection && !hasMergedDocumentPdfSelection) {
-                validation.setText("Select profile PDF, All Documents PDF, all documents, or at least one separate document.");
+                validation.setText("Select a profile PDF, all documents PDF, all documents, or at least one separate document.");
                 return;
             }
 
@@ -1137,40 +1135,6 @@ public class EmployeeDetailView extends JFrame {
         return selectedOptions[0];
     }
 
-    private JPanel createModernCard() {
-        JPanel card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBackground(Color.WHITE);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(new Color(226, 232, 240), 18, 1),
-                BorderFactory.createEmptyBorder(16, 16, 16, 16)
-        ));
-        card.setAlignmentX(Component.LEFT_ALIGNMENT);
-        return card;
-    }
-
-    private JPanel createSectionHeader(String titleText, String helperText) {
-        JPanel header = new JPanel();
-        header.setOpaque(false);
-        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
-        header.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel title = new JLabel(titleText);
-        title.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 15));
-        title.setForeground(new Color(17, 24, 39));
-        title.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel helper = new JLabel(htmlWrap(helperText));
-        helper.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        helper.setForeground(new Color(100, 116, 139));
-        helper.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        header.add(title);
-        header.add(Box.createVerticalStrut(3));
-        header.add(helper);
-        return header;
-    }
-
     private JPanel createOptionCard(
             JCheckBox checkbox,
             String helperText,
@@ -1178,46 +1142,21 @@ public class EmployeeDetailView extends JFrame {
             Color badgeBg,
             Color badgeFg
     ) {
-        JPanel row = new JPanel(new BorderLayout(12, 4));
-        row.setBackground(new Color(248, 250, 252));
-        row.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(new Color(226, 232, 240), 14, 1),
-                BorderFactory.createEmptyBorder(10, 12, 10, 12)
-        ));
-        row.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JPanel left = new JPanel();
-        left.setOpaque(false);
-        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        JPanel left = UniversalDialogHelper.createDialogTextStack();
         left.add(checkbox);
 
-        JLabel helper = new JLabel(htmlWrap(helperText));
+        JLabel helper = UniversalDialogHelper.createDialogHelperLabel(helperText);
         helper.setBorder(BorderFactory.createEmptyBorder(0, 25, 0, 0));
-        helper.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        helper.setForeground(new Color(100, 116, 139));
-        helper.setAlignmentX(Component.LEFT_ALIGNMENT);
         left.add(helper);
 
-        row.add(left, BorderLayout.CENTER);
-        row.add(createBadge(badgeText, badgeBg, badgeFg), BorderLayout.EAST);
-        return row;
+        return UniversalDialogHelper.createDialogRow(left, createBadge(badgeText, badgeBg, badgeFg));
     }
 
     private JPanel createDocumentCard(
             JCheckBox checkbox,
             EmployeeReportService.AvailableDocument availableDocument
     ) {
-        JPanel row = new JPanel(new BorderLayout(12, 4));
-        row.setBackground(new Color(248, 250, 252));
-        row.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(new Color(226, 232, 240), 12, 1),
-                BorderFactory.createEmptyBorder(9, 11, 9, 11)
-        ));
-        row.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JPanel left = new JPanel();
-        left.setOpaque(false);
-        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        JPanel left = UniversalDialogHelper.createDialogTextStack();
         left.add(checkbox);
 
         String statusText;
@@ -1225,80 +1164,31 @@ public class EmployeeDetailView extends JFrame {
         Color badgeFg;
         String badge;
         if (!availableDocument.fileReady()) {
-            statusText = "File missing — cannot be included.";
+            statusText = "File missing - cannot be included.";
             badgeBg = new Color(254, 226, 226);
             badgeFg = new Color(185, 28, 28);
             badge = "Missing";
         } else if (availableDocument.mergeableForDocumentsPdf()) {
-            statusText = "Ready — can be copied and included in All Documents PDF.";
+            statusText = "Ready - can be copied and included in the all documents PDF.";
             badgeBg = new Color(220, 252, 231);
             badgeFg = new Color(22, 101, 52);
             badge = "PDF Ready";
         } else {
-            statusText = "Ready — can be copied separately.";
+            statusText = "Ready - can be copied separately.";
             badgeBg = new Color(232, 241, 255);
-            badgeFg = new Color(20, 101, 192);
+            badgeFg = UniversalDialogHelper.TEXT_PRIMARY;
             badge = "Ready";
         }
 
-        JLabel status = new JLabel(htmlWrap(statusText));
+        JLabel status = UniversalDialogHelper.createDialogHelperLabel(statusText);
         status.setBorder(BorderFactory.createEmptyBorder(0, 25, 0, 0));
-        status.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        status.setForeground(new Color(100, 116, 139));
-        status.setAlignmentX(Component.LEFT_ALIGNMENT);
         left.add(status);
 
-        row.add(left, BorderLayout.CENTER);
-        row.add(createBadge(badge, badgeBg, badgeFg), BorderLayout.EAST);
-        return row;
-    }
-
-    private JPanel createInfoBox(String titleText, String detailText, Color bg, Color fg) {
-        JPanel box = new JPanel(new BorderLayout(10, 0));
-        box.setBackground(bg);
-        box.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(bg, 14, 0),
-                BorderFactory.createEmptyBorder(11, 13, 11, 13)
-        ));
-        box.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel dot = new JLabel("●", SwingConstants.CENTER);
-        dot.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        dot.setForeground(fg);
-        box.add(dot, BorderLayout.WEST);
-
-        JPanel text = new JPanel();
-        text.setOpaque(false);
-        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
-
-        JLabel title = new JLabel(titleText);
-        title.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
-        title.setForeground(fg);
-        JLabel desc = new JLabel(htmlWrap(detailText));
-        desc.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        desc.setForeground(fg);
-
-        text.add(title);
-        text.add(Box.createVerticalStrut(2));
-        text.add(desc);
-        box.add(text, BorderLayout.CENTER);
-
-        box.putClientProperty("titleLabel", title);
-        box.putClientProperty("descriptionLabel", desc);
-        return box;
+        return UniversalDialogHelper.createDialogRow(left, createBadge(badge, badgeBg, badgeFg));
     }
 
     private JLabel createBadge(String text, Color bg, Color fg) {
-        JLabel badge = new JLabel(text, SwingConstants.CENTER);
-        badge.setOpaque(true);
-        badge.setBackground(bg);
-        badge.setForeground(fg);
-        badge.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 11));
-        badge.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(bg, 20, 0),
-                BorderFactory.createEmptyBorder(4, 10, 4, 10)
-        ));
-        return badge;
+        return UniversalDialogHelper.createPill(text, bg, fg);
     }
 
     private EmployeeReportService.AvailableDocument findDocumentByLabel(
@@ -1314,26 +1204,7 @@ public class EmployeeDetailView extends JFrame {
     }
 
     private void resizeReportDialog(JDialog dialog) {
-        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-        int availableWidth = Math.max(360, screen.width - 90);
-        int availableHeight = Math.max(320, screen.height - 110);
-        int width = Math.min(820, Math.max(500, (int) (screen.width * 0.58)));
-        int height = Math.min(680, Math.max(420, (int) (screen.height * 0.78)));
-        width = Math.min(width, availableWidth);
-        height = Math.min(height, availableHeight);
-        dialog.setMinimumSize(new Dimension(Math.min(460, width), Math.min(360, height)));
-        dialog.setPreferredSize(new Dimension(width, height));
-        dialog.setSize(new Dimension(width, height));
-    }
-
-    private void styleModernScrollPane(JScrollPane scrollPane) {
-        scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(9, 0));
-        scrollPane.getHorizontalScrollBar().setPreferredSize(new Dimension(0, 9));
-        scrollPane.getViewport().setOpaque(true);
-    }
-
-    private String htmlWrap(String text) {
-        return "<html><body style='width:360px'>" + text + "</body></html>";
+        UniversalDialogHelper.resizeLargeDialog(dialog, this);
     }
 
     private boolean hasReadyDocument(List<EmployeeReportService.AvailableDocument> availableDocuments) {
@@ -1369,75 +1240,12 @@ public class EmployeeDetailView extends JFrame {
     private JCheckBox createDownloadCheckbox(String text, boolean selected) {
         JCheckBox checkbox = new JCheckBox(text, selected);
         checkbox.setOpaque(false);
-        checkbox.setForeground(new Color(17, 24, 39));
+        checkbox.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
         checkbox.setFocusPainted(false);
-        checkbox.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        checkbox.setFont(UniversalDialogHelper.mediumFont(13));
         checkbox.setBorder(BorderFactory.createEmptyBorder(3, 0, 3, 0));
         checkbox.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return checkbox;
-    }
-
-    private JButton createDialogButton(String text, boolean primary) {
-        JButton button = new JButton(text);
-        button.setPreferredSize(new Dimension(primary ? 142 : 96, 38));
-        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
-        button.setFocusPainted(false);
-        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(primary ? new Color(20, 101, 192) : new Color(226, 232, 240), 18, primary ? 0 : 1),
-                BorderFactory.createEmptyBorder(8, 14, 8, 14)
-        ));
-        if (primary) {
-            button.setBackground(new Color(22, 163, 74));
-            button.setForeground(Color.WHITE);
-            button.setBorderPainted(false);
-        } else {
-            button.setBackground(Color.WHITE);
-            button.setForeground(new Color(71, 85, 105));
-            button.setBorderPainted(true);
-        }
-        com.kgm.ui.styling.ButtonStateHelper.install(button);
-        return button;
-    }
-
-    private static class RoundedBorder extends javax.swing.border.AbstractBorder {
-        private final Color color;
-        private final int radius;
-        private final int thickness;
-
-        RoundedBorder(Color color, int radius, int thickness) {
-            this.color = color;
-            this.radius = radius;
-            this.thickness = thickness;
-        }
-
-        @Override
-        public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
-            if (thickness <= 0) {
-                return;
-            }
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(color);
-            for (int i = 0; i < thickness; i++) {
-                g2.drawRoundRect(x + i, y + i, width - i - i - 1, height - i - i - 1, radius, radius);
-            }
-            g2.dispose();
-        }
-
-        @Override
-        public Insets getBorderInsets(Component c) {
-            return new Insets(thickness, thickness, thickness, thickness);
-        }
-
-        @Override
-        public Insets getBorderInsets(Component c, Insets insets) {
-            insets.left = thickness;
-            insets.top = thickness;
-            insets.right = thickness;
-            insets.bottom = thickness;
-            return insets;
-        }
     }
 
     private boolean panelHasEditableFields(Container container) {

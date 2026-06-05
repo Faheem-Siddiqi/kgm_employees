@@ -25,17 +25,15 @@ import java.util.function.Consumer;
  * Shows: Department breakdown, Grades, Designations, Missing Documents, Exit Trends.
  *
  * UX features:
- * - Dense X-axis charts automatically take full width and scroll horizontally if content still overflows.
- * - Smaller charts render two per row on wide screens and one per row on narrow screens.
- * - Single chart in a row always occupies full width.
+ * - Charts render two per row by default, with horizontal chart scrolling when dense labels overflow.
+ * - Each chart can be expanded to a full row from an icon CTA in the card header.
  * - Modern hover state, value badges, soft card styling and cleaner label placement.
  * - Zero-count items hidden from missing data bars.
  * - Click grade bar to drill into departments within that grade.
  * - Click designation bar to drill into departments with that designation.
  */
 public class HomeStatsChartsPanel extends JPanel {
-    private static final int CARD_GAP = HomeStatsChartHelper.CARD_GAP;
-    private static final int SINGLE_COLUMN_WIDTH = HomeStatsChartHelper.SINGLE_COLUMN_WIDTH;
+    private static final Icon FULL_ROW_ICON = loadFullRowIcon();
 
     private EmployeeRecordDao repo;
     private final JPanel chartsPanel = new JPanel(new GridBagLayout());
@@ -43,7 +41,8 @@ public class HomeStatsChartsPanel extends JPanel {
     private final JButton departmentBack = new JButton("Back");
     private final JLabel missingTitle = new JLabel("Missing Required Data");
     private final JButton missingBack = new JButton("Back");
-    private final JButton missingDetail = new JButton("View employees with missing required data");
+    private final JButton missingDetail = new JButton("");
+    // View affected employees
 
     private final DashboardBarChart departmentChart = new DashboardBarChart();
     private final DashboardBarChart gradeChart = new DashboardBarChart();
@@ -56,6 +55,7 @@ public class HomeStatsChartsPanel extends JPanel {
     private String selectedMissingGroup;
     private String selectedGrade;
     private String selectedDesignation;
+    private String fullRowChartKey;
     private Consumer<String> showInTableHandler;
 
     public HomeStatsChartsPanel(EmployeeRecordDao repo) {
@@ -112,6 +112,7 @@ public class HomeStatsChartsPanel extends JPanel {
         selectedMissingGroup = null;
         selectedGrade = null;
         selectedDesignation = null;
+        fullRowChartKey = null;
         rebuildCharts();
     }
 
@@ -134,13 +135,24 @@ public class HomeStatsChartsPanel extends JPanel {
         configureGradeChart();
         configureDesignationChart();
         exitTrendChart.setItems(paletteItems(stats.exitTrends()));
+        exitTrendChart.setPreferredChartHeight(averageChartContainerHeight(
+                departmentChart,
+                gradeChart,
+                designationChart,
+                missingDocsChart
+        ));
 
         List<ChartCardSpec> cards = List.of(
-                new ChartCardSpec(departmentCard(), departmentChart),
-                new ChartCardSpec(gradeCard(), gradeChart),
-                new ChartCardSpec(designationCard(), designationChart),
-                new ChartCardSpec(missingDataCard(), missingDocsChart),
-                new ChartCardSpec(chartCardWithFilter("Exit Reasons Overview", exitTrendChart, "RESIGN_REASON"), exitTrendChart)
+                new ChartCardSpec("department", departmentCard(), departmentChart),
+                new ChartCardSpec("grade", gradeCard(), gradeChart),
+                new ChartCardSpec("designation", designationCard(), designationChart),
+                new ChartCardSpec("missing", missingDataCard(), missingDocsChart),
+                new ChartCardSpec("exitReasons", chartCardWithFilter(
+                        "Exit Reasons Overview",
+                        exitTrendChart,
+                        "RESIGN_REASON",
+                        "exitReasons"
+                ), exitTrendChart)
         );
 
         addResponsiveChartCards(cards);
@@ -150,50 +162,93 @@ public class HomeStatsChartsPanel extends JPanel {
     }
 
     private void addResponsiveChartCards(List<ChartCardSpec> cards) {
-        int availableWidth = Math.max(0, getWidth());
-        boolean singleColumn = availableWidth > 0 && availableWidth < HomeStatsChartHelper.SINGLE_COLUMN_WIDTH;
-        int halfWidth = availableWidth > 0 ? Math.max(320, (availableWidth - CARD_GAP) / 2) : 420;
-        int row = 0;
+        int expandedIndex = expandedChartIndex(cards);
+        if (expandedIndex < 0) {
+            addGridChartCards(cards, 0);
+            return;
+        }
+
+        int expandedRow = expandedIndex / 2;
+        int row = addGridChartCards(cards.subList(0, expandedRow * 2), 0);
+
+        ChartCardSpec expanded = cards.get(expandedIndex);
+        addChartCard(chartsPanel, expanded.component(), 0, row, 2, 1.0);
+        row++;
+
+        List<ChartCardSpec> shiftedCards = new ArrayList<>();
+        for (int index = expandedRow * 2; index < cards.size(); index++) {
+            if (index != expandedIndex) {
+                shiftedCards.add(cards.get(index));
+            }
+        }
+        addGridChartCards(shiftedCards, row);
+    }
+
+    private int expandedChartIndex(List<ChartCardSpec> cards) {
+        if (fullRowChartKey == null) {
+            return -1;
+        }
+
+        for (int index = 0; index < cards.size(); index++) {
+            if (fullRowChartKey.equals(cards.get(index).key())) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private int addGridChartCards(List<ChartCardSpec> cards, int startRow) {
+        int row = startRow;
         int col = 0;
 
-        for (int i = 0; i < cards.size(); i++) {
-            ChartCardSpec spec = cards.get(i);
-            boolean fullWidth = singleColumn || !((DashboardChart) spec.chart()).canFitInColumn(halfWidth);
+        for (ChartCardSpec spec : cards) {
+            addChartCard(chartsPanel, spec.component(), col, row, 1, 1.0);
 
-            if (fullWidth && col == 1) {
-                row++;
-                col = 0;
-            }
-
-            int gridWidth = fullWidth ? 2 : 1;
-            addChartCard(chartsPanel, spec.component(), col, row, gridWidth, 1.0);
-
-            if (fullWidth || col == 1) {
+            if (col == 1) {
                 row++;
                 col = 0;
             } else {
                 col = 1;
             }
         }
+        if (col == 1) {
+            addEmptyGridSlot(chartsPanel, 1, row);
+        }
+        return col == 0 ? row : row + 1;
+    }
+
+    private int averageChartContainerHeight(DashboardChart... charts) {
+        if (charts == null || charts.length == 0) {
+            return HomeStatsChartHelper.AVERAGE_CHART_HEIGHT;
+        }
+
+        int total = 0;
+        int count = 0;
+        for (DashboardChart chart : charts) {
+            if (chart == null) {
+                continue;
+            }
+            int height = chart.chartPreferredHeight();
+            if (chart instanceof DashboardBarChart) {
+                height += HomeStatsChartHelper.CHART_HORIZONTAL_SCROLLBAR_HEIGHT;
+            }
+            total += height;
+            count++;
+        }
+        return count == 0 ? HomeStatsChartHelper.AVERAGE_CHART_HEIGHT : total / count;
     }
 
     private JPanel departmentCard() {
         departmentBack.setVisible(selectedDepartment != null);
 
-        JPanel titleRow = new JPanel(new BorderLayout());
-        titleRow.setOpaque(false);
-        departmentTitle.setFont(HomeStatsChartHelper.CARD_TITLE_FONT);
-        departmentTitle.setForeground(HomeStatsChartHelper.TEXT_PRIMARY);
-        titleRow.add(departmentTitle, BorderLayout.WEST);
-
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        actions.setOpaque(false);
+        JPanel actions = chartActions();
         if (selectedDepartment != null) {
             actions.add(createShowInTableLink("DEPARTMENT", selectedDepartment, selectedDepartment));
         }
         actions.add(departmentBack);
-        titleRow.add(actions, BorderLayout.EAST);
-        return chartCard(titleRow, departmentChart);
+        actions.add(createFullRowToggle("department"));
+        styleChartTitle(departmentTitle);
+        return chartCard(chartHeader(departmentTitle, departmentHelperText(), actions), departmentChart);
     }
 
     private void styleDepartmentBackButton() {
@@ -228,7 +283,7 @@ public class HomeStatsChartsPanel extends JPanel {
         button.setBackground(HomeStatsChartHelper.SURFACE);
         button.setBorder(HomeStatsChartHelper.buttonBorder());
         ButtonStateHelper.installRounded(button, 8);
-        ButtonStateHelper.setHoverBackground(button, HomeStatsChartHelper.MUTED_SURFACE, new Color(241, 245, 249));
+        ButtonStateHelper.setHoverBackground(button, HomeStatsChartHelper.MUTED_SURFACE, HomeStatsChartHelper.SOFT_HOVER);
     }
 
     private void configureDepartmentChart() {
@@ -260,17 +315,11 @@ public class HomeStatsChartsPanel extends JPanel {
     }
 
     private JPanel gradeCard() {
-        JPanel titleRow = new JPanel(new BorderLayout());
-        titleRow.setOpaque(false);
-
         JLabel gradeTitle = new JLabel(selectedGrade == null ? "Employees by Grade" : "Departments in Grade " + selectedGrade);
-        gradeTitle.setFont(HomeStatsChartHelper.CARD_TITLE_FONT);
-        gradeTitle.setForeground(HomeStatsChartHelper.TEXT_PRIMARY);
-        titleRow.add(gradeTitle, BorderLayout.WEST);
+        styleChartTitle(gradeTitle);
 
+        JPanel actions = chartActions();
         if (selectedGrade != null) {
-            JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-            actions.setOpaque(false);
             actions.add(createShowInTableLink("GRADE", selectedGrade, "Grade " + selectedGrade));
             // Back button for grade drill-down
             JButton gradeBack = new JButton("Back");
@@ -280,10 +329,9 @@ public class HomeStatsChartsPanel extends JPanel {
             });
             styleSecondaryButton(gradeBack);
             actions.add(gradeBack);
-            titleRow.add(actions, BorderLayout.EAST);
         }
-
-        return chartCard(titleRow, gradeChart);
+        actions.add(createFullRowToggle("grade"));
+        return chartCard(chartHeader(gradeTitle, gradeHelperText(), actions), gradeChart);
     }
 
     private void configureGradeChart() {
@@ -330,18 +378,12 @@ public class HomeStatsChartsPanel extends JPanel {
     }
 
     private JPanel designationCard() {
-        JPanel titleRow = new JPanel(new BorderLayout());
-        titleRow.setOpaque(false);
-
         JLabel designationTitle = new JLabel(selectedDesignation == null
                 ? "Employees by Designation"
                 : "Departments with " + selectedDesignation);
-        designationTitle.setFont(HomeStatsChartHelper.CARD_TITLE_FONT);
-        designationTitle.setForeground(HomeStatsChartHelper.TEXT_PRIMARY);
-        titleRow.add(designationTitle, BorderLayout.WEST);
+        styleChartTitle(designationTitle);
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        actions.setOpaque(false);
+        JPanel actions = chartActions();
         if (selectedDesignation != null) {
             actions.add(createShowInTableLink("DESIGNATION", selectedDesignation, selectedDesignation));
             JButton designationBack = new JButton("Back");
@@ -351,10 +393,9 @@ public class HomeStatsChartsPanel extends JPanel {
             });
             styleSecondaryButton(designationBack);
             actions.add(designationBack);
-            titleRow.add(actions, BorderLayout.EAST);
         }
-
-        return chartCard(titleRow, designationChart);
+        actions.add(createFullRowToggle("designation"));
+        return chartCard(chartHeader(designationTitle, designationHelperText(), actions), designationChart);
     }
 
     private void configureDesignationChart() {
@@ -397,7 +438,8 @@ public class HomeStatsChartsPanel extends JPanel {
     }
 
     private JLabel createShowInTableLink(String columnName, String value, String displayLabel) {
-        JLabel link = new JLabel("Show in Table");
+        JLabel link = new JLabel("");
+        // View affected employees button table
         link.setFont(HomeStatsChartHelper.LINK_FONT);
         link.setForeground(HomeStatsChartHelper.BLUE);
         link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -409,6 +451,230 @@ public class HomeStatsChartsPanel extends JPanel {
             }
         });
         return link;
+    }
+
+    private JPanel chartHeader(JLabel title, String helperText, JComponent actions) {
+        styleChartTitle(title);
+
+        JLabel helper = new JLabel(helperText == null ? "" : helperText);
+        helper.setFont(HomeStatsChartHelper.CARD_HELPER_FONT);
+        helper.setForeground(HomeStatsChartHelper.TEXT_SECONDARY);
+        helper.setToolTipText(helper.getText());
+        helper.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel copy = new JPanel();
+        copy.setOpaque(false);
+        copy.setLayout(new BoxLayout(copy, BoxLayout.Y_AXIS));
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+        copy.add(title);
+        copy.add(Box.createVerticalStrut(4));
+        copy.add(helper);
+
+        JPanel header = new JPanel(new BorderLayout(12, 0));
+        header.setOpaque(false);
+        header.add(copy, BorderLayout.CENTER);
+        if (actions != null && actions.getComponentCount() > 0) {
+            header.add(actions, BorderLayout.EAST);
+        }
+        return header;
+    }
+
+    private JPanel chartActions() {
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+        actions.setOpaque(false);
+        actions.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        return actions;
+    }
+
+    private void styleChartTitle(JLabel label) {
+        label.setFont(HomeStatsChartHelper.CARD_TITLE_FONT);
+        label.setForeground(HomeStatsChartHelper.TEXT_PRIMARY);
+        label.setToolTipText(label.getText());
+    }
+
+    private String departmentHelperText() {
+        if (stats == null) {
+            return "";
+        }
+        if (selectedDepartment == null) {
+            int total = countTotal(stats.employeesByDepartment());
+            return formatNumber(total) + " of " + formatNumber(stats.totalEmployees())
+                    + " employees by department | Click a bar to drill into sections";
+        }
+
+        List<EmployeeRecordDao.CountStat> sections = stats.sectionsByDepartment()
+                .getOrDefault(selectedDepartment, List.of());
+        return formatNumber(countTotal(sections)) + " employees across "
+                + formatNumber(sections.size()) + " sections | Click a bar to show employees";
+    }
+
+    private String gradeHelperText() {
+        if (stats == null) {
+            return "";
+        }
+        if (selectedGrade == null) {
+            return formatNumber(contributionTotal(stats.employeesByGrade())) + " employees across "
+                    + formatNumber(stats.employeesByGrade().size()) + " grades | Click a bar to view departments";
+        }
+
+        List<EmployeeRecordDao.CountStat> departments = getDepartmentsByGrade()
+                .getOrDefault(selectedGrade, List.of());
+        return formatNumber(countTotal(departments)) + " employees across "
+                + formatNumber(departments.size()) + " departments | Click a bar to show employees";
+    }
+
+    private String designationHelperText() {
+        if (stats == null) {
+            return "";
+        }
+        if (selectedDesignation == null) {
+            return formatNumber(countTotal(stats.employeesByDesignation())) + " employees across "
+                    + formatNumber(stats.employeesByDesignation().size())
+                    + " designations | Click a bar to view departments";
+        }
+
+        List<EmployeeRecordDao.CountStat> departments = stats.departmentsByDesignation()
+                .getOrDefault(selectedDesignation, List.of());
+        return formatNumber(countTotal(departments)) + " employees across "
+                + formatNumber(departments.size()) + " departments | Click a bar to show employees";
+    }
+
+    private String missingHelperText() {
+        if (stats == null) {
+            return "";
+        }
+        if (selectedMissingGroup == null) {
+            int missingItems = stats.totalMissingRequiredDocuments() + stats.totalMissingRequiredFields();
+            return formatNumber(stats.employeesMissingAnyRequiredData()) + " of "
+                    + formatNumber(stats.totalEmployees()) + " employees affected | "
+                    + formatNumber(missingItems) + " missing required items | Click a bar for details";
+        }
+        if ("Documents".equals(selectedMissingGroup)) {
+            return formatNumber(stats.employeesMissingRequiredDocuments()) + " employees affected | "
+                    + formatNumber(stats.missingRequiredDocuments().size())
+                    + " required documents tracked | Click a bar to view employees";
+        }
+        return formatNumber(stats.employeesMissingRequiredFields()) + " employees affected | "
+                + formatNumber(stats.missingRequiredFields().size())
+                + " required heading fields tracked | Click a bar to view employees";
+    }
+
+    private String exitReasonsHelperText() {
+        if (stats == null) {
+            return "";
+        }
+        return formatNumber(countTotal(stats.exitTrends())) + " of " + formatNumber(stats.totalEmployees())
+                + " employees grouped by exit reason | Click a slice to filter table";
+    }
+
+    private int countTotal(List<EmployeeRecordDao.CountStat> items) {
+        int total = 0;
+        if (items != null) {
+            for (EmployeeRecordDao.CountStat item : items) {
+                total += Math.max(0, item.count());
+            }
+        }
+        return total;
+    }
+
+    private int contributionTotal(List<EmployeeRecordDao.ContributionStat> items) {
+        int total = 0;
+        if (items != null) {
+            for (EmployeeRecordDao.ContributionStat item : items) {
+                total += Math.max(0, item.count());
+            }
+        }
+        return total;
+    }
+
+    private JButton createFullRowToggle(String chartKey) {
+        boolean expanded = chartKey.equals(fullRowChartKey);
+        JButton button = new JButton(FULL_ROW_ICON != null ? FULL_ROW_ICON : new FullRowToggleIcon());
+        String accessibleName = expanded ? "Back to grid" : "Use full row";
+        button.setText(null);
+        button.setBorderPainted(false);
+        button.setFocusPainted(false);
+        button.setMargin(new Insets(0, 0, 0, 0));
+        button.setBorder(new EmptyBorder(4, 4, 4, 4));
+        button.setPreferredSize(new Dimension(HomeStatsChartHelper.FULL_ROW_BUTTON_SIZE, HomeStatsChartHelper.FULL_ROW_BUTTON_SIZE));
+        button.setMinimumSize(new Dimension(HomeStatsChartHelper.FULL_ROW_BUTTON_SIZE, HomeStatsChartHelper.FULL_ROW_BUTTON_SIZE));
+        button.setMaximumSize(new Dimension(HomeStatsChartHelper.FULL_ROW_BUTTON_SIZE, HomeStatsChartHelper.FULL_ROW_BUTTON_SIZE));
+        button.setForeground(HomeStatsChartHelper.BLUE);
+        button.setBackground(expanded ? HomeStatsChartHelper.FULL_ROW_ACTIVE : HomeStatsChartHelper.SURFACE);
+        button.setSelected(expanded);
+        button.setIconTextGap(0);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.getAccessibleContext().setAccessibleName(accessibleName);
+        button.setToolTipText(expanded
+                ? "Place this chart back in the two-column grid."
+                : "Give this chart the full row width.");
+        ButtonStateHelper.installRounded(button, 8);
+        ButtonStateHelper.setHoverBackground(
+                button,
+                HomeStatsChartHelper.FULL_ROW_ACTIVE,
+                HomeStatsChartHelper.FULL_ROW_PRESSED
+        );
+        button.addActionListener(event -> {
+            fullRowChartKey = expanded ? null : chartKey;
+            rebuildCharts();
+        });
+        return button;
+    }
+
+    private static Icon loadFullRowIcon() {
+        ImageIcon icon = new ImageIcon(HomeStatsChartHelper.FULL_ROW_ICON_PATH);
+        if (icon.getIconWidth() <= 0) {
+            java.net.URL resource = HomeStatsChartsPanel.class.getResource("/images/Full Screen.png");
+            if (resource != null) {
+                icon = new ImageIcon(resource);
+            }
+        }
+        if (icon.getIconWidth() <= 0) {
+            return null;
+        }
+
+        Image scaled = icon.getImage().getScaledInstance(
+                HomeStatsChartHelper.FULL_ROW_ICON_SIZE,
+                HomeStatsChartHelper.FULL_ROW_ICON_SIZE,
+                Image.SCALE_SMOOTH
+        );
+        return new ImageIcon(scaled);
+    }
+
+    private static class FullRowToggleIcon implements Icon {
+        @Override
+        public int getIconWidth() {
+            return HomeStatsChartHelper.FULL_ROW_ICON_SIZE;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return HomeStatsChartHelper.FULL_ROW_ICON_SIZE;
+        }
+
+        @Override
+        public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(component.getForeground());
+            g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+            int left = x + 2;
+            int top = y + 2;
+            int right = x + HomeStatsChartHelper.FULL_ROW_ICON_SIZE - 3;
+            int bottom = y + HomeStatsChartHelper.FULL_ROW_ICON_SIZE - 3;
+            int arm = 5;
+
+            g2.drawLine(left, top, left + arm, top);
+            g2.drawLine(left, top, left, top + arm);
+            g2.drawLine(right - arm, top, right, top);
+            g2.drawLine(right, top, right, top + arm);
+            g2.drawLine(left, bottom - arm, left, bottom);
+            g2.drawLine(left, bottom, left + arm, bottom);
+            g2.drawLine(right - arm, bottom, right, bottom);
+            g2.drawLine(right, bottom - arm, right, bottom);
+            g2.dispose();
+        }
     }
 
     private void showInTable(String columnName, String value, String displayLabel) {
@@ -431,19 +697,12 @@ public class HomeStatsChartsPanel extends JPanel {
     private JPanel missingDataCard() {
         missingBack.setVisible(selectedMissingGroup != null);
 
-        JPanel titleRow = new JPanel(new BorderLayout(8, 0));
-        titleRow.setOpaque(false);
-        missingTitle.setFont(HomeStatsChartHelper.CARD_TITLE_FONT);
-        missingTitle.setForeground(HomeStatsChartHelper.TEXT_PRIMARY);
-        titleRow.add(missingTitle, BorderLayout.WEST);
-
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        actions.setOpaque(false);
+        JPanel actions = chartActions();
         actions.add(missingDetail);
         actions.add(missingBack);
-        titleRow.add(actions, BorderLayout.EAST);
-
-        return chartCard(titleRow, missingDocsChart);
+        actions.add(createFullRowToggle("missing"));
+        styleChartTitle(missingTitle);
+        return chartCard(chartHeader(missingTitle, missingHelperText(), actions), missingDocsChart);
     }
 
     private void configureMissingChart() {
@@ -503,13 +762,11 @@ public class HomeStatsChartsPanel extends JPanel {
 
     private JPanel chartCard(String title, JComponent chart) {
         JLabel label = new JLabel(title);
-        label.setFont(HomeStatsChartHelper.CARD_TITLE_FONT);
-        label.setForeground(HomeStatsChartHelper.TEXT_PRIMARY);
-        return chartCard(label, chart);
+        return chartCard(chartHeader(label, "", null), chart);
     }
 
     private JPanel chartCard(JComponent title, JComponent chart) {
-        JPanel card = new JPanel(new BorderLayout(0, 10));
+        JPanel card = new JPanel(new BorderLayout(0, 16));
         card.setBackground(HomeStatsChartHelper.SURFACE);
         card.setBorder(HomeStatsChartHelper.cardBorder());
         card.add(title, BorderLayout.NORTH);
@@ -517,22 +774,20 @@ public class HomeStatsChartsPanel extends JPanel {
         return card;
     }
 
-    private JPanel chartCardWithFilter(String title, JComponent chart, String columnName) {
-        JPanel card = new JPanel(new BorderLayout(0, 10));
+    private JPanel chartCardWithFilter(String title, JComponent chart, String columnName, String chartKey) {
+        JPanel card = new JPanel(new BorderLayout(0, 16));
         card.setBackground(HomeStatsChartHelper.SURFACE);
         card.setBorder(HomeStatsChartHelper.cardBorder());
 
-        JPanel topRow = new JPanel(new BorderLayout());
-        topRow.setOpaque(false);
         JLabel label = new JLabel(title);
-        label.setFont(HomeStatsChartHelper.CARD_TITLE_FONT);
-        label.setForeground(HomeStatsChartHelper.TEXT_PRIMARY);
-        topRow.add(label, BorderLayout.WEST);
+
+        JPanel actions = chartActions();
+        actions.add(createFullRowToggle(chartKey));
 
         if ("RESIGN_REASON".equalsIgnoreCase(columnName) && chart instanceof DashboardPieChart pieChart) {
             pieChart.setClickHandler(item -> showInTable(columnName, item.label(), item.label()));
         }
-        card.add(topRow, BorderLayout.NORTH);
+        card.add(chartHeader(label, exitReasonsHelperText(), actions), BorderLayout.NORTH);
         card.add(chartContainer(chart), BorderLayout.CENTER);
         return card;
     }
@@ -670,11 +925,31 @@ public class HomeStatsChartsPanel extends JPanel {
         gbc.gridx = x;
         gbc.gridy = y;
         gbc.gridwidth = width;
-        gbc.insets = new Insets(0, 0, CARD_GAP, x == 0 && width == 1 ? CARD_GAP : 0);
+        gbc.insets = new Insets(
+                0,
+                0,
+                HomeStatsChartHelper.CARD_GAP,
+                x == 0 && width == 1 ? HomeStatsChartHelper.CARD_GAP : 0
+        );
         gbc.fill = GridBagConstraints.BOTH;
         gbc.weightx = weightx;
         gbc.weighty = 0.0;
         target.add(component, gbc);
+    }
+
+    private void addEmptyGridSlot(JPanel target, int x, int y) {
+        JPanel spacer = new JPanel();
+        spacer.setOpaque(false);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = x;
+        gbc.gridy = y;
+        gbc.gridwidth = 1;
+        gbc.insets = new Insets(0, 0, HomeStatsChartHelper.CARD_GAP, 0);
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weightx = 1.0;
+        gbc.weighty = 0.0;
+        target.add(spacer, gbc);
     }
 
     private List<ChartItem> countItems(List<EmployeeRecordDao.CountStat> stats, Color color) {
@@ -769,7 +1044,7 @@ public class HomeStatsChartsPanel extends JPanel {
     private record ChartItem(String label, int count, String tooltip, Color color) {
     }
 
-    private record ChartCardSpec(JComponent component, JComponent chart) {
+    private record ChartCardSpec(String key, JComponent component, JComponent chart) {
     }
 
     /**
@@ -780,22 +1055,9 @@ public class HomeStatsChartsPanel extends JPanel {
         int chartPreferredHeight();
 
         int chartPreferredWidth();
-
-        boolean canFitInColumn(int availableColumnWidth);
     }
 
     private static class DashboardBarChart extends JPanel implements DashboardChart, Scrollable {
-        private static final int CHART_TOP = HomeStatsChartHelper.CHART_TOP;
-        private static final int CHART_LEFT = HomeStatsChartHelper.CHART_LEFT;
-        private static final int CHART_RIGHT = HomeStatsChartHelper.CHART_RIGHT;
-        private static final int BAR_MIN_WIDTH = HomeStatsChartHelper.BAR_MIN_WIDTH;
-        private static final int BAR_MAX_WIDTH = HomeStatsChartHelper.BAR_MAX_WIDTH;
-        private static final int SLOT_MIN_WIDTH = HomeStatsChartHelper.SLOT_MIN_WIDTH;
-        private static final int SLOT_MAX_WIDTH = HomeStatsChartHelper.SLOT_MAX_WIDTH;
-        private static final double BAR_WIDTH_RATIO = HomeStatsChartHelper.BAR_WIDTH_RATIO;
-        private static final int LABEL_LINE_HEIGHT = HomeStatsChartHelper.LABEL_LINE_HEIGHT;
-        private static final int MAX_LABEL_LINES = HomeStatsChartHelper.MAX_LABEL_LINES;
-
         private final List<ChartItem> items = new ArrayList<>();
         private final Map<Integer, Rectangle> barBounds = new LinkedHashMap<>();
         private int hoveredIndex = -1;
@@ -848,24 +1110,21 @@ public class HomeStatsChartsPanel extends JPanel {
         }
 
         public int chartPreferredHeight() {
-            return 260 + dynamicBottomSpace();
+            return HomeStatsChartHelper.BAR_CHART_BASE_HEIGHT + dynamicBottomSpace();
         }
 
         public int chartPreferredWidth() {
             if (items.isEmpty()) {
                 return HomeStatsChartHelper.CHART_MIN_WIDTH;
             }
-            int slot = Math.max(SLOT_MIN_WIDTH, dynamicSlotWidth());
+            int slot = Math.max(HomeStatsChartHelper.SLOT_MIN_WIDTH, dynamicSlotWidth());
             return Math.max(
                     HomeStatsChartHelper.CHART_MIN_WIDTH,
-                    CHART_LEFT + CHART_RIGHT + 28 + slot * items.size()
+                    HomeStatsChartHelper.CHART_LEFT
+                            + HomeStatsChartHelper.CHART_RIGHT
+                            + HomeStatsChartHelper.BAR_CHART_EXTRA_WIDTH
+                            + slot * items.size()
             );
-        }
-
-        public boolean canFitInColumn(int availableColumnWidth) {
-            return items.isEmpty()
-                    || (items.size() <= HomeStatsChartHelper.FULL_WIDTH_ITEM_LIMIT
-                    && chartPreferredWidth() <= availableColumnWidth);
         }
 
         void setClickHandler(Consumer<ChartItem> clickHandler) {
@@ -901,11 +1160,11 @@ public class HomeStatsChartsPanel extends JPanel {
 
             int width = getWidth();
             int height = getHeight();
-            int left = CHART_LEFT;
-            int right = CHART_RIGHT;
-            int top = CHART_TOP;
+            int left = HomeStatsChartHelper.CHART_LEFT;
+            int right = HomeStatsChartHelper.CHART_RIGHT;
+            int top = HomeStatsChartHelper.CHART_TOP;
             int bottom = dynamicBottomSpace();
-            int chartHeight = Math.max(96, height - top - bottom);
+            int chartHeight = Math.max(HomeStatsChartHelper.BAR_CHART_MIN_PLOT_HEIGHT, height - top - bottom);
             int chartRight = width - right;
             int chartWidth = Math.max(1, chartRight - left);
             int max = maxCount();
@@ -923,10 +1182,10 @@ public class HomeStatsChartsPanel extends JPanel {
                 int y = top + chartHeight - (chartHeight * line / 4);
                 int value = (int) Math.round(max * (line / 4.0));
 
-                g2.setColor(line == 0 ? new Color(203, 213, 225) : HomeStatsChartHelper.GRID_LINE);
+                g2.setColor(line == 0 ? HomeStatsChartHelper.GRID_BASELINE : HomeStatsChartHelper.GRID_LINE);
                 g2.drawLine(left, y, right, y);
 
-                g2.setColor(line == 0 ? HomeStatsChartHelper.TEXT_PRIMARY : new Color(100, 116, 139));
+                g2.setColor(line == 0 ? HomeStatsChartHelper.TEXT_PRIMARY : HomeStatsChartHelper.TEXT_SECONDARY);
                 String label = compactNumber(value);
                 g2.drawString(label, left - metrics.stringWidth(label) - 8, y + 4);
             }
@@ -935,12 +1194,21 @@ public class HomeStatsChartsPanel extends JPanel {
         private void drawBars(Graphics2D g2, int left, int top, int chartHeight, int chartWidth, int max) {
             int itemCount = Math.max(1, items.size());
 
-            int idealSlot = Math.min(SLOT_MAX_WIDTH, Math.max(SLOT_MIN_WIDTH, dynamicSlotWidth()));
+            int idealSlot = Math.min(
+                    HomeStatsChartHelper.SLOT_MAX_WIDTH,
+                    Math.max(HomeStatsChartHelper.SLOT_MIN_WIDTH, dynamicSlotWidth())
+            );
             int fittedSlot = Math.max(idealSlot, chartWidth / itemCount);
-            int slot = Math.max(44, Math.min(idealSlot, fittedSlot));
+            int slot = Math.max(HomeStatsChartHelper.BAR_SLOT_FIT_MIN_WIDTH, Math.min(idealSlot, fittedSlot));
             int usedWidth = slot * itemCount;
             int startX = left + Math.max(0, (chartWidth - usedWidth) / 2);
-            int barWidth = Math.max(BAR_MIN_WIDTH, Math.min(BAR_MAX_WIDTH, (int) Math.round(slot * BAR_WIDTH_RATIO)));
+            int barWidth = Math.max(
+                    HomeStatsChartHelper.BAR_MIN_WIDTH,
+                    Math.min(
+                            HomeStatsChartHelper.BAR_MAX_WIDTH,
+                            (int) Math.round(slot * HomeStatsChartHelper.BAR_WIDTH_RATIO)
+                    )
+            );
 
             FontMetrics labelMetrics = g2.getFontMetrics(HomeStatsChartHelper.LABEL_FONT);
 
@@ -962,15 +1230,29 @@ public class HomeStatsChartsPanel extends JPanel {
                 boolean hovered = index == hoveredIndex;
                 Color barColor = hovered ? HomeStatsChartHelper.hoverColor(item.color()) : item.color();
 
-                g2.setColor(new Color(barColor.getRed(), barColor.getGreen(), barColor.getBlue(), hovered ? 245 : 220));
+                g2.setColor(HomeStatsChartHelper.withAlpha(
+                        barColor,
+                        hovered ? HomeStatsChartHelper.BAR_HOVER_ALPHA : HomeStatsChartHelper.BAR_ALPHA
+                ));
                 g2.fillRoundRect(barX, barY, barWidth, barHeight, 4, 4);
 
                 drawValueInsideBar(g2, compactNumber(item.count()), barX, barY, barWidth, barHeight, hovered);
 
                 g2.setFont(HomeStatsChartHelper.LABEL_FONT);
                 g2.setColor(hovered ? HomeStatsChartHelper.TEXT_PRIMARY : HomeStatsChartHelper.TEXT_SECONDARY);
-                List<String> labelLines = stackedLabelLines(item.label(), labelMetrics, Math.max(54, slot - 12), MAX_LABEL_LINES);
-                drawCenteredLabelLines(g2, labelLines, centerX, zeroY + 22, LABEL_LINE_HEIGHT);
+                List<String> labelLines = stackedLabelLines(
+                        item.label(),
+                        labelMetrics,
+                        Math.max(HomeStatsChartHelper.BAR_LABEL_MIN_WIDTH, slot - 12),
+                        HomeStatsChartHelper.MAX_LABEL_LINES
+                );
+                drawCenteredLabelLines(
+                        g2,
+                        labelLines,
+                        centerX,
+                        zeroY + HomeStatsChartHelper.BAR_LABEL_Y_OFFSET,
+                        HomeStatsChartHelper.LABEL_LINE_HEIGHT
+                );
             }
         }
 
@@ -994,7 +1276,10 @@ public class HomeStatsChartsPanel extends JPanel {
             Shape oldClip = g2.getClip();
             g2.setClip(new Rectangle(barX, barY, barWidth, barHeight));
 
-            g2.setColor(new Color(255, 255, 255, hovered ? 255 : 245));
+            g2.setColor(HomeStatsChartHelper.withAlpha(
+                    HomeStatsChartHelper.SURFACE,
+                    hovered ? HomeStatsChartHelper.BAR_VALUE_HOVER_ALPHA : HomeStatsChartHelper.BAR_VALUE_ALPHA
+            ));
             g2.drawString(fittedValue, textX, textY);
 
             g2.setClip(oldClip);
@@ -1069,7 +1354,7 @@ public class HomeStatsChartsPanel extends JPanel {
 
         private boolean cleanWasTrimmed(String clean, List<String> lines) {
             String visible = String.join(" ", lines).replace("...", "").trim();
-            return visible.length() < clean.length() && lines.size() >= MAX_LABEL_LINES;
+            return visible.length() < clean.length() && lines.size() >= HomeStatsChartHelper.MAX_LABEL_LINES;
         }
 
         private String withEllipsis(String value, FontMetrics metrics, int maxWidth) {
@@ -1135,15 +1420,25 @@ public class HomeStatsChartsPanel extends JPanel {
                     longestWord = Math.max(longestWord, word.length());
                 }
             }
-            return Math.max(SLOT_MIN_WIDTH, Math.min(SLOT_MAX_WIDTH, 64 + longestWord * 5));
+            return Math.max(
+                    HomeStatsChartHelper.SLOT_MIN_WIDTH,
+                    Math.min(
+                            HomeStatsChartHelper.SLOT_MAX_WIDTH,
+                            HomeStatsChartHelper.BAR_DYNAMIC_SLOT_BASE
+                                    + longestWord * HomeStatsChartHelper.BAR_DYNAMIC_SLOT_PER_CHAR
+                    )
+            );
         }
 
         private int dynamicBottomSpace() {
             int maxLines = 1;
             for (ChartItem item : items) {
-                maxLines = Math.max(maxLines, Math.min(MAX_LABEL_LINES, cleanLabel(item.label()).split("\\s+").length));
+                maxLines = Math.max(
+                        maxLines,
+                        Math.min(HomeStatsChartHelper.MAX_LABEL_LINES, cleanLabel(item.label()).split("\\s+").length)
+                );
             }
-            return 42 + maxLines * LABEL_LINE_HEIGHT;
+            return HomeStatsChartHelper.BAR_LABEL_BOTTOM_BASE + maxLines * HomeStatsChartHelper.LABEL_LINE_HEIGHT;
         }
 
         private static String compactNumber(int value) {
@@ -1200,13 +1495,10 @@ public class HomeStatsChartsPanel extends JPanel {
      * Hover changes only the slice color and legend text weight; no extra shadow/detail box is drawn.
      */
     private static class DashboardPieChart extends JPanel implements DashboardChart {
-        private static final int PIE_MIN_SIZE = HomeStatsChartHelper.PIE_MIN_SIZE;
-        private static final int PIE_MAX_SIZE = HomeStatsChartHelper.PIE_MAX_SIZE;
-        private static final int LEGEND_ROW_HEIGHT = HomeStatsChartHelper.LEGEND_ROW_HEIGHT;
-
         private final List<ChartItem> items = new ArrayList<>();
         private final Map<Integer, Shape> sliceBounds = new LinkedHashMap<>();
         private final Map<Integer, Rectangle> legendBounds = new LinkedHashMap<>();
+        private int preferredChartHeight = HomeStatsChartHelper.AVERAGE_CHART_HEIGHT;
         private int hoveredIndex = -1;
         private Consumer<ChartItem> clickHandler;
 
@@ -1259,17 +1551,19 @@ public class HomeStatsChartsPanel extends JPanel {
             this.clickHandler = clickHandler;
         }
 
+        void setPreferredChartHeight(int preferredChartHeight) {
+            this.preferredChartHeight = Math.max(1, preferredChartHeight);
+            setPreferredSize(new Dimension(chartPreferredWidth(), chartPreferredHeight()));
+            revalidate();
+            repaint();
+        }
+
         public int chartPreferredHeight() {
-            int legendRows = Math.max(2, Math.min(8, items.size()));
-            return Math.max(260, 126 + legendRows * LEGEND_ROW_HEIGHT);
+            return preferredChartHeight;
         }
 
         public int chartPreferredWidth() {
             return HomeStatsChartHelper.CHART_MIN_WIDTH;
-        }
-
-        public boolean canFitInColumn(int availableColumnWidth) {
-            return chartPreferredWidth() <= availableColumnWidth;
         }
 
         public JToolTip createToolTip() {
@@ -1302,20 +1596,82 @@ public class HomeStatsChartsPanel extends JPanel {
 
             int width = getWidth();
             int height = getHeight();
-            boolean compact = width < 560;
-            int pieSize = Math.max(PIE_MIN_SIZE, Math.min(PIE_MAX_SIZE, compact ? width - 56 : height - 64));
-            int pieX = compact ? (width - pieSize) / 2 : 36;
-            int pieY = 28;
+            int legendRows = Math.max(
+                    HomeStatsChartHelper.PIE_MIN_LEGEND_ROWS,
+                    Math.min(HomeStatsChartHelper.PIE_MAX_LEGEND_ROWS, items.size())
+            );
+            int legendHeight = legendRows * HomeStatsChartHelper.LEGEND_ROW_HEIGHT;
+            int pieSize = Math.max(
+                    HomeStatsChartHelper.PIE_MIN_SIZE,
+                    Math.min(
+                            HomeStatsChartHelper.PIE_MAX_SIZE,
+                            height - HomeStatsChartHelper.PIE_TOP - HomeStatsChartHelper.PIE_BOTTOM
+                    )
+            );
+            int availableLegendWidth = Math.max(
+                    HomeStatsChartHelper.PIE_LEGEND_MIN_WIDTH,
+                    width - HomeStatsChartHelper.PIE_LEFT - pieSize
+                            - HomeStatsChartHelper.PIE_LEGEND_GAP
+                            - HomeStatsChartHelper.PIE_LEGEND_RIGHT
+            );
+            int legendWidth = preferredLegendWidth(g2, availableLegendWidth);
+            if (legendWidth < HomeStatsChartHelper.PIE_LEGEND_TARGET_MIN_WIDTH) {
+                pieSize = Math.max(
+                        HomeStatsChartHelper.PIE_MIN_SIZE,
+                        width - HomeStatsChartHelper.PIE_LEFT
+                                - HomeStatsChartHelper.PIE_LEGEND_GAP
+                                - HomeStatsChartHelper.PIE_LEGEND_RIGHT
+                                - HomeStatsChartHelper.PIE_LEGEND_TARGET_MIN_WIDTH
+                );
+                availableLegendWidth = Math.max(
+                        HomeStatsChartHelper.PIE_LEGEND_MIN_WIDTH,
+                        width - HomeStatsChartHelper.PIE_LEFT - pieSize
+                                - HomeStatsChartHelper.PIE_LEGEND_GAP
+                                - HomeStatsChartHelper.PIE_LEGEND_RIGHT
+                );
+                legendWidth = preferredLegendWidth(g2, availableLegendWidth);
+            }
+            int legendX = Math.max(
+                    HomeStatsChartHelper.PIE_LEFT + pieSize + HomeStatsChartHelper.PIE_LEGEND_GAP,
+                    width - HomeStatsChartHelper.PIE_LEGEND_RIGHT - legendWidth
+            );
+            int pieAreaWidth = Math.max(
+                    pieSize,
+                    legendX - HomeStatsChartHelper.PIE_LEGEND_GAP - HomeStatsChartHelper.PIE_LEFT
+            );
+            int pieX = HomeStatsChartHelper.PIE_LEFT + Math.max(0, (pieAreaWidth - pieSize) / 2);
+            int pieY = HomeStatsChartHelper.PIE_TOP + Math.max(
+                    0,
+                    (height - HomeStatsChartHelper.PIE_TOP - HomeStatsChartHelper.PIE_BOTTOM - pieSize) / 2
+            );
+            int legendY = HomeStatsChartHelper.PIE_TOP + Math.max(
+                    0,
+                    (height - HomeStatsChartHelper.PIE_TOP - HomeStatsChartHelper.PIE_BOTTOM - legendHeight) / 2
+            );
 
             drawPie(g2, pieX, pieY, pieSize);
-
-            if (compact) {
-                drawLegend(g2, 24, pieY + pieSize + 24, Math.max(120, width - 48));
-            } else {
-                drawLegend(g2, pieX + pieSize + 34, pieY + 8, Math.max(160, width - pieX - pieSize - 58));
-            }
+            drawLegend(g2, legendX, legendY, legendWidth);
 
             g2.dispose();
+        }
+
+        private int preferredLegendWidth(Graphics2D g2, int maxWidth) {
+            g2.setFont(HomeStatsChartHelper.LABEL_FONT);
+            FontMetrics metrics = g2.getFontMetrics();
+            int width = 96;
+            int total = totalCount();
+            for (ChartItem item : items) {
+                double percent = total == 0 ? 0 : item.count() * 100.0 / total;
+                String value = compactNumber(item.count()) + " / " + String.format("%.0f%%", percent);
+                int rowWidth = HomeStatsChartHelper.PIE_LEGEND_ROW_PAD * 2
+                        + HomeStatsChartHelper.PIE_LEGEND_DOT_SIZE
+                        + HomeStatsChartHelper.PIE_LEGEND_DOT_GAP
+                        + metrics.stringWidth(cleanLabel(item.label()))
+                        + HomeStatsChartHelper.PIE_LEGEND_VALUE_GAP
+                        + metrics.stringWidth(value);
+                width = Math.max(width, rowWidth);
+            }
+            return Math.min(maxWidth, width);
         }
 
         private void drawPie(Graphics2D g2, int x, int y, int size) {
@@ -1329,7 +1685,12 @@ public class HomeStatsChartsPanel extends JPanel {
                 sliceBounds.put(index, slice);
 
                 Color color = index == hoveredIndex ? HomeStatsChartHelper.hoverColor(item.color()) : item.color();
-                g2.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), index == hoveredIndex ? 245 : 220));
+                g2.setColor(HomeStatsChartHelper.withAlpha(
+                        color,
+                        index == hoveredIndex
+                                ? HomeStatsChartHelper.PIE_SLICE_HOVER_ALPHA
+                                : HomeStatsChartHelper.PIE_SLICE_ALPHA
+                ));
                 g2.fill(slice);
                 g2.setColor(Color.WHITE);
                 g2.draw(slice);
@@ -1362,28 +1723,52 @@ public class HomeStatsChartsPanel extends JPanel {
 
             for (int index = 0; index < items.size(); index++) {
                 ChartItem item = items.get(index);
-                int rowY = y + index * LEGEND_ROW_HEIGHT;
-                Rectangle row = new Rectangle(x, rowY - 4, width, LEGEND_ROW_HEIGHT);
-                legendBounds.put(index, row);
-
+                int rowY = y + index * HomeStatsChartHelper.LEGEND_ROW_HEIGHT;
                 boolean hovered = index == hoveredIndex;
                 Color color = hovered ? HomeStatsChartHelper.hoverColor(item.color()) : item.color();
-                g2.setColor(color);
-                g2.fillRoundRect(x, rowY, 12, 12, 4, 4);
 
                 double percent = total == 0 ? 0 : item.count() * 100.0 / total;
-                String value = compactNumber(item.count()) + " \u2022 " + String.format("%.0f%%", percent);
+                String value = compactNumber(item.count()) + " / " + String.format("%.0f%%", percent);
 
                 g2.setFont(hovered ? hoverFont : normalFont);
                 FontMetrics metrics = g2.getFontMetrics();
                 int valueW = metrics.stringWidth(value);
-                int labelMax = Math.max(40, width - 30 - valueW - 12);
+                int labelMax = Math.max(
+                        18,
+                        width - HomeStatsChartHelper.PIE_LEGEND_ROW_PAD * 2
+                                - HomeStatsChartHelper.PIE_LEGEND_DOT_SIZE
+                                - HomeStatsChartHelper.PIE_LEGEND_DOT_GAP
+                                - HomeStatsChartHelper.PIE_LEGEND_VALUE_GAP
+                                - valueW
+                );
                 String label = fitText(g2, cleanLabel(item.label()), labelMax);
+                int dotX = x + HomeStatsChartHelper.PIE_LEGEND_ROW_PAD;
+                int labelX = dotX
+                        + HomeStatsChartHelper.PIE_LEGEND_DOT_SIZE
+                        + HomeStatsChartHelper.PIE_LEGEND_DOT_GAP;
+                int valueX = x + width - HomeStatsChartHelper.PIE_LEGEND_ROW_PAD - valueW;
 
+                Rectangle row = new Rectangle(x, rowY - 4, width, HomeStatsChartHelper.LEGEND_ROW_HEIGHT);
+                legendBounds.put(index, row);
+
+                if (hovered) {
+                    g2.setColor(HomeStatsChartHelper.withAlpha(color, HomeStatsChartHelper.PIE_LEGEND_HOVER_ALPHA));
+                    g2.fillRoundRect(row.x, row.y, row.width, row.height, 8, 8);
+                }
+
+                g2.setColor(color);
+                g2.fillRoundRect(
+                        dotX,
+                        rowY,
+                        HomeStatsChartHelper.PIE_LEGEND_DOT_SIZE,
+                        HomeStatsChartHelper.PIE_LEGEND_DOT_SIZE,
+                        4,
+                        4
+                );
                 g2.setColor(hovered ? HomeStatsChartHelper.TEXT_PRIMARY : HomeStatsChartHelper.TEXT_SECONDARY);
-                g2.drawString(label, x + 20, rowY + 11);
+                g2.drawString(label, labelX, rowY + 10);
                 g2.setColor(HomeStatsChartHelper.TEXT_PRIMARY);
-                g2.drawString(value, x + width - valueW, rowY + 11);
+                g2.drawString(value, valueX, rowY + 10);
             }
         }
 

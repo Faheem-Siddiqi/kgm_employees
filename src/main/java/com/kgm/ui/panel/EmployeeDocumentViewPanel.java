@@ -461,22 +461,22 @@ public class EmployeeDocumentViewPanel extends JPanel {
 
     private void showBulkUploadSummary(EmployeeDocumentUtil.BulkUploadResult summary) {
         String uploadedText = summary.uploadedCount() == 1
-                ? "1 document is ready to save."
-                : summary.uploadedCount() + " documents are ready to save.";
+                ? "1 document is ready to save with this employee."
+                : summary.uploadedCount() + " documents are ready to save with this employee.";
         String discardedText = summary.discardedCount() == 1
-                ? "1 file was not used."
-                : summary.discardedCount() + " files were not used.";
+                ? "1 selected file could not be matched to a document slot."
+                : summary.discardedCount() + " selected files could not be matched to document slots.";
 
         if (summary.discardedCount() == 0) {
-            DialogHelper.success(this, "Bulk upload complete.\n" + uploadedText);
+            DialogHelper.success(this, "Documents ready\n" + uploadedText + "\nSave the employee record to keep these uploads.");
             return;
         }
 
         DialogHelper.warningSections(
                 this,
-                "Bulk Upload Complete",
-                "Uploaded documents\n" + uploadedText,
-                "Files to review\n" + discardedText + "\n" + summary.discardedDetails()
+                "Review unmatched files",
+                "Ready to save\n" + uploadedText + "\nSave the employee record to keep these uploads.",
+                "Files that need attention\n" + discardedText + "\n" + summary.discardedDetails()
         );
     }
 

@@ -10,6 +10,7 @@ import com.kgm.service.ExcelImportService;
 import com.kgm.service.ExcelSampleGenerator;
 import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.component.LoadingOverlay;
+import com.kgm.ui.dialog.UniversalDialog;
 import com.kgm.ui.panel.ChartsPanel;
 import com.kgm.ui.panel.EmployeeTablePanel;
 import com.kgm.ui.panel.FooterPanel;
@@ -17,6 +18,7 @@ import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.KPIRowsPanel;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.HomeViewHelper;
+import com.kgm.ui.styling.UniversalDialogHelper;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -344,7 +346,10 @@ public class HomeView extends JFrame {
         SwingWorker<File[], Void> pickerWorker = new SwingWorker<>() {
             @Override
             protected File[] doInBackground() {
-                return FileUploadCard.chooseDirectories(HomeView.this, "Select employee folders or files inside them");
+                return FileUploadCard.chooseDirectories(
+                        HomeView.this,
+                        "Select up to " + BulkFolderDocumentImportService.MAX_FOLDERS + " employee folders"
+                );
             }
 
             @Override
@@ -447,38 +452,75 @@ public class HomeView extends JFrame {
     }
 
     private void showBulkDocumentImportResult(BulkFolderDocumentImportService.ImportResult result) {
-        JDialog dialog = new JDialog(this, "Bulk Document Upload Complete", Dialog.ModalityType.APPLICATION_MODAL);
+        JDialog dialog = new JDialog(this, "Bulk Document Upload Finished", Dialog.ModalityType.APPLICATION_MODAL);
+        UniversalDialogHelper.styleDialogWindow(dialog);
         dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dialog.getRootPane().registerKeyboardAction(
+                event -> dialog.dispose(),
+                KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+                JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
         dialog.setContentPane(createBulkDocumentResultContent(dialog, result));
-        dialog.pack();
-        dialog.setMinimumSize(new Dimension(560, 240));
+        UniversalDialogHelper.resizeLargeDialog(dialog, this);
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
     }
 
     private JPanel createBulkDocumentResultContent(JDialog dialog, BulkFolderDocumentImportService.ImportResult result) {
-        Color accent = result.skippedCount() == 0 ? new Color(28, 137, 85) : new Color(176, 76, 19);
+        UniversalDialog.Type resultType = bulkResultType(result);
+        Color accent = UniversalDialogHelper.accentFor(resultType);
         JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(Color.WHITE);
+        root.setBackground(UniversalDialogHelper.BACKGROUND);
+        UniversalDialogHelper.styleRoot(root);
 
-        JPanel header = new JPanel(new BorderLayout());
-        header.setBackground(accent);
-        header.setBorder(BorderFactory.createEmptyBorder(16, 22, 16, 22));
-        JLabel title = new JLabel("Bulk Document Upload Complete");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 17));
-        title.setForeground(Color.WHITE);
-        header.add(title, BorderLayout.WEST);
+        JPanel header = new JPanel(new BorderLayout(12, 0));
+        header.setBackground(UniversalDialogHelper.BACKGROUND);
+        header.setBorder(BorderFactory.createEmptyBorder(24, 24, 8, 20));
+
+        JPanel headerText = UniversalDialogHelper.createDialogTextStack();
+        JLabel title = new JLabel(bulkResultTitle(result));
+        title.setFont(UniversalDialogHelper.mediumFont(18));
+        title.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel subtitle = new JLabel(UniversalDialogHelper.htmlWrap(bulkResultSubtitle(result)));
+        subtitle.setFont(UniversalDialogHelper.regularFont(13));
+        subtitle.setForeground(UniversalDialogHelper.MUTED_TEXT);
+        subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        headerText.add(title);
+        headerText.add(Box.createVerticalStrut(4));
+        headerText.add(subtitle);
+        header.add(headerText, BorderLayout.CENTER);
+
+        JPanel headerActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        headerActions.setOpaque(false);
+        headerActions.add(UniversalDialogHelper.createPill(
+                result.skippedCount() == 0 ? "Complete" : "Needs review",
+                UniversalDialogHelper.surface(resultType),
+                accent
+        ));
+        JButton topClose = UniversalDialogHelper.closeButton();
+        topClose.addActionListener(event -> dialog.dispose());
+        headerActions.add(topClose);
+        header.add(headerActions, BorderLayout.EAST);
         root.add(header, BorderLayout.NORTH);
 
         JPanel body = new JPanel();
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-        body.setBackground(Color.WHITE);
-        body.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
+        body.setBackground(UniversalDialogHelper.BACKGROUND);
+        body.setBorder(BorderFactory.createEmptyBorder(14, 24, 18, 24));
 
         body.add(summaryCard(result));
-        if (!result.employeeSummaries().isEmpty()) {
+        if (result.uploadedCount() > 0) {
             body.add(Box.createVerticalStrut(10));
-            body.add(employeeSummariesCard(result.employeeSummaries()));
+            body.add(successfulUploadsCard(result));
+        }
+        java.util.List<BulkFolderDocumentImportService.EmployeeUploadSummary> reviewEmployees =
+                employeesWithReviewItems(result.employeeSummaries());
+        if (!reviewEmployees.isEmpty()) {
+            body.add(Box.createVerticalStrut(10));
+            body.add(employeeReviewCard(reviewEmployees));
         }
         if (!result.folderErrors().isEmpty()) {
             body.add(Box.createVerticalStrut(10));
@@ -486,70 +528,152 @@ public class HomeView extends JFrame {
         }
 
         JScrollPane scroll = new JScrollPane(body);
-        scroll.setBorder(null);
-        scroll.getViewport().setBackground(Color.WHITE);
         scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
-        int preferredHeight = Math.min(560, Math.max(180, body.getPreferredSize().height + 12));
-        scroll.setPreferredSize(new Dimension(640, preferredHeight));
+        scroll.getVerticalScrollBar().setUnitIncrement(18);
+        scroll.getVerticalScrollBar().setBlockIncrement(120);
+        UniversalDialogHelper.styleDialogScrollPane(scroll);
         root.add(scroll, BorderLayout.CENTER);
 
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        footer.setBackground(new Color(247, 249, 251));
-        footer.setBorder(BorderFactory.createEmptyBorder(14, 22, 14, 22));
-        JButton close = new JButton("OK");
-        close.setPreferredSize(new Dimension(92, 34));
-        close.setBackground(accent);
-        close.setForeground(Color.WHITE);
-        close.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
-        close.setFocusPainted(false);
-        close.setBorderPainted(false);
-        close.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        JPanel footer = new JPanel(new BorderLayout(12, 8));
+        footer.setBackground(UniversalDialogHelper.BACKGROUND);
+        footer.setBorder(BorderFactory.createEmptyBorder(0, 24, 24, 24));
+
+        JLabel footerHint = new JLabel(UniversalDialogHelper.htmlWrap(
+                result.skippedCount() == 0
+                        ? "All matched documents are now saved in their employee records."
+                        : "Open any folder link below to review files that still need attention."
+        ));
+        footerHint.setFont(UniversalDialogHelper.regularFont(12));
+        footerHint.setForeground(UniversalDialogHelper.MUTED_TEXT);
+        footer.add(footerHint, BorderLayout.CENTER);
+
+        JPanel buttonRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        buttonRow.setOpaque(false);
+        JButton close = UniversalDialogHelper.primaryButton("Done", UniversalDialogHelper.PRIMARY);
         close.addActionListener(event -> dialog.dispose());
-        footer.add(close);
+        buttonRow.add(close);
+        footer.add(buttonRow, BorderLayout.EAST);
         root.add(footer, BorderLayout.SOUTH);
         dialog.getRootPane().setDefaultButton(close);
         return root;
     }
 
+    private UniversalDialog.Type bulkResultType(BulkFolderDocumentImportService.ImportResult result) {
+        if (result.skippedCount() > 0 || result.uploadedCount() == 0) {
+            return UniversalDialog.Type.WARNING;
+        }
+        return UniversalDialog.Type.SUCCESS;
+    }
+
+    private String bulkResultTitle(BulkFolderDocumentImportService.ImportResult result) {
+        if (result.skippedCount() > 0) {
+            return "Review bulk document upload";
+        }
+        if (result.uploadedCount() == 0) {
+            return "No documents were uploaded";
+        }
+        return "Bulk documents uploaded";
+    }
+
+    private String bulkResultSubtitle(BulkFolderDocumentImportService.ImportResult result) {
+        if (result.skippedCount() > 0) {
+            return "Some folders or files need attention. The upload results are grouped below.";
+        }
+        if (result.uploadedCount() == 0) {
+            return "No matching documents were found in the selected folders.";
+        }
+        return "Matched documents were saved to the correct employee records.";
+    }
+
     private JPanel summaryCard(BulkFolderDocumentImportService.ImportResult result) {
-        JPanel card = resultCard(new Color(248, 250, 252), new Color(220, 226, 232));
+        UniversalDialog.Type type = bulkResultType(result);
+        JPanel card = resultCard(UniversalDialogHelper.surface(type), UniversalDialogHelper.border(type));
         JLabel heading = sectionHeading("Summary");
-        JLabel text = new JLabel(result.uploadedCount() + " document" + plural(result.uploadedCount())
-                + " uploaded, " + result.skippedCount() + " file" + plural(result.skippedCount()) + " skipped/failed.");
-        text.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        text.setForeground(new Color(35, 43, 54));
-        text.setAlignmentX(Component.LEFT_ALIGNMENT);
         card.add(heading);
         card.add(Box.createVerticalStrut(4));
-        card.add(text);
+        card.add(wrappedText(bulkSummaryMessage(result), UniversalDialogHelper.surface(type)));
         return card;
     }
 
-    private JPanel employeeSummariesCard(java.util.List<BulkFolderDocumentImportService.EmployeeUploadSummary> employees) {
-        JPanel card = resultCard(new Color(248, 255, 250), new Color(187, 247, 208));
-        card.add(sectionHeading("Employee Results"));
+    private String bulkSummaryMessage(BulkFolderDocumentImportService.ImportResult result) {
+        String status;
+        if (result.uploadedCount() == 0) {
+            status = "No documents were uploaded.";
+        } else if (result.skippedCount() == 0) {
+            status = "All matched documents were uploaded successfully.";
+        } else {
+            status = "Upload finished with items to review.";
+        }
+        return status
+                + "\nUploaded: " + result.uploadedCount() + " document" + plural(result.uploadedCount())
+                + "\nNeeds review: " + result.skippedCount() + " item" + plural(result.skippedCount())
+                + "\nOnly files directly inside each selected employee folder were checked.";
+    }
+
+    private JPanel successfulUploadsCard(BulkFolderDocumentImportService.ImportResult result) {
+        JPanel card = resultCard(
+                UniversalDialogHelper.surface(UniversalDialog.Type.SUCCESS),
+                UniversalDialogHelper.border(UniversalDialog.Type.SUCCESS)
+        );
+        int employeeCount = result.uploadedEmployees().size();
+        card.add(sectionHeading("Uploaded documents"));
+        card.add(Box.createVerticalStrut(4));
+        card.add(wrappedText(
+                result.uploadedCount() + " document" + plural(result.uploadedCount())
+                        + " uploaded for " + employeeCount + " employee" + plural(employeeCount) + ".",
+                UniversalDialogHelper.surface(UniversalDialog.Type.SUCCESS)
+        ));
+        return card;
+    }
+
+    private java.util.List<BulkFolderDocumentImportService.EmployeeUploadSummary> employeesWithReviewItems(
+            java.util.List<BulkFolderDocumentImportService.EmployeeUploadSummary> employees
+    ) {
+        java.util.List<BulkFolderDocumentImportService.EmployeeUploadSummary> reviewEmployees = new java.util.ArrayList<>();
+        for (BulkFolderDocumentImportService.EmployeeUploadSummary employee : employees) {
+            if (employee.skippedCount() > 0) {
+                reviewEmployees.add(employee);
+            }
+        }
+        return reviewEmployees;
+    }
+
+    private JPanel employeeReviewCard(java.util.List<BulkFolderDocumentImportService.EmployeeUploadSummary> employees) {
+        Color background = UniversalDialogHelper.surface(UniversalDialog.Type.WARNING);
+        JPanel card = resultCard(background, UniversalDialogHelper.border(UniversalDialog.Type.WARNING));
+        card.add(sectionHeading("Needs attention"));
         for (BulkFolderDocumentImportService.EmployeeUploadSummary employee : employees) {
             card.add(Box.createVerticalStrut(10));
-            card.add(folderLink("Employee: " + employee.displayName(), employee.folder()));
-            addSummaryParagraph(card, "Uploaded", employee.uploadedLabels(), new Color(248, 255, 250));
+            card.add(folderLink("Employee folder: " + employee.displayName(), employee.folder()));
+            addUploadedCountParagraph(card, employee.uploadedLabels().size(), background);
             addSummaryParagraph(
                     card,
-                    "Already exists in DB, not uploaded",
+                    "Already saved, left unchanged",
                     employee.alreadyExistingLabels(),
-                    new Color(248, 255, 250)
+                    background
             );
             addSummaryParagraph(
                     card,
-                    "No matching document label found",
+                    "No matching document label",
                     employee.noMatchFiles(),
-                    new Color(248, 255, 250)
+                    background
             );
             for (Map.Entry<String, java.util.List<String>> failure : employee.failedByReason().entrySet()) {
-                addSummaryParagraph(card, failure.getKey(), failure.getValue(), new Color(248, 255, 250));
+                addSummaryParagraph(card, failure.getKey(), failure.getValue(), background);
             }
         }
         return card;
+    }
+
+    private void addUploadedCountParagraph(JPanel card, int uploadedCount, Color background) {
+        if (uploadedCount <= 0) {
+            return;
+        }
+        card.add(wrappedText(
+                "Uploaded successfully: " + uploadedCount + " document" + plural(uploadedCount),
+                background
+        ));
     }
 
     private void addSummaryParagraph(JPanel card, String label, java.util.List<String> values, Color background) {
@@ -560,12 +684,13 @@ public class HomeView extends JFrame {
     }
 
     private JPanel folderErrorsCard(java.util.List<BulkFolderDocumentImportService.FolderError> errors) {
-        JPanel card = resultCard(new Color(255, 250, 245), new Color(254, 215, 170));
-        card.add(sectionHeading("Error Folder"));
+        Color background = UniversalDialogHelper.surface(UniversalDialog.Type.ERROR);
+        JPanel card = resultCard(background, UniversalDialogHelper.border(UniversalDialog.Type.ERROR));
+        card.add(sectionHeading("Folder issues"));
         for (BulkFolderDocumentImportService.FolderError error : errors) {
             card.add(Box.createVerticalStrut(10));
-            card.add(folderLink("Employee Code - " + error.folderName(), error.folder()));
-            card.add(wrappedText(String.join("\n", error.messages()), new Color(255, 250, 245)));
+            card.add(folderLink("Folder: " + error.folderName(), error.folder()));
+            card.add(wrappedText(String.join("\n", error.messages()), background));
         }
         return card;
     }
@@ -575,8 +700,8 @@ public class HomeView extends JFrame {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBackground(background);
         card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(border),
-                BorderFactory.createEmptyBorder(12, 14, 12, 14)
+                UniversalDialogHelper.roundedBorder(border, 8, 1),
+                BorderFactory.createEmptyBorder(14, 16, 14, 16)
         ));
         card.setAlignmentX(Component.LEFT_ALIGNMENT);
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
@@ -585,8 +710,8 @@ public class HomeView extends JFrame {
 
     private JLabel sectionHeading(String text) {
         JLabel label = new JLabel(text);
-        label.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        label.setForeground(new Color(35, 43, 54));
+        label.setFont(UniversalDialogHelper.mediumFont(14));
+        label.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
         return label;
     }
@@ -597,8 +722,8 @@ public class HomeView extends JFrame {
         area.setFocusable(false);
         area.setLineWrap(true);
         area.setWrapStyleWord(true);
-        area.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        area.setForeground(new Color(35, 43, 54));
+        area.setFont(UniversalDialogHelper.regularFont(13));
+        area.setForeground(UniversalDialogHelper.TEXT_SECONDARY);
         area.setBackground(background);
         area.setBorder(BorderFactory.createEmptyBorder(3, 0, 0, 0));
         area.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -608,9 +733,9 @@ public class HomeView extends JFrame {
 
     private JLabel folderLink(String folderName, File folder) {
         JLabel label = new JLabel(folderName == null || folderName.isBlank() ? "Open folder" : folderName);
-        Color normal = new Color(35, 43, 54);
-        Color active = new Color(0, 112, 210);
-        label.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        Color normal = UniversalDialogHelper.TEXT_PRIMARY;
+        Color active = UniversalDialogHelper.PRIMARY;
+        label.setFont(UniversalDialogHelper.mediumFont(13));
         label.setForeground(normal);
         label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
