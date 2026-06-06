@@ -40,6 +40,19 @@ class EmployeeDocumentUtilTest {
     }
 
     @Test
+    void documentTypesIncludeResignApplicationDefault() {
+        EmployeeDocumentUtil.DocumentType type = EmployeeDocumentUtil.documentTypes().stream()
+                .filter(documentType -> "RESIGN_APPLICATION".equals(documentType.employeeFieldName()))
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(type);
+        assertEquals("Resign Application", type.label());
+        assertEquals("RESIGN_APPLICATION.jpg", type.storageName());
+        assertTrue(type.aliases().contains("Resign_Application"));
+    }
+
+    @Test
     void prepareImageForUploadAcceptsReadableJpegUnderConfiguredLimit() throws IOException {
         File source = writeJpeg(tempDir.resolve("CNIC_FRONT.jpg"), 160, 100, 0.9f);
         System.setProperty(DOCUMENT_UPLOAD_PROPERTY, Long.toString(source.length() + 1024));
