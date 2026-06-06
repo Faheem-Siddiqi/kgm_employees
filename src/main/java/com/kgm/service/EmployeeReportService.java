@@ -98,6 +98,9 @@ public class EmployeeReportService {
         List<DocumentEntry> mergedPdfDocuments = effectiveOptions.includeMergedDocumentsPdf()
                 ? mergeableDocumentEntries(employee)
                 : List.of();
+        if (effectiveOptions.includeAllDocuments() && selectedDocuments.isEmpty()) {
+            throw new IllegalArgumentException("No saved document files are ready to copy.");
+        }
         if (!effectiveOptions.includePdfProfile()
                 && !effectiveOptions.includeMergedDocumentsPdf()
                 && selectedDocuments.isEmpty()) {
@@ -177,9 +180,9 @@ public class EmployeeReportService {
     }
 
     private List<DocumentEntry> selectedDocumentEntries(Employee employee, PackageOptions options) {
-        List<DocumentEntry> available = savedDocumentEntries(employee);
+        List<DocumentEntry> available = readyDocumentEntries(employee);
         if (options.includeAllDocuments()) {
-            return available;
+            return savedNonPhotoDocumentEntries(available);
         }
 
         Set<String> selectedLabels = new HashSet<>(options.selectedDocumentLabels());
@@ -203,18 +206,29 @@ public class EmployeeReportService {
         return available;
     }
 
-    private List<DocumentEntry> mergeableDocumentEntries(Employee employee) {
+    private List<DocumentEntry> readyDocumentEntries(Employee employee) {
         List<DocumentEntry> available = new ArrayList<>();
         for (DocumentEntry entry : savedDocumentEntries(employee)) {
-            if (entry.employeePhoto()) {
-                continue;
-            }
             Path source = resolveDocumentPath(entry.sourcePath());
             if (Files.isRegularFile(source)) {
                 available.add(entry);
             }
         }
         return available;
+    }
+
+    private List<DocumentEntry> savedNonPhotoDocumentEntries(List<DocumentEntry> entries) {
+        List<DocumentEntry> documents = new ArrayList<>();
+        for (DocumentEntry entry : entries) {
+            if (!entry.employeePhoto()) {
+                documents.add(entry);
+            }
+        }
+        return documents;
+    }
+
+    private List<DocumentEntry> mergeableDocumentEntries(Employee employee) {
+        return savedNonPhotoDocumentEntries(readyDocumentEntries(employee));
     }
 
     private List<PackagedDocument> copyEmployeeDocuments(List<DocumentEntry> entries, Path documentsDirectory) throws IOException {

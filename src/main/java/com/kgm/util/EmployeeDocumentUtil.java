@@ -60,6 +60,7 @@ public final class EmployeeDocumentUtil {
             new DocumentType("Appointment Letter Back", "APPOINTMENT_LETTER_BACK", "APPOINTMENT_LETTER_BACK.jpg", "Appointment_Letter_Back"),
             new DocumentType("Application Front", "APPLICATION_FRONT", "APPLICATION_FRONT.jpg", "Application_Front"),
             new DocumentType("Application Back", "APPLICATION_BACK", "APPLICATION_BACK.jpg", "Application_Back"),
+            new DocumentType("Resign Application", "RESIGN_APPLICATION", "RESIGN_APPLICATION.jpg", "Resign_Application"),
             new DocumentType("Clearance Certificate", "CLEARANCE_CERTIFICATE", "CLEARANCE_CERTIFICATE.jpg"),
             new DocumentType("Service Certificate", "SERVICE_CERTIFICATE", "SERVICE_CERTIFICATE.jpg", "Service Certificate/"),
             new DocumentType("Payment Voucher", "PAYMENT_VOUCHER", "PAYMENT_VOUCHER.jpg"),

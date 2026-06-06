@@ -2,7 +2,7 @@ package com.kgm.ui;
 
 import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.EmployeeFieldDefinition;
-import com.kgm.service.AuthService;
+import com.kgm.config.AppConfig;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
@@ -40,6 +40,10 @@ public class FieldManagementView extends JFrame {
     private static final int BUTTON_RADIUS = 10;
     private static final Color NEUTRAL_BUTTON_TEXT = new Color(99, 115, 129);
     private static final Color NEUTRAL_BUTTON_BORDER = new Color(198, 207, 216);
+    private static final Color PASSWORD_BORDER = new Color(200, 200, 200);
+    private static final Color PASSWORD_FOCUS_BORDER = EmployeeRegistrationViewHelper.PRIMARY;
+    private static final Color PASSWORD_TEXT = new Color(35, 43, 54);
+    private static final Color PASSWORD_MUTED_TEXT = new Color(99, 115, 129);
 
     private static final int FIELD_COLUMN = 0;
     private static final int FIELD_LABEL = 1;
@@ -733,7 +737,7 @@ public class FieldManagementView extends JFrame {
             DialogHelper.warning(this, "System Field", "ID cannot be marked as required.");
             return;
         }
-        if (!confirmPassword("Enter admin password to edit required status.")) {
+        if (!confirmPassword("Enter the Field Settings password to edit required status.")) {
             return;
         }
         Boolean required = showRequiredStatusDialog(selected);
@@ -847,7 +851,7 @@ public class FieldManagementView extends JFrame {
             );
             return;
         }
-        if (!confirmPassword("Enter admin password to delete this category.")) {
+        if (!confirmPassword("Enter the Field Settings password to delete this category.")) {
             return;
         }
 
@@ -906,6 +910,9 @@ public class FieldManagementView extends JFrame {
         }
 
         CategoryRow category = categoryRows.get(row);
+        if (!confirmPassword("Enter the Field Settings password to edit this category.")) {
+            return;
+        }
         String renamed = showCategoryDialog(category);
         if (renamed == null) {
             return;
@@ -982,6 +989,9 @@ public class FieldManagementView extends JFrame {
     }
 
     private void addField() {
+        if (!confirmPassword("Enter the Field Settings password to add a field.")) {
+            return;
+        }
         FieldFormData data = showFieldDialog("Add Employee Field", null);
         if (data == null) {
             return;
@@ -1009,8 +1019,7 @@ public class FieldManagementView extends JFrame {
         if (selected == null) {
             return;
         }
-        if (!selected.customField()
-                && !confirmPassword("Enter admin password to edit this built-in field.")) {
+        if (!confirmPassword("Enter the Field Settings password to edit this field.")) {
             return;
         }
 
@@ -1045,7 +1054,7 @@ public class FieldManagementView extends JFrame {
             DialogHelper.warning(this, "Built-in Field", "Only custom fields can be deleted.");
             return;
         }
-        if (!confirmPassword("Enter admin password to delete this field.")) {
+        if (!confirmPassword("Enter the Field Settings password to delete this field.")) {
             return;
         }
 
@@ -1305,18 +1314,39 @@ public class FieldManagementView extends JFrame {
     }
 
     private boolean confirmPassword() {
-        return confirmPassword("Enter admin password to delete this field.");
+        return confirmPassword("Enter the Field Settings password to continue.");
     }
 
     private boolean confirmPassword(String message) {
-        JPasswordField password = new JPasswordField(18);
-        JPanel panel = new JPanel(new BorderLayout(0, 8));
-        panel.add(new JLabel(message), BorderLayout.NORTH);
-        panel.add(password, BorderLayout.CENTER);
+        JPasswordField password = new PlaceholderPasswordField("Field Settings password", 24);
+        stylePasswordInput(password);
+        JButton toggle = createPasswordToggle(password);
+
+        JPanel inputRow = createPasswordInputRow(password, toggle);
+        JLabel prompt = new JLabel(message);
+        prompt.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        prompt.setForeground(PASSWORD_TEXT);
+        JLabel fieldLabel = new JLabel("Password");
+        fieldLabel.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
+        fieldLabel.setForeground(PASSWORD_MUTED_TEXT);
+
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(new EmptyBorder(4, 4, 2, 4));
+        prompt.setAlignmentX(Component.LEFT_ALIGNMENT);
+        fieldLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        inputRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(prompt);
+        panel.add(Box.createVerticalStrut(12));
+        panel.add(fieldLabel);
+        panel.add(Box.createVerticalStrut(6));
+        panel.add(inputRow);
+        SwingUtilities.invokeLater(password::requestFocusInWindow);
 
         int result = DialogHelper.formOption(
                 this,
-                "Admin Password",
+                "Field Settings Password",
                 panel,
                 "Confirm",
                 "Cancel"
@@ -1325,11 +1355,81 @@ public class FieldManagementView extends JFrame {
             return false;
         }
 
-        boolean valid = AuthService.isAdminPassword(new String(password.getPassword()));
+        boolean valid = isFieldSettingsPassword(new String(password.getPassword()));
         if (!valid) {
-            DialogHelper.error(this, "Password Incorrect", "The admin password is incorrect.");
+            DialogHelper.error(this, "Password Incorrect", "The Field Settings password is incorrect.");
         }
         return valid;
+    }
+
+    private static boolean isFieldSettingsPassword(String password) {
+        String expectedPassword = AppConfig.fieldSettingsPassword();
+        return expectedPassword != null
+                && !expectedPassword.isBlank()
+                && expectedPassword.equals(password == null ? "" : password);
+    }
+
+    private static void stylePasswordInput(JPasswordField password) {
+        password.setBorder(null);
+        password.setOpaque(false);
+        password.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        password.setForeground(PASSWORD_TEXT);
+        password.setCaretColor(PASSWORD_FOCUS_BORDER);
+        password.setPreferredSize(new Dimension(260, 36));
+        password.setMinimumSize(new Dimension(220, 36));
+        password.setToolTipText("Field Settings password");
+    }
+
+    private JPanel createPasswordInputRow(JPasswordField password, JButton toggle) {
+        JPanel row = new JPanel(new BorderLayout(8, 0));
+        row.setOpaque(true);
+        row.setBackground(Color.WHITE);
+        row.setPreferredSize(new Dimension(360, 38));
+        row.setMaximumSize(new Dimension(420, 38));
+        row.setBorder(passwordInputBorder(PASSWORD_BORDER));
+        row.add(password, BorderLayout.CENTER);
+        row.add(toggle, BorderLayout.EAST);
+        password.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent event) {
+                row.setBorder(passwordInputBorder(PASSWORD_FOCUS_BORDER));
+            }
+
+            @Override
+            public void focusLost(java.awt.event.FocusEvent event) {
+                row.setBorder(passwordInputBorder(PASSWORD_BORDER));
+            }
+        });
+        return row;
+    }
+
+    private static JButton createPasswordToggle(JPasswordField password) {
+        char maskedEcho = password.getEchoChar();
+        JButton toggle = new JButton("Show");
+        toggle.setToolTipText("Show or hide password");
+        toggle.setFocusPainted(false);
+        toggle.setContentAreaFilled(false);
+        toggle.setBorderPainted(false);
+        toggle.setOpaque(false);
+        toggle.setForeground(PASSWORD_MUTED_TEXT);
+        toggle.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
+        toggle.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        toggle.setBorder(new EmptyBorder(0, 8, 0, 8));
+        toggle.addActionListener(event -> {
+            boolean showing = password.getEchoChar() == 0;
+            password.setEchoChar(showing ? maskedEcho : (char) 0);
+            toggle.setText(showing ? "Show" : "Hide");
+            password.requestFocusInWindow();
+        });
+        ButtonStateHelper.install(toggle);
+        return toggle;
+    }
+
+    private static javax.swing.border.Border passwordInputBorder(Color color) {
+        return BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(color),
+                BorderFactory.createEmptyBorder(0, 10, 0, 6)
+        );
     }
 
     private GridBagConstraints formConstraints() {
@@ -1567,6 +1667,32 @@ public class FieldManagementView extends JFrame {
             int tabChromeHeight = Math.max(0, preferred.height - tallestTabContentHeight);
             Dimension selectedSize = selected.getPreferredSize();
             return new Dimension(preferred.width, selectedSize.height + tabChromeHeight);
+        }
+    }
+
+    private static class PlaceholderPasswordField extends JPasswordField {
+        private final String placeholder;
+
+        PlaceholderPasswordField(String placeholder, int columns) {
+            super(columns);
+            this.placeholder = placeholder;
+        }
+
+        @Override
+        protected void paintComponent(Graphics graphics) {
+            super.paintComponent(graphics);
+            if (getPassword().length > 0 || isFocusOwner()) {
+                return;
+            }
+
+            Graphics2D copy = (Graphics2D) graphics.create();
+            copy.setColor(new Color(130, 140, 150));
+            copy.setFont(getFont());
+            Insets insets = getInsets();
+            FontMetrics metrics = copy.getFontMetrics();
+            int y = (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent();
+            copy.drawString(placeholder, insets.left, y);
+            copy.dispose();
         }
     }
 

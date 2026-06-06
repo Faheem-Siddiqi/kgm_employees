@@ -27,6 +27,14 @@ public final class AppConfig {
         return setting("kgm.admin.password", "KGM_ADMIN_PASSWORD", "");
     }
 
+    public static String fieldSettingsPassword() {
+        String configured = setting("kgm.field.settings.password", "FIELD_SETTINGS", "");
+        if (configured == null || configured.isBlank()) {
+            configured = setting("kgm.field.settings.password", "KGM_FIELD_SETTINGS_PASSWORD", "");
+        }
+        return configured == null || configured.isBlank() ? adminPassword() : configured;
+    }
+
     public static Path employeeStorageDirectory() {
         String configured = setting(
                 "kgm.employee.storage.dir",

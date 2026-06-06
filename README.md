@@ -332,19 +332,20 @@ The application uses `EmployeeDocumentUtil` as the single source of truth for do
 | 7 | `APPOINTMENT_LETTER_BACK` | Appointment Letter Back |
 | 8 | `APPLICATION_FRONT` | Application Front |
 | 9 | `APPLICATION_BACK` | Application Back |
-| 10 | `CLEARANCE_CERTIFICATE` | Clearance Certificate |
-| 11 | `SERVICE_CERTIFICATE` | Service Certificate |
-| 12 | `PAYMENT_VOUCHER` | Payment Voucher |
-| 13 | `TRIAL_CARD` | Trial Card |
-| 14 | `MEDICAL_DOC` | Medical |
-| 15 | `INTERVIEW_FORMS` | Interview Forms |
-| 16 | `COVID_CERTIFICATE` | Covid Certificate |
-| 17 | `DISCIPLINARY_I` | Disciplinary I |
-| 18 | `DISCIPLINARY_II` | Disciplinary II |
-| 19 | `DISCIPLINARY_III` | Disciplinary III |
-| 20 | `MISCELLANEOUS_I` | Miscellaneous I |
-| 21 | `MISCELLANEOUS_II` | Miscellaneous II |
-| 22 | `MISCELLANEOUS_III` | Miscellaneous III |
+| 10 | `RESIGN_APPLICATION` | Resign Application |
+| 11 | `CLEARANCE_CERTIFICATE` | Clearance Certificate |
+| 12 | `SERVICE_CERTIFICATE` | Service Certificate |
+| 13 | `PAYMENT_VOUCHER` | Payment Voucher |
+| 14 | `TRIAL_CARD` | Trial Card |
+| 15 | `MEDICAL_DOC` | Medical |
+| 16 | `INTERVIEW_FORMS` | Interview Forms |
+| 17 | `COVID_CERTIFICATE` | Covid Certificate |
+| 18 | `DISCIPLINARY_I` | Disciplinary I |
+| 19 | `DISCIPLINARY_II` | Disciplinary II |
+| 20 | `DISCIPLINARY_III` | Disciplinary III |
+| 21 | `MISCELLANEOUS_I` | Miscellaneous I |
+| 22 | `MISCELLANEOUS_II` | Miscellaneous II |
+| 23 | `MISCELLANEOUS_III` | Miscellaneous III |
 
 ### Document Upload Status Colors and States
 
@@ -497,6 +498,7 @@ Settings can be passed through JVM properties, OS environment variables, or `.en
 | `KGM_DB_PASSWORD` | `kgm.db.password` | Database password |
 | `KGM_ADMIN_USER` | `kgm.admin.user` | Application admin username |
 | `KGM_ADMIN_PASSWORD` | `kgm.admin.password` | Application admin password |
+| `FIELD_SETTINGS` | `kgm.field.settings.password` | Field Management password for adding, editing, deleting, or changing required field settings |
 | `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local folder for employee photos and documents |
 | `KGM_DOCUMENT_UPLOAD_MAX_BYTES` | `kgm.document.upload.max.bytes` | Maximum prepared JPG/JPEG document/photo upload size in bytes; files above it use the best JPEG quality that fits |
 
@@ -524,7 +526,10 @@ Application login is configured in `.env`:
 ```text
 KGM_ADMIN_USER=...
 KGM_ADMIN_PASSWORD=...
+FIELD_SETTINGS=...
 ```
+
+If `FIELD_SETTINGS` is not set, Field Management falls back to `KGM_ADMIN_PASSWORD` so existing installs keep working.
 
 ---
 

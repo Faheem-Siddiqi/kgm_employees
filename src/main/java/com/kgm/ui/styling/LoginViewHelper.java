@@ -19,7 +19,7 @@ public final class LoginViewHelper {
     private static final int FIELD_HEIGHT = 40;
     private static final int BUTTON_HEIGHT = 40;
     private static final int LOGO_MARGIN = 30;
-    private static final int LOGO_WIDTH = 76;
+    private static final int LOGO_WIDTH = 55;
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color TEXT_PRIMARY = new Color(15, 23, 42);
     private static final Color HEADING_GREY = new Color(17, 24, 39);

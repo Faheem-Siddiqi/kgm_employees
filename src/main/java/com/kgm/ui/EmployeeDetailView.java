@@ -858,6 +858,11 @@ public class EmployeeDetailView extends JFrame {
     private EmployeeReportService.PackageOptions showDownloadOptionsDialog(
             List<EmployeeReportService.AvailableDocument> availableDocuments
     ) {
+        List<EmployeeReportService.AvailableDocument> documents = availableDocuments == null
+                ? List.of()
+                : List.copyOf(availableDocuments);
+        boolean hasReadySavedDocuments = hasReadyMergeableDocument(documents);
+
         JDialog dialog = new JDialog(this, "Download Employee Report", true);
         UniversalDialogHelper.styleDialogWindow(dialog);
         dialog.getRootPane().registerKeyboardAction(
@@ -927,7 +932,15 @@ public class EmployeeDetailView extends JFrame {
 
         JCheckBox pdfProfile = createDownloadCheckbox("Profile PDF", true);
         JCheckBox allDocumentsPdf = createDownloadCheckbox("All documents PDF", false);
-        JCheckBox allDocuments = createDownloadCheckbox("Copy all saved documents", true);
+        JCheckBox allDocuments = createDownloadCheckbox("Copy all saved documents", hasReadySavedDocuments);
+        allDocumentsPdf.setEnabled(hasReadySavedDocuments);
+        allDocumentsPdf.setToolTipText(hasReadySavedDocuments
+                ? "Merge supported saved document images into a single PDF."
+                : "Available after at least one saved document image file is ready.");
+        allDocuments.setEnabled(hasReadySavedDocuments);
+        allDocuments.setToolTipText(hasReadySavedDocuments
+                ? "Copy every ready saved document separately."
+                : "Available after at least one saved document file is ready.");
 
         JPanel optionsCard = UniversalDialogHelper.createDialogCard();
         optionsCard.add(UniversalDialogHelper.createDialogSectionHeader(
@@ -973,7 +986,7 @@ public class EmployeeDetailView extends JFrame {
         documentList.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         Map<String, JCheckBox> documentChecks = new LinkedHashMap<>();
-        for (EmployeeReportService.AvailableDocument availableDocument : availableDocuments) {
+        for (EmployeeReportService.AvailableDocument availableDocument : documents) {
             JCheckBox checkbox = createDownloadCheckbox(availableDocument.label(), false);
             checkbox.setEnabled(availableDocument.fileReady() && !allDocuments.isSelected());
             checkbox.setToolTipText(availableDocument.fileReady()
@@ -984,7 +997,7 @@ public class EmployeeDetailView extends JFrame {
             documentList.add(Box.createVerticalStrut(8));
         }
 
-        if (availableDocuments.isEmpty()) {
+        if (documents.isEmpty()) {
             JPanel empty = UniversalDialogHelper.createInfoBox(
                     "No saved documents found",
                     "No document files are ready to copy yet. You can still generate the profile PDF.",
@@ -1015,12 +1028,27 @@ public class EmployeeDetailView extends JFrame {
         validation.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         Runnable refreshState = () -> {
+            long readyCount = documents.stream()
+                    .filter(document -> document.fileReady() && document.mergeableForDocumentsPdf())
+                    .count();
+            boolean canCopyDocuments = readyCount > 0;
+            boolean canCreateDocumentsPdf = hasReadyMergeableDocument(documents);
+
+            allDocuments.setEnabled(canCopyDocuments);
+            allDocumentsPdf.setEnabled(canCreateDocumentsPdf);
+            if (!canCopyDocuments) {
+                allDocuments.setSelected(false);
+            }
+            if (!canCreateDocumentsPdf) {
+                allDocumentsPdf.setSelected(false);
+            }
+
             boolean chooseSpecificDocs = !allDocuments.isSelected();
 
             documentSection.setVisible(chooseSpecificDocs);
 
             for (JCheckBox checkbox : documentChecks.values()) {
-                EmployeeReportService.AvailableDocument doc = findDocumentByLabel(availableDocuments, checkbox.getText());
+                EmployeeReportService.AvailableDocument doc = findDocumentByLabel(documents, checkbox.getText());
                 boolean fileReady = doc != null && doc.fileReady();
                 checkbox.setEnabled(chooseSpecificDocs && fileReady);
                 if (!chooseSpecificDocs) {
@@ -1028,7 +1056,6 @@ public class EmployeeDetailView extends JFrame {
                 }
             }
 
-            long readyCount = availableDocuments.stream().filter(EmployeeReportService.AvailableDocument::fileReady).count();
             long selectedCount = documentChecks.values().stream().filter(JCheckBox::isSelected).count();
 
             if (allDocuments.isSelected()) {
@@ -1038,7 +1065,9 @@ public class EmployeeDetailView extends JFrame {
                         : "All ready saved documents will be copied separately: " + readyCount);
             } else {
                 selectionTitle.setText("Copy mode: selected documents");
-                selectionDescription.setText(selectedCount == 0
+                selectionDescription.setText(readyCount == 0
+                        ? "No saved document files are ready to copy."
+                        : selectedCount == 0
                         ? "Choose one or more ready documents, or turn on Copy all saved documents."
                         : "Selected separate documents: " + selectedCount);
             }
@@ -1056,6 +1085,8 @@ public class EmployeeDetailView extends JFrame {
         };
 
         allDocuments.addItemListener(event -> refreshState.run());
+        allDocumentsPdf.addItemListener(event -> refreshState.run());
+        pdfProfile.addItemListener(event -> refreshState.run());
         for (JCheckBox checkbox : documentChecks.values()) {
             checkbox.addItemListener(event -> refreshState.run());
         }
@@ -1088,7 +1119,10 @@ public class EmployeeDetailView extends JFrame {
         cancel.addActionListener(event -> dialog.dispose());
         chooseFolder.addActionListener(event -> {
             List<String> selectedDocumentLabels = new ArrayList<>();
-            if (!allDocuments.isSelected()) {
+            boolean includeAllDocuments = allDocuments.isEnabled() && allDocuments.isSelected();
+            boolean includeAllDocumentsPdf = allDocumentsPdf.isEnabled() && allDocumentsPdf.isSelected();
+
+            if (!includeAllDocuments) {
                 for (Map.Entry<String, JCheckBox> entry : documentChecks.entrySet()) {
                     if (entry.getValue().isSelected()) {
                         selectedDocumentLabels.add(entry.getKey());
@@ -1096,12 +1130,12 @@ public class EmployeeDetailView extends JFrame {
                 }
             }
 
-            boolean hasDocumentSelection = allDocuments.isSelected()
-                    ? hasReadyDocument(availableDocuments)
-                    : hasReadySelectedDocument(availableDocuments, selectedDocumentLabels);
+            boolean hasDocumentSelection = includeAllDocuments
+                    ? hasReadyMergeableDocument(documents)
+                    : hasReadySelectedDocument(documents, selectedDocumentLabels);
 
-            boolean hasMergedDocumentPdfSelection = allDocumentsPdf.isSelected()
-                    && hasReadyMergeableDocument(availableDocuments);
+            boolean hasMergedDocumentPdfSelection = includeAllDocumentsPdf
+                    && hasReadyMergeableDocument(documents);
 
             if (allDocumentsPdf.isSelected() && !hasMergedDocumentPdfSelection) {
                 validation.setText("No saved document images are available for the all documents PDF.");
@@ -1115,8 +1149,8 @@ public class EmployeeDetailView extends JFrame {
 
             selectedOptions[0] = new EmployeeReportService.PackageOptions(
                     pdfProfile.isSelected(),
-                    allDocuments.isSelected(),
-                    allDocumentsPdf.isSelected(),
+                    includeAllDocuments,
+                    includeAllDocumentsPdf,
                     selectedDocumentLabels
             );
             dialog.dispose();
@@ -1205,15 +1239,6 @@ public class EmployeeDetailView extends JFrame {
 
     private void resizeReportDialog(JDialog dialog) {
         UniversalDialogHelper.resizeLargeDialog(dialog, this);
-    }
-
-    private boolean hasReadyDocument(List<EmployeeReportService.AvailableDocument> availableDocuments) {
-        for (EmployeeReportService.AvailableDocument document : availableDocuments) {
-            if (document.fileReady()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private boolean hasReadySelectedDocument(

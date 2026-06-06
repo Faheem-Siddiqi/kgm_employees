@@ -164,6 +164,7 @@ public class EmployeeFieldDefinitionDao {
             def("APPOINTMENT_LETTER_BACK", "Appointment Letter Back", "Documents", true, false, 2060),
             def("APPLICATION_FRONT", "Application Front", "Documents", true, false, 2070),
             def("APPLICATION_BACK", "Application Back", "Documents", true, false, 2080),
+            def("RESIGN_APPLICATION", "Resign Application", "Documents", true, false, 2085),
             def("CLEARANCE_CERTIFICATE", "Clearance Certificate", "Documents", true, false, 2090),
             def("SERVICE_CERTIFICATE", "Service Certificate", "Documents", true, false, 2100),
             def("PAYMENT_VOUCHER", "Payment Voucher", "Documents", true, false, 2110),

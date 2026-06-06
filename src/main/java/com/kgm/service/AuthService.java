@@ -18,4 +18,11 @@ public class AuthService {
     public static boolean isAdminPassword(String password) {
         return login(AppConfig.adminUsername(), password);
     }
+
+    public static boolean isFieldSettingsPassword(String password) {
+        String expectedPassword = AppConfig.fieldSettingsPassword();
+        return expectedPassword != null
+                && !expectedPassword.isBlank()
+                && expectedPassword.equals(password == null ? "" : password);
+    }
 }

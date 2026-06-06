@@ -28,7 +28,7 @@ public class LoginView extends JFrame {
         JPanel outer = LoginViewHelper.createOuterPanel();
         JPanel form = LoginViewHelper.createFormPanel();
 
-        JLabel eyebrow = LoginViewHelper.createEyebrowLabel("KGM EX-EMPLOYEES PORTAL");
+        JLabel eyebrow = LoginViewHelper.createEyebrowLabel("KGM Ex Emploees Portal");
         JLabel welcome = LoginViewHelper.createWelcomeLabel("Welcome Back");
         JLabel subtitle = LoginViewHelper.createSubtitleLabel("Sign in to continue to ex-employee management.");
 

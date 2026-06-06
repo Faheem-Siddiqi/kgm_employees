@@ -1,8 +1,8 @@
 {
   "kind": "kgm.employeeFieldMetadata",
   "schemaVersion": 1,
-  "updatedAt": "2026-05-25T07:01:05.148513500Z",
-  "checksum": "a439cb57b2aa458705fc3a60e34ce8fd2b83931bc746e2856578dee3302eeeb2",
+  "updatedAt": "2026-06-06T04:50:03.054Z",
+  "checksum": "71beefe46d406234cdca17f4f401fe3e76ce0babb643473e5b1bb91f61931930",
   "dbChecksum": "",
   "source": "bundled-default",
   "count": 167,
@@ -703,6 +703,23 @@
       "textAreaField": false,
       "dropdownOptions": "",
       "requiredField": true
+    },
+    {
+      "columnName": "RESIGN_APPLICATION",
+      "label": "Resign Application",
+      "heading": "Documents",
+      "documentField": true,
+      "customField": false,
+      "protectedField": true,
+      "detailField": false,
+      "dateField": false,
+      "sortOrder": 2085,
+      "coreField": false,
+      "dropdownField": false,
+      "variableOptionField": false,
+      "textAreaField": false,
+      "dropdownOptions": "",
+      "requiredField": false
     },
     {
       "columnName": "CLEARANCE_CERTIFICATE",
@@ -2846,5 +2863,6 @@
       "dropdownOptions": "",
       "requiredField": false
     }
-  ]
+  ],
+  "fieldCount": 168
 }

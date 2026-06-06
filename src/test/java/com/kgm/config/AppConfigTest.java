@@ -7,11 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class AppConfigTest {
     private static final String DOCUMENT_UPLOAD_PROPERTY = "kgm.document.upload.max.bytes";
+    private static final String FIELD_SETTINGS_PROPERTY = "kgm.field.settings.password";
     private static final long DEFAULT_UPLOAD_LIMIT = 400L * 1024L;
 
     @AfterEach
     void clearProperties() {
         System.clearProperty(DOCUMENT_UPLOAD_PROPERTY);
+        System.clearProperty(FIELD_SETTINGS_PROPERTY);
     }
 
     @Test
@@ -35,5 +37,12 @@ class AppConfigTest {
 
         System.setProperty(DOCUMENT_UPLOAD_PROPERTY, "not-a-number");
         assertEquals(DEFAULT_UPLOAD_LIMIT, AppConfig.documentUploadMaxBytes());
+    }
+
+    @Test
+    void fieldSettingsPasswordUsesDedicatedJvmProperty() {
+        System.setProperty(FIELD_SETTINGS_PROPERTY, "field-secret");
+
+        assertEquals("field-secret", AppConfig.fieldSettingsPassword());
     }
 }

@@ -52,12 +52,30 @@ public final class EmployeeFieldMetadataStore {
 
     public static Snapshot loadRestoreSnapshot() throws IOException {
         synchronized (LOCK) {
-            Optional<Snapshot> external = loadBestExternalSnapshot();
-            if (external.isPresent()) {
-                return external.get();
+            Optional<Snapshot> restore = loadBestRestoreSnapshot();
+            if (restore.isPresent()) {
+                return restore.get();
             }
             return loadBundledDefault();
         }
+    }
+
+    private static Optional<Snapshot> loadBestRestoreSnapshot() {
+        Optional<Snapshot> external = loadBestExternalSnapshot();
+        Snapshot cache = null;
+        try {
+            cache = readFile(cachePath(), false);
+        } catch (IOException | RuntimeException ignored) {
+        }
+
+        if (cache == null) {
+            return external;
+        }
+        if (external.isEmpty() || cache.updatedAt().isAfter(external.get().updatedAt())) {
+            recoverExternalFromSnapshot(cache, "external-recovered-from-cache");
+            return Optional.of(cache);
+        }
+        return external;
     }
 
     public static Optional<Snapshot> loadBestExternalSnapshot() {
@@ -352,6 +370,10 @@ public final class EmployeeFieldMetadataStore {
     }
 
     private static void recoverExternalFromBackup(Snapshot backup) {
+        recoverExternalFromSnapshot(backup, "external-recovered-from-backup");
+    }
+
+    private static void recoverExternalFromSnapshot(Snapshot backup, String source) {
         if (backup == null) {
             return;
         }
@@ -361,7 +383,7 @@ public final class EmployeeFieldMetadataStore {
                     backup.updatedAt(),
                     backup.checksum(),
                     backup.dbChecksum(),
-                    "external-recovered-from-backup",
+                    source,
                     backup.definitions()
             )), false);
         } catch (IOException ignored) {
