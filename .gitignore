@@ -18,6 +18,7 @@ employees/**
 !employees/.gitkeep
 resources/employees/**
 !resources/employees/.gitkeep
+!resources/employees/.gitignore
 
 # Local OS/editor noise
 *.lnk

@@ -1,6 +1,7 @@
 package com.kgm.ui;
 
 import com.kgm.config.AppConfig;
+import com.kgm.config.DatabaseConnection;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.database.DatabaseInitializer;
 import com.kgm.model.Employee;
@@ -986,6 +987,7 @@ public class HomeView extends JFrame {
                     DialogHelper.error(HomeView.this, "Dashboard stopped", "Dashboard loading was interrupted.");
                 } catch (ExecutionException exception) {
                     exception.printStackTrace();
+                    DatabaseConnection.reportIfConnectionFailure(exception);
                     if (latest) {
                         tablePanel.showLoadFailed("Dashboard data could not be loaded.");
                     }
@@ -1070,6 +1072,7 @@ public class HomeView extends JFrame {
                 } catch (ExecutionException exception) {
                     // Log but don't fail completely - table is already showing
                     exception.printStackTrace();
+                    DatabaseConnection.reportIfConnectionFailure(exception);
                     DialogHelper.error(HomeView.this, "Dashboard Analytics Failed", 
                             "Dashboard charts could not be loaded, but employee data is displayed.\n\n" + 
                             (exception.getCause() != null ? exception.getCause().getMessage() : exception.getMessage()));

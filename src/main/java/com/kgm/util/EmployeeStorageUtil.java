@@ -6,11 +6,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 
 public final class EmployeeStorageUtil {
     private static final String LOGICAL_ROOT = "employees";
     private static final String DOCUMENTS_DIR = "documents";
     private static final String PROFILE_IMAGE = "EMP_IMG.jpg";
+    private static final String STORAGE_GITIGNORE = "# Runtime employee files managed by KGM Ex-Employee Management.\n*\n!.gitignore\n!.gitkeep\n";
 
     private EmployeeStorageUtil() {
     }
@@ -19,14 +21,25 @@ public final class EmployeeStorageUtil {
         return AppConfig.employeeStorageDirectory();
     }
 
+    public static Path ensureStorageRoot() throws IOException {
+        AppConfig.ensureLocalEmployeeStorageSetting();
+        Path root = storageRoot();
+        Files.createDirectories(root);
+        protectStorageRootFromGit(root);
+        return root;
+    }
+
     public static Path ensureEmployeeDirectory(String employeeCode) throws IOException {
-        Path directory = employeeDirectory(employeeCode);
+        Path directory = ensureStorageRoot().resolve(pathSegment(employeeCode)).normalize();
         Files.createDirectories(directory);
         return directory;
     }
 
     public static Path ensureDocumentDirectory(String employeeCode) throws IOException {
-        Path directory = documentDirectory(employeeCode);
+        Path directory = ensureStorageRoot()
+                .resolve(pathSegment(employeeCode))
+                .resolve(DOCUMENTS_DIR)
+                .normalize();
         Files.createDirectories(directory);
         return directory;
     }
@@ -124,6 +137,23 @@ public final class EmployeeStorageUtil {
     private static Path resolveUnderRoot(Path root, String relativePath) {
         Path resolved = root.resolve(relativePath).normalize();
         return resolved.startsWith(root) ? resolved : root;
+    }
+
+    private static void protectStorageRootFromGit(Path root) throws IOException {
+        Path marker = root.resolve(".gitignore").normalize();
+        if (!marker.startsWith(root)) {
+            return;
+        }
+        if (Files.isRegularFile(marker)) {
+            String existing = Files.readString(marker, StandardCharsets.UTF_8);
+            if (existing.equals(STORAGE_GITIGNORE)) {
+                return;
+            }
+            if (!existing.startsWith("# Runtime employee files managed by KGM Ex-Employee Management.")) {
+                return;
+            }
+        }
+        Files.writeString(marker, STORAGE_GITIGNORE, StandardCharsets.UTF_8);
     }
 
     private static String pathSegment(String value) {

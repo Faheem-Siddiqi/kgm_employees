@@ -22,9 +22,9 @@ public class Main {
         System.out.println("========================================");
 
         SwingUtilities.invokeLater(() -> {
+            ApplicationStartup.startSilently();
             LoginView loginView = new LoginView();
             loginView.setVisible(true);
-            ApplicationStartup.startSilently();
         });
     }
 

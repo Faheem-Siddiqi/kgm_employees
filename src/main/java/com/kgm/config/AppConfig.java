@@ -3,6 +3,7 @@ package com.kgm.config;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,6 +12,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class AppConfig {
+    private static final String DEFAULT_EMPLOYEE_STORAGE_DIR = "resources/employees";
+    private static final String EMPLOYEE_STORAGE_DIR_PROPERTY = "kgm.employee.storage.dir";
+    private static final String EMPLOYEE_STORAGE_DIR_ENV = "KGM_EMPLOYEE_STORAGE_DIR";
+    private static final String EMPLOYEE_STORAGE_ON_SERVER_ENV = "KGM_EMPLOYEE_STORAGE_ON_SERVER";
     private static final long DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES = 400L * 1024L;
     private static final int DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES = 15;
     private static final Pattern WINDOWS_ENV_TOKEN = Pattern.compile("%([A-Za-z0-9_]+)%");
@@ -36,16 +41,47 @@ public final class AppConfig {
     }
 
     public static Path employeeStorageDirectory() {
+        if (employeeStorageOnServer()) {
+            return serverEmployeeStorageDirectory();
+        }
+
         String configured = setting(
-                "kgm.employee.storage.dir",
-                "KGM_EMPLOYEE_STORAGE_DIR",
-                "resources/employees"
+                EMPLOYEE_STORAGE_DIR_PROPERTY,
+                EMPLOYEE_STORAGE_DIR_ENV,
+                ""
         );
+        if (configured == null || configured.isBlank()) {
+            return defaultLocalEmployeeStorageDirectory();
+        }
+        return configuredPath(configured);
+    }
+
+    public static boolean employeeStorageOnServer() {
+        return booleanSetting(
+                "kgm.employee.storage.on.server",
+                EMPLOYEE_STORAGE_ON_SERVER_ENV,
+                false
+        );
+    }
+
+    private static Path serverEmployeeStorageDirectory() {
+        String configured = System.getProperty("kgm.employee.storage.server.dir");
+        if (configured != null && !configured.isBlank()) {
+            return configuredPath(configured);
+        }
+        return Path.of(System.getProperty("user.dir"), "employees").toAbsolutePath().normalize();
+    }
+
+    private static Path defaultLocalEmployeeStorageDirectory() {
+        return configuredPath(DEFAULT_EMPLOYEE_STORAGE_DIR);
+    }
+
+    private static Path configuredPath(String configured) {
         Path path = Path.of(expandPath(configured));
         if (!path.isAbsolute()) {
             path = Path.of(System.getProperty("user.dir")).resolve(path);
         }
-        return path.normalize();
+        return path.toAbsolutePath().normalize();
     }
 
     public static long documentUploadMaxBytes() {
@@ -63,6 +99,60 @@ public final class AppConfig {
                 DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES
         );
         return minutes > Integer.MAX_VALUE ? DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES : (int) minutes;
+    }
+
+    public static void ensureLocalEmployeeStorageSetting() {
+        if (employeeStorageOnServer() || hasNonBlankSystemStorageDir() || hasNonBlankEnvironmentStorageDir()) {
+            return;
+        }
+
+        Path path = dotEnvPath();
+        List<String> lines = new ArrayList<>();
+        if (Files.isRegularFile(path)) {
+            try {
+                lines.addAll(Files.readAllLines(path));
+            } catch (IOException exception) {
+                System.err.println("Could not read .env file: " + exception.getMessage());
+                return;
+            }
+        }
+
+        boolean changed = ensureDotEnvValue(lines, EMPLOYEE_STORAGE_ON_SERVER_ENV, "false");
+        changed = ensureDotEnvValue(lines, EMPLOYEE_STORAGE_DIR_ENV, DEFAULT_EMPLOYEE_STORAGE_DIR) || changed;
+
+        if (!changed) {
+            return;
+        }
+
+        try {
+            Path parent = path.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.write(path, lines);
+        } catch (IOException exception) {
+            System.err.println("Could not update .env employee storage path: " + exception.getMessage());
+        }
+    }
+
+    private static boolean ensureDotEnvValue(List<String> lines, String key, String value) {
+        for (int index = 0; index < lines.size(); index++) {
+            EnvLine envLine = parseEnvLine(lines.get(index));
+            if (envLine == null || !key.equals(envLine.key())) {
+                continue;
+            }
+            if (envLine.value().isBlank()) {
+                lines.set(index, key + "=" + value);
+                return true;
+            }
+            return false;
+        }
+
+        if (!lines.isEmpty() && !lines.get(lines.size() - 1).isBlank()) {
+            lines.add("");
+        }
+        lines.add(key + "=" + value);
+        return true;
     }
 
     public static String setting(String propertyName, String envName, String defaultValue) {
@@ -94,12 +184,25 @@ public final class AppConfig {
         }
     }
 
+    private static boolean booleanSetting(String propertyName, String envName, boolean defaultValue) {
+        String configured = setting(propertyName, envName, Boolean.toString(defaultValue));
+        if (configured == null) {
+            return defaultValue;
+        }
+
+        return switch (configured.trim().toLowerCase()) {
+            case "true", "1", "yes", "y", "on" -> true;
+            case "false", "0", "no", "n", "off" -> false;
+            default -> defaultValue;
+        };
+    }
+
     private static String normalizeNumber(String value) {
         return value == null ? "" : value.trim().replace(",", "").replace("_", "");
     }
 
     private static Map<String, String> loadDotEnv() {
-        Path path = Path.of(System.getProperty("user.dir"), ".env").toAbsolutePath().normalize();
+        Path path = dotEnvPath();
         if (!Files.isRegularFile(path)) {
             return Map.of();
         }
@@ -140,13 +243,22 @@ public final class AppConfig {
     }
 
     private static void parseLine(String rawLine, Map<String, String> values) {
-        if (rawLine == null) {
+        EnvLine envLine = parseEnvLine(rawLine);
+        if (envLine == null) {
             return;
+        }
+
+        values.put(envLine.key(), envLine.value());
+    }
+
+    private static EnvLine parseEnvLine(String rawLine) {
+        if (rawLine == null) {
+            return null;
         }
 
         String line = rawLine.strip();
         if (line.isEmpty() || line.startsWith("#")) {
-            return;
+            return null;
         }
         if (line.startsWith("export ")) {
             line = line.substring("export ".length()).strip();
@@ -154,16 +266,30 @@ public final class AppConfig {
 
         int separator = line.indexOf('=');
         if (separator <= 0) {
-            return;
+            return null;
         }
 
         String key = line.substring(0, separator).trim();
         String value = line.substring(separator + 1).trim();
         if (key.isEmpty()) {
-            return;
+            return null;
         }
 
-        values.put(key, unquote(value));
+        return new EnvLine(key, unquote(value));
+    }
+
+    private static Path dotEnvPath() {
+        return Path.of(System.getProperty("user.dir"), ".env").toAbsolutePath().normalize();
+    }
+
+    private static boolean hasNonBlankSystemStorageDir() {
+        String value = System.getProperty(EMPLOYEE_STORAGE_DIR_PROPERTY);
+        return value != null && !value.isBlank();
+    }
+
+    private static boolean hasNonBlankEnvironmentStorageDir() {
+        String value = System.getenv(EMPLOYEE_STORAGE_DIR_ENV);
+        return value != null && !value.isBlank();
     }
 
     private static String unquote(String value) {
@@ -211,5 +337,8 @@ public final class AppConfig {
             builder.append('\\');
         }
         return builder.toString();
+    }
+
+    private record EnvLine(String key, String value) {
     }
 }

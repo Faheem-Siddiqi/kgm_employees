@@ -205,7 +205,7 @@ The project follows a layered desktop-application architecture:
 | --- | --- |
 | **images/** | Static UI images such as logo, header, login background, and login foreground artwork. |
 | **resources/Labels.txt** | Optional document label/alias reference used by Upload All and bulk document matching so user-facing filenames can map to the correct document field. |
-| **resources/employees/** | Runtime employee file storage for profile images and uploaded documents. The folder is created when needed and ignored by Git except for `.gitkeep`. |
+| **employees/** or configured storage path | Runtime employee file storage for profile images and uploaded documents. The selected folder is prepared at startup and receives its own `.gitignore` guard so uploaded files are not committed. |
 | **%APPDATA%/KGM Ex-Employee Management/employee_field_metadata.json** | Latest user-change metadata backup. It is written after the DB update succeeds and is used first after a database drop/reset. |
 | **%LOCALAPPDATA%/KGM Ex-Employee Management/cache/employee_field_metadata.cache.json** | Metadata cache for fast reload only. It is ignored whenever its schema version or DB checksum is not fresh. |
 | **target/** | Maven build output. Generated and ignored by Git. |
@@ -238,7 +238,7 @@ The project follows a layered desktop-application architecture:
 
 7. Document Handling
    EmployeeDocumentUploadPanel -> dynamic search, single upload, or Upload All filename matching for the configured document fields
-   -> configured local employee storage, saved in DB as employees/{employeeCode}/documents paths
+   -> configured employee storage root, saved in DB as employees/{employeeCode}/documents paths
    EmployeeDocumentViewPanel -> searchable saved documents, locked-document checks, single or Upload All upload for missing documents
    -> missing documents uploaded through detail update
 
@@ -439,7 +439,7 @@ Additional styling colors used in the document upload interface:
 - Empty values, blank strings, `N/A`, `n/a`, `NA`, `NULL`, and `-` are treated as placeholders and are not written as updates.
 - `EMPLOYEE_CODE` is the record key and stays locked in the detail screen.
 - Document fields are record-safe: if a document path already exists in the database, that document remains marked `Locked`, can be viewed from the detail screen, and cannot be replaced.
-- If a document field is empty or a placeholder, the detail screen allows upload. The file is copied under `KGM_EMPLOYEE_STORAGE_DIR` and the logical database path is saved as `employees/{employeeCode}/documents/{file}` on Update.
+- If a document field is empty or a placeholder, the detail screen allows upload. The file is copied under the active employee storage root and the logical database path is saved as `employees/{employeeCode}/documents/{file}` on Update.
 - Profile image follows the same safety rule: it can be uploaded only when `EMP_IMG` is empty or a placeholder.
 - Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be a real JPG/JPEG image and must match a document label, Employee field name, storage filename, or supported alias from `resources/Labels.txt` after normalizing spaces, underscores, punctuation, and case.
 - Document/photo upload size is controlled by `AppConfig.documentUploadMaxBytes()`, which reads `kgm.document.upload.max.bytes`, then `KGM_DOCUMENT_UPLOAD_MAX_BYTES`, then `.env`, then defaults to `409600` bytes (400 KB). Commas and underscores are accepted in the value, for example `614,400` or `1_024_000`.
@@ -499,8 +499,11 @@ Settings can be passed through JVM properties, OS environment variables, or `.en
 | `KGM_ADMIN_USER` | `kgm.admin.user` | Application admin username |
 | `KGM_ADMIN_PASSWORD` | `kgm.admin.password` | Application admin password |
 | `FIELD_SETTINGS` | `kgm.field.settings.password` | Field Management password for adding, editing, deleting, or changing required field settings |
-| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local folder for employee photos and documents |
+| `KGM_EMPLOYEE_STORAGE_ON_SERVER` | `kgm.employee.storage.on.server` | `true` stores under the app/server `employees/` folder and ignores `KGM_EMPLOYEE_STORAGE_DIR`; `false` uses `KGM_EMPLOYEE_STORAGE_DIR` |
+| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local folder for employee photos and documents when server storage is disabled. If blank or missing in `.env`, startup writes `resources/employees` and uses that project-relative folder |
 | `KGM_DOCUMENT_UPLOAD_MAX_BYTES` | `kgm.document.upload.max.bytes` | Maximum prepared JPG/JPEG document/photo upload size in bytes; files above it use the best JPEG quality that fits |
+
+Employee documents keep logical database paths such as `employees/EMP001/documents/CNIC_FRONT.jpg`; only the physical storage root changes. Startup, Add Employee, View Employee File, Upload All, bulk folder upload, preview, and report/download flows all resolve through `EmployeeStorageUtil`, so changing the storage mode or path in `.env` moves future reads/writes to the same root without code changes. Existing legacy files under `resources/employees` and root `employees` remain readable as fallbacks when a saved DB path points there.
 
 ### Startup
 
@@ -514,6 +517,8 @@ com.kgm.Main
 
 The application initializes the configured database and employee schema automatically on startup.
 At startup, the console also prints `MySQL Server Running On` with the configured host and port.
+If the database check takes longer than 850 ms, a modern connection screen appears instead of leaving the user waiting silently.
+If MySQL is unreachable or the connection is lost, the screen shows the configured connection, keeps technical details collapsed, retries automatically every few seconds, and closes once the database is available again.
 
 ### Field Metadata Backup and DB Drop Behavior
 

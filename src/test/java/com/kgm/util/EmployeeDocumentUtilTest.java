@@ -29,6 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class EmployeeDocumentUtilTest {
     private static final String DOCUMENT_UPLOAD_PROPERTY = "kgm.document.upload.max.bytes";
     private static final String EMPLOYEE_STORAGE_PROPERTY = "kgm.employee.storage.dir";
+    private static final String EMPLOYEE_STORAGE_ON_SERVER_PROPERTY = "kgm.employee.storage.on.server";
+    private static final String EMPLOYEE_SERVER_STORAGE_PROPERTY = "kgm.employee.storage.server.dir";
+    private final String originalUserDir = System.getProperty("user.dir");
 
     @TempDir
     Path tempDir;
@@ -37,6 +40,9 @@ class EmployeeDocumentUtilTest {
     void clearUploadLimitProperty() {
         System.clearProperty(DOCUMENT_UPLOAD_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_PROPERTY);
+        System.clearProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY);
+        System.clearProperty(EMPLOYEE_SERVER_STORAGE_PROPERTY);
+        System.setProperty("user.dir", originalUserDir);
     }
 
     @Test
@@ -209,7 +215,120 @@ class EmployeeDocumentUtilTest {
         String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage("EMP/001", 0, source);
 
         assertEquals("employees/EMP_001/documents/CNIC_FRONT.jpg", dbPath);
-        assertTrue(Files.exists(storageRoot.resolve("EMP_001").resolve("documents").resolve("CNIC_FRONT.jpg")));
+        Path copied = storageRoot.resolve("EMP_001").resolve("documents").resolve("CNIC_FRONT.jpg");
+        assertTrue(Files.exists(copied));
+        assertEquals(copied.toFile(), EmployeeDocumentUtil.resolveStoredFile(dbPath));
+        assertStorageRootProtected(storageRoot);
+    }
+
+    @Test
+    void serverStorageModeUsesServerRootAndIgnoresLocalEmployeeStoragePath() throws IOException {
+        Path serverRoot = tempDir.resolve("server-employees");
+        Path localRoot = tempDir.resolve("local-employees");
+        System.setProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY, "true");
+        System.setProperty(EMPLOYEE_SERVER_STORAGE_PROPERTY, serverRoot.toString());
+        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, localRoot.toString());
+        File source = writeJpeg(tempDir.resolve("CNIC_BACK.jpg"), 160, 100, 0.9f);
+
+        String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage("EMP:002", 1, source);
+
+        assertEquals("employees/EMP_002/documents/CNIC_BACK.jpg", dbPath);
+        Path copied = serverRoot.resolve("EMP_002").resolve("documents").resolve("CNIC_BACK.jpg");
+        assertTrue(Files.exists(copied));
+        assertEquals(copied.toFile(), EmployeeDocumentUtil.resolveStoredFile(dbPath));
+        assertFalse(Files.exists(localRoot));
+        assertStorageRootProtected(serverRoot);
+    }
+
+    @Test
+    void relativeResourcesEmployeesPathIsCreatedAndProtected() throws IOException {
+        Path projectDir = tempDir.resolve("project");
+        Files.createDirectories(projectDir);
+        System.setProperty("user.dir", projectDir.toString());
+        System.setProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY, "false");
+        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, "resources/employees");
+
+        Path root = EmployeeStorageUtil.ensureStorageRoot();
+
+        Path expected = projectDir.resolve("resources").resolve("employees").toAbsolutePath().normalize();
+        assertEquals(expected, root);
+        assertTrue(Files.isDirectory(expected));
+        assertStorageRootProtected(expected);
+    }
+
+    @Test
+    void blankLocalStorageEnvIsRepairedToProjectResourcesEmployees() throws IOException {
+        Path projectDir = tempDir.resolve("project-with-blank-env");
+        Files.createDirectories(projectDir);
+        Path dotEnv = projectDir.resolve(".env");
+        Files.writeString(dotEnv, "KGM_EMPLOYEE_STORAGE_ON_SERVER=false\nKGM_EMPLOYEE_STORAGE_DIR=\n");
+        System.setProperty("user.dir", projectDir.toString());
+
+        Path root = EmployeeStorageUtil.ensureStorageRoot();
+
+        Path expected = projectDir.resolve("resources").resolve("employees").toAbsolutePath().normalize();
+        assertEquals(expected, root);
+        assertTrue(Files.isDirectory(expected));
+        assertStorageRootProtected(expected);
+        String repairedEnv = Files.readString(dotEnv);
+        assertTrue(repairedEnv.contains("KGM_EMPLOYEE_STORAGE_ON_SERVER=false"));
+        assertTrue(repairedEnv.contains("KGM_EMPLOYEE_STORAGE_DIR=resources/employees"));
+    }
+
+    @Test
+    void missingLocalStorageEnvIsAddedAsProjectResourcesEmployees() throws IOException {
+        Path projectDir = tempDir.resolve("project-with-missing-env");
+        Files.createDirectories(projectDir);
+        Path dotEnv = projectDir.resolve(".env");
+        Files.writeString(dotEnv, "KGM_EMPLOYEE_STORAGE_ON_SERVER=false\n");
+        System.setProperty("user.dir", projectDir.toString());
+
+        Path root = EmployeeStorageUtil.ensureStorageRoot();
+
+        Path expected = projectDir.resolve("resources").resolve("employees").toAbsolutePath().normalize();
+        assertEquals(expected, root);
+        assertTrue(Files.isDirectory(expected));
+        assertStorageRootProtected(expected);
+        String repairedEnv = Files.readString(dotEnv);
+        assertTrue(repairedEnv.contains("KGM_EMPLOYEE_STORAGE_ON_SERVER=false"));
+        assertTrue(repairedEnv.contains("KGM_EMPLOYEE_STORAGE_DIR=resources/employees"));
+    }
+
+    @Test
+    void missingDotEnvIsCreatedWithProjectResourcesEmployees() throws IOException {
+        Path projectDir = tempDir.resolve("project-without-env");
+        Files.createDirectories(projectDir);
+        Path dotEnv = projectDir.resolve(".env");
+        System.setProperty("user.dir", projectDir.toString());
+
+        Path root = EmployeeStorageUtil.ensureStorageRoot();
+
+        Path expected = projectDir.resolve("resources").resolve("employees").toAbsolutePath().normalize();
+        assertEquals(expected, root);
+        assertTrue(Files.isDirectory(expected));
+        assertStorageRootProtected(expected);
+        String repairedEnv = Files.readString(dotEnv);
+        assertTrue(repairedEnv.contains("KGM_EMPLOYEE_STORAGE_ON_SERVER=false"));
+        assertTrue(repairedEnv.contains("KGM_EMPLOYEE_STORAGE_DIR=resources/employees"));
+    }
+
+    @Test
+    void customLocalStorageEnvPathIsCreatedWhenMissing() throws IOException {
+        Path projectDir = tempDir.resolve("project-with-custom-env");
+        Files.createDirectories(projectDir);
+        Path dotEnv = projectDir.resolve(".env");
+        Files.writeString(dotEnv, "KGM_EMPLOYEE_STORAGE_ON_SERVER=false\nKGM_EMPLOYEE_STORAGE_DIR=custom-employee-data\n");
+        System.setProperty("user.dir", projectDir.toString());
+
+        Path root = EmployeeStorageUtil.ensureStorageRoot();
+
+        Path expected = projectDir.resolve("custom-employee-data").toAbsolutePath().normalize();
+        assertEquals(expected, root);
+        assertTrue(Files.isDirectory(expected));
+        assertStorageRootProtected(expected);
+        String unchangedEnv = Files.readString(dotEnv);
+        assertTrue(unchangedEnv.contains("KGM_EMPLOYEE_STORAGE_DIR=custom-employee-data"));
+        assertFalse(unchangedEnv.contains("KGM_EMPLOYEE_STORAGE_DIR=resources/employees"));
     }
 
     @Test
@@ -329,6 +448,15 @@ class EmployeeDocumentUtilTest {
         BufferedImage image = gradientImage(width, height);
         writeJpeg(image, path.toFile(), quality);
         return path.toFile();
+    }
+
+    private void assertStorageRootProtected(Path storageRoot) throws IOException {
+        Path marker = storageRoot.resolve(".gitignore");
+        assertTrue(Files.isRegularFile(marker));
+        String content = Files.readString(marker);
+        assertTrue(content.contains("*"));
+        assertTrue(content.contains("!.gitignore"));
+        assertTrue(content.contains("!.gitkeep"));
     }
 
     private BufferedImage gradientImage(int width, int height) {

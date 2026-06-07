@@ -343,7 +343,8 @@ public class DatabaseInitializer {
         } catch (SQLException e) {
             System.out.println("=> MySQL database creation failed!");
             e.printStackTrace();
-            return;
+            DatabaseConnection.reportConnectionFailure(e);
+            throw startupFailure("MySQL database creation failed.", e);
         }
 
         try (Connection conn = DatabaseConnection.getConnection();
@@ -368,7 +369,18 @@ public class DatabaseInitializer {
         } catch (SQLException e) {
             System.out.println("=> MySQL schema failed!");
             e.printStackTrace();
+            DatabaseConnection.reportConnectionFailure(e);
+            throw startupFailure("MySQL schema initialization failed.", e);
         }
+    }
+
+    public static synchronized void reconnect() {
+        initialized = false;
+        init();
+    }
+
+    private static IllegalStateException startupFailure(String message, SQLException exception) {
+        return new IllegalStateException(message + " Check the server connection and database credentials.", exception);
     }
 
     private static boolean schemaReady() {
