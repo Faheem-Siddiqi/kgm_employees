@@ -33,19 +33,6 @@ public final class ApplicationStartup {
         ensureStarted();
     }
 
-    public static void initializeBlocking() {
-        synchronized (LOCK) {
-            if (ready) {
-                return;
-            }
-            if (startupWorker != null && !startupWorker.isDone()) {
-                throw new IllegalStateException("Application startup is already running.");
-            }
-        }
-        performStartupWork();
-        markReady();
-    }
-
     public static void prepareThen(Component parent, Runnable onReady, Runnable onFailure) {
         boolean runNow;
         synchronized (LOCK) {
@@ -93,7 +80,18 @@ public final class ApplicationStartup {
         return new SwingWorker<>() {
             @Override
             protected Void doInBackground() {
-                performStartupWork();
+                setStartupPhase(StartupPhase.PREPARING_STORAGE);
+                try {
+                    EmployeeStorageUtil.ensureStorageRoot();
+                } catch (Exception exception) {
+                    throw new IllegalStateException("Employee storage folder could not be prepared: " + exception.getMessage(), exception);
+                }
+                setStartupPhase(StartupPhase.CONNECTING_DATABASE);
+                DatabaseInitializer.init();
+                setStartupPhase(StartupPhase.LOADING_METADATA);
+                EmployeeFieldDefinitionCache.refreshFromDatabase();
+                EmployeeDocumentUtil.documentTypes();
+                EmployeeDocumentUtil.requiredDocumentFlags();
                 return null;
             }
 
@@ -120,21 +118,6 @@ public final class ApplicationStartup {
                 }
             }
         };
-    }
-
-    private static void performStartupWork() {
-        setStartupPhase(StartupPhase.PREPARING_STORAGE);
-        try {
-            EmployeeStorageUtil.ensureStorageRoot();
-        } catch (Exception exception) {
-            throw new IllegalStateException("Employee storage folder could not be prepared: " + exception.getMessage(), exception);
-        }
-        setStartupPhase(StartupPhase.CONNECTING_DATABASE);
-        DatabaseInitializer.init();
-        setStartupPhase(StartupPhase.LOADING_METADATA);
-        EmployeeFieldDefinitionCache.refreshFromDatabase();
-        EmployeeDocumentUtil.documentTypes();
-        EmployeeDocumentUtil.requiredDocumentFlags();
     }
 
     public static void showConnectionFailure(Throwable failure) {

@@ -203,8 +203,8 @@ The project follows a layered desktop-application architecture:
 
 | Path | Functionality |
 | --- | --- |
-| **src/main/resources/images/** | Static UI images such as logo, header, login background, and login foreground artwork. These are bundled inside the shaded JAR/EXE. |
-| **src/main/resources/resources/Labels.txt** | Optional document label/alias reference bundled with the app for Upload All and bulk document matching. |
+| **images/** | Static UI images such as logo, header, login background, and login foreground artwork. |
+| **resources/Labels.txt** | Optional document label/alias reference used by Upload All and bulk document matching so user-facing filenames can map to the correct document field. |
 | **employees/** or configured storage path | Runtime employee file storage for profile images and uploaded documents. The selected folder is prepared at startup and receives its own `.gitignore` guard so uploaded files are not committed. |
 | **%APPDATA%/KGM Ex-Employee Management/employee_field_metadata.json** | Latest user-change metadata backup. It is written after the DB update succeeds and is used first after a database drop/reset. |
 | **%LOCALAPPDATA%/KGM Ex-Employee Management/cache/employee_field_metadata.cache.json** | Metadata cache for fast reload only. It is ignored whenever its schema version or DB checksum is not fresh. |
@@ -441,7 +441,7 @@ Additional styling colors used in the document upload interface:
 - Document fields are record-safe: if a document path already exists in the database, that document remains marked `Locked`, can be viewed from the detail screen, and cannot be replaced.
 - If a document field is empty or a placeholder, the detail screen allows upload. The file is copied under the active employee storage root and the logical database path is saved as `employees/{employeeCode}/documents/{file}` on Update.
 - Profile image follows the same safety rule: it can be uploaded only when `EMP_IMG` is empty or a placeholder.
-- Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be a real JPG/JPEG image and must match a document label, Employee field name, storage filename, or supported alias from the bundled `src/main/resources/resources/Labels.txt` after normalizing spaces, underscores, punctuation, and case.
+- Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be a real JPG/JPEG image and must match a document label, Employee field name, storage filename, or supported alias from `resources/Labels.txt` after normalizing spaces, underscores, punctuation, and case.
 - Document/photo upload size is controlled by `AppConfig.documentUploadMaxBytes()`, which reads `kgm.document.upload.max.bytes`, then `KGM_DOCUMENT_UPLOAD_MAX_BYTES`, then `.env`, then defaults to `409600` bytes (400 KB). Commas and underscores are accepted in the value, for example `614,400` or `1_024_000`.
 - If a selected JPG/JPEG is above the configured upload limit, the app dynamically searches for the best JPEG quality that fits before saving. It does not resize, crop, rotate, or scale the image, and it verifies that the compressed width and height match the original image.
 - Compression applies to employee photo uploads, Add Employee document uploads, View Employee Details document uploads, `Upload All`, single upload/replace for missing documents, and the Home dashboard bulk folder document upload. Excel import/export is not part of this flow.
@@ -479,30 +479,13 @@ Additional styling colors used in the document upload interface:
 
 ### Prerequisites
 
-- Java 21 JDK or newer. `jpackage` is included only with a full JDK, not a JRE.
-- Maven 3.8 or newer.
-- MySQL Server 8.0 or newer.
-- Git for `update-exe.ps1`.
-
-Official installers:
-
-- Java 21 JDK: `https://adoptium.net/temurin/releases/?version=21`
-- Maven: `https://maven.apache.org/download.cgi`
-- MySQL Windows Installer: `https://dev.mysql.com/downloads/windows/installer/`
-
-### Clone and First Setup
-
-```powershell
-git clone <your-repo-url>
-cd KGM_Ex_Employees-main
-Copy-Item .env.example .env
-```
-
-Edit `.env` and replace every dummy value with the machine's real values.
+- Java 21 or newer
+- Maven 3.8 or newer
+- MySQL 8.0 or newer
 
 ### Database Configuration
 
-Create a local `.env` file from `.env.example`, then replace the dummy values with the machine's real settings. `.env` is intentionally ignored by Git. Packaged EXE installs also check `config\.env` beside the EXE, so the output folder can keep its own machine-specific configuration between updates.
+Create a local `.env` file from `.env.example`, then replace the dummy values with the machine's real settings. `.env` is intentionally ignored by Git.
 
 Settings can be passed through JVM properties, OS environment variables, or `.env`. JVM properties win first, then OS environment variables, then `.env`, then safe defaults.
 
@@ -517,91 +500,25 @@ Settings can be passed through JVM properties, OS environment variables, or `.en
 | `KGM_ADMIN_PASSWORD` | `kgm.admin.password` | Application admin password |
 | `FIELD_SETTINGS` | `kgm.field.settings.password` | Field Management password for adding, editing, deleting, or changing required field settings |
 | `KGM_EMPLOYEE_STORAGE_ON_SERVER` | `kgm.employee.storage.on.server` | `true` stores under the app/server `employees/` folder and ignores `KGM_EMPLOYEE_STORAGE_DIR`; `false` uses `KGM_EMPLOYEE_STORAGE_DIR` |
-| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local or LAN folder for employee photos and documents when server storage is disabled. If blank or missing in `.env`, startup writes `resources/employees` and uses that app-relative folder |
-| `KGM_EMPLOYEE_STORAGE_SERVER_DIR` | `kgm.employee.storage.server.dir` | Optional app/server folder override when `KGM_EMPLOYEE_STORAGE_ON_SERVER=true` |
+| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local folder for employee photos and documents when server storage is disabled. If blank or missing in `.env`, startup writes `resources/employees` and uses that project-relative folder |
 | `KGM_DOCUMENT_UPLOAD_MAX_BYTES` | `kgm.document.upload.max.bytes` | Maximum prepared JPG/JPEG document/photo upload size in bytes; files above it use the best JPEG quality that fits |
-| `KGM_ENV_FILE` | `kgm.env.file` | Optional absolute path to a specific `.env` file |
 
 Employee documents keep logical database paths such as `employees/EMP001/documents/CNIC_FRONT.jpg`; only the physical storage root changes. Startup, Add Employee, View Employee File, Upload All, bulk folder upload, preview, and report/download flows all resolve through `EmployeeStorageUtil`, so changing the storage mode or path in `.env` moves future reads/writes to the same root without code changes. Existing legacy files under `resources/employees` and root `employees` remain readable as fallbacks when a saved DB path points there.
 
-For a protected app-local folder, keep:
-
-```text
-KGM_EMPLOYEE_STORAGE_ON_SERVER=false
-KGM_EMPLOYEE_STORAGE_DIR=resources/employees
-```
-
-For a LAN/shared folder, use a UNC path that the Windows user can access:
-
-```text
-KGM_EMPLOYEE_STORAGE_ON_SERVER=false
-KGM_EMPLOYEE_STORAGE_DIR=\\SERVER\Shared\KGMExEmployees
-```
-
 ### Startup
 
-```powershell
-# Compile quickly
-mvn -q compile
+```bash
+# Compile
+mvn -q -DskipTests compile
 
-# Run from Maven
-mvn exec:java
-
-# Run the shaded JAR after packaging
-mvn package
-java -jar target\kgm-ex-employee-management-1.0.0.jar
+# Run from an IDE using:
+com.kgm.Main
 ```
 
 The application initializes the configured database and employee schema automatically on startup.
 At startup, the console also prints `MySQL Server Running On` with the configured host and port.
-If `.env` is missing, MySQL is not installed, the server is unreachable, or credentials fail, a setup screen appears instead of crashing. It shows MySQL install/setup steps, `.env` values, technical details, automatic retry, and a `Retry Connection` button. When setup becomes valid, the normal login screen opens.
-
-### Build the Shaded JAR
-
-```powershell
-mvn package
-```
-
-The shaded runnable JAR is generated at:
-
-```text
-target\kgm-ex-employee-management-1.0.0.jar
-```
-
-### Create or Update the Windows EXE
-
-Use one of these commands from the project root:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build-exe.ps1 -OutputDir "D:\KGM-eX-Employees-App" -CleanTarget
-```
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\update-exe.ps1 -OutputDir "D:\KGM-eX-Employees-App" -CleanTarget
-```
-
-`build-exe.ps1` checks Java, Maven, and `jpackage`, builds the shaded JAR, creates a jpackage app image, and copies the EXE into the output folder.
-
-`update-exe.ps1` does the same work after `git pull`.
-
-Generated EXE:
-
-```text
-D:\KGM-eX-Employees-App\KGM Ex Employees.exe
-```
-
-The scripts replace only generated app files: `KGM Ex Employees.exe`, `app\`, and `runtime\`. They preserve these folders on every build/update:
-
-```text
-config\
-employees\
-resources\employees\
-images\uploads\
-logs\
-backups\
-```
-
-If project `.env` exists and the output does not already have `config\.env`, the script copies it once. Existing `config\.env` is preserved so production credentials and storage paths are not overwritten by updates.
+If the database check takes longer than 850 ms, a modern connection screen appears instead of leaving the user waiting silently.
+If MySQL is unreachable or the connection is lost, the screen shows the configured connection, keeps technical details collapsed, retries automatically every few seconds, and closes once the database is available again.
 
 ### Field Metadata Backup and DB Drop Behavior
 
