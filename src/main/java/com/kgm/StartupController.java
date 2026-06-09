@@ -10,8 +10,7 @@ import javax.swing.SwingUtilities;
 import java.util.List;
 
 public final class StartupController {
-    private static final Object WINDOW_LIFECYCLE_LOCK = new Object();
-    private static boolean windowLifecycleActive;
+    private static final Object APPLICATION_LIFECYCLE_LOCK = new Object();
 
     private StartupController() {
     }
@@ -21,11 +20,11 @@ public final class StartupController {
         RuntimeException startupFailure = initializeSafely();
         DatabaseConnection.setConnectionFailureListener(DatabaseSetupView::showConnectionFailure);
         showStartupResult(startupFailure);
+        waitForApplicationExit();
     }
 
     public static void showLoginWindow() {
         new LoginView().setVisible(true);
-        keepJvmAliveForApplication();
         System.out.println("KGM Ex-Employees app started");
     }
 
@@ -43,7 +42,6 @@ public final class StartupController {
                 showLoginWindow();
             } else {
                 DatabaseSetupView.showStartupFailure(startupFailure);
-                keepJvmAliveForApplication();
                 System.out.println("KGM Ex-Employees app opened database setup guide");
             }
         };
@@ -63,27 +61,20 @@ public final class StartupController {
         }
     }
 
-    private static void keepJvmAliveForApplication() {
-        synchronized (WINDOW_LIFECYCLE_LOCK) {
-            if (windowLifecycleActive) {
-                return;
-            }
-            windowLifecycleActive = true;
+    private static void waitForApplicationExit() {
+        if (SwingUtilities.isEventDispatchThread()) {
+            return;
         }
-
-        Thread lifecycleThread = new Thread(() -> {
-            try {
-                synchronized (WINDOW_LIFECYCLE_LOCK) {
-                    while (windowLifecycleActive) {
-                        WINDOW_LIFECYCLE_LOCK.wait();
-                    }
+        synchronized (APPLICATION_LIFECYCLE_LOCK) {
+            while (true) {
+                try {
+                    APPLICATION_LIFECYCLE_LOCK.wait();
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    return;
                 }
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
             }
-        }, "KGM-Window-Lifecycle");
-        lifecycleThread.setDaemon(false);
-        lifecycleThread.start();
+        }
     }
 
     private static RuntimeException initializeSafely() {
