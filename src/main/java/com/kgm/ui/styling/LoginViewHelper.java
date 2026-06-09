@@ -8,6 +8,7 @@ import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.geom.RoundRectangle2D;
+import java.net.URL;
 
 public final class LoginViewHelper {
     private static final String LOGIN_BACKGROUND_PATH = "images/LoginBG.png";
@@ -189,16 +190,24 @@ public final class LoginViewHelper {
         private final int logoHeight;
 
         ImagePanel(String imagePath, String logoPath) {
-            ImageIcon icon = new ImageIcon(imagePath);
+            ImageIcon icon = loadIcon(imagePath);
             image = icon.getIconWidth() > 0 ? icon.getImage() : null;
 
-            ImageIcon logoIcon = new ImageIcon(logoPath);
+            ImageIcon logoIcon = loadIcon(logoPath);
             logo = logoIcon.getIconWidth() > 0 ? logoIcon.getImage() : null;
             logoWidth = logo != null ? LOGO_WIDTH : 0;
             logoHeight = logo != null
                     ? Math.round(LOGO_WIDTH * (logoIcon.getIconHeight() / (float) logoIcon.getIconWidth()))
                     : 0;
             setBackground(PAGE_BACKGROUND);
+        }
+
+        private ImageIcon loadIcon(String imagePath) {
+            String resourcePath = imagePath.startsWith("/")
+                    ? imagePath
+                    : "/" + imagePath.replace('\\', '/');
+            URL resource = LoginViewHelper.class.getResource(resourcePath);
+            return resource == null ? new ImageIcon(imagePath) : new ImageIcon(resource);
         }
 
         @Override

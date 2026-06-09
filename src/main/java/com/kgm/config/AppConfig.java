@@ -13,9 +13,13 @@ import java.util.regex.Pattern;
 
 public final class AppConfig {
     private static final String DEFAULT_EMPLOYEE_STORAGE_DIR = "resources/employees";
+    private static final String DOT_ENV_FILE_PROPERTY = "kgm.env.file";
+    private static final String DOT_ENV_FILE_ENV = "KGM_ENV_FILE";
     private static final String EMPLOYEE_STORAGE_DIR_PROPERTY = "kgm.employee.storage.dir";
     private static final String EMPLOYEE_STORAGE_DIR_ENV = "KGM_EMPLOYEE_STORAGE_DIR";
     private static final String EMPLOYEE_STORAGE_ON_SERVER_ENV = "KGM_EMPLOYEE_STORAGE_ON_SERVER";
+    private static final String EMPLOYEE_STORAGE_SERVER_DIR_PROPERTY = "kgm.employee.storage.server.dir";
+    private static final String EMPLOYEE_STORAGE_SERVER_DIR_ENV = "KGM_EMPLOYEE_STORAGE_SERVER_DIR";
     private static final long DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES = 400L * 1024L;
     private static final int DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES = 15;
     private static final Pattern WINDOWS_ENV_TOKEN = Pattern.compile("%([A-Za-z0-9_]+)%");
@@ -65,7 +69,11 @@ public final class AppConfig {
     }
 
     private static Path serverEmployeeStorageDirectory() {
-        String configured = System.getProperty("kgm.employee.storage.server.dir");
+        String configured = setting(
+                EMPLOYEE_STORAGE_SERVER_DIR_PROPERTY,
+                EMPLOYEE_STORAGE_SERVER_DIR_ENV,
+                ""
+        );
         if (configured != null && !configured.isBlank()) {
             return configuredPath(configured);
         }
@@ -79,7 +87,7 @@ public final class AppConfig {
     private static Path configuredPath(String configured) {
         Path path = Path.of(expandPath(configured));
         if (!path.isAbsolute()) {
-            path = Path.of(System.getProperty("user.dir")).resolve(path);
+            path = configBaseDirectory().resolve(path);
         }
         return path.toAbsolutePath().normalize();
     }
@@ -99,6 +107,29 @@ public final class AppConfig {
                 DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES
         );
         return minutes > Integer.MAX_VALUE ? DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES : (int) minutes;
+    }
+
+    public static Path activeDotEnvPath() {
+        return dotEnvPath();
+    }
+
+    public static boolean dotEnvFileExists() {
+        return Files.isRegularFile(dotEnvPath());
+    }
+
+    public static List<String> startupConfigurationIssues() {
+        List<String> issues = new ArrayList<>();
+        boolean externalConfigPresent = hasExternalStartupConfig();
+        if (!dotEnvFileExists() && !externalConfigPresent) {
+            issues.add(".env was not found. Create it from .env.example or set the matching environment variables.");
+        }
+        if (adminUsername().isBlank()) {
+            issues.add("KGM_ADMIN_USER is missing.");
+        }
+        if (adminPassword().isBlank()) {
+            issues.add("KGM_ADMIN_PASSWORD is missing.");
+        }
+        return List.copyOf(issues);
     }
 
     public static void ensureLocalEmployeeStorageSetting() {
@@ -279,7 +310,111 @@ public final class AppConfig {
     }
 
     private static Path dotEnvPath() {
+        Path configured = configuredDotEnvPath();
+        if (configured != null) {
+            return configured;
+        }
+
+        for (Path candidate : dotEnvCandidates()) {
+            if (Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+        }
+
         return Path.of(System.getProperty("user.dir"), ".env").toAbsolutePath().normalize();
+    }
+
+    private static Path configuredDotEnvPath() {
+        String propertyValue = System.getProperty(DOT_ENV_FILE_PROPERTY);
+        if (propertyValue != null && !propertyValue.isBlank()) {
+            return configuredDotEnvPath(propertyValue);
+        }
+
+        String envValue = System.getenv(DOT_ENV_FILE_ENV);
+        if (envValue != null && !envValue.isBlank()) {
+            return configuredDotEnvPath(envValue);
+        }
+
+        return null;
+    }
+
+    private static Path configuredDotEnvPath(String configured) {
+        Path path = Path.of(expandPath(configured));
+        if (!path.isAbsolute()) {
+            path = Path.of(System.getProperty("user.dir")).resolve(path);
+        }
+        return path.toAbsolutePath().normalize();
+    }
+
+    private static List<Path> dotEnvCandidates() {
+        List<Path> candidates = new ArrayList<>();
+        addDotEnvCandidates(candidates, Path.of(System.getProperty("user.dir")));
+        if (isPackagedRuntime()) {
+            Path runtimeBase = packagedRuntimeBaseDirectory();
+            addDotEnvCandidates(candidates, runtimeBase);
+        }
+        return candidates;
+    }
+
+    private static void addDotEnvCandidates(List<Path> candidates, Path baseDirectory) {
+        if (baseDirectory == null) {
+            return;
+        }
+        Path base = baseDirectory.toAbsolutePath().normalize();
+        addUnique(candidates, base.resolve(".env"));
+        addUnique(candidates, base.resolve("config").resolve(".env"));
+    }
+
+    private static void addUnique(List<Path> paths, Path candidate) {
+        Path normalized = candidate.toAbsolutePath().normalize();
+        if (!paths.contains(normalized)) {
+            paths.add(normalized);
+        }
+    }
+
+    private static boolean isPackagedRuntime() {
+        Path javaHome = Path.of(System.getProperty("java.home", "")).toAbsolutePath().normalize();
+        Path fileName = javaHome.getFileName();
+        return fileName != null && "runtime".equalsIgnoreCase(fileName.toString());
+    }
+
+    private static Path packagedRuntimeBaseDirectory() {
+        Path javaHome = Path.of(System.getProperty("java.home", "")).toAbsolutePath().normalize();
+        Path parent = javaHome.getParent();
+        return parent == null ? javaHome : parent;
+    }
+
+    private static Path configBaseDirectory() {
+        Path envPath = dotEnvPath();
+        Path parent = envPath.getParent();
+        if (parent != null && parent.getFileName() != null
+                && "config".equalsIgnoreCase(parent.getFileName().toString())
+                && parent.getParent() != null) {
+            return parent.getParent().toAbsolutePath().normalize();
+        }
+        if (parent != null) {
+            return parent.toAbsolutePath().normalize();
+        }
+        return Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+    }
+
+    private static boolean hasExternalStartupConfig() {
+        return hasNonBlankPropertyOrEnv("kgm.db.host", "KGM_DB_HOST")
+                || hasNonBlankPropertyOrEnv("kgm.db.port", "KGM_DB_PORT")
+                || hasNonBlankPropertyOrEnv("kgm.db.name", "KGM_DB_NAME")
+                || hasNonBlankPropertyOrEnv("kgm.db.user", "KGM_DB_USER")
+                || hasNonBlankPropertyOrEnv("kgm.db.password", "KGM_DB_PASSWORD")
+                || hasNonBlankPropertyOrEnv("kgm.admin.user", "KGM_ADMIN_USER")
+                || hasNonBlankPropertyOrEnv("kgm.admin.password", "KGM_ADMIN_PASSWORD");
+    }
+
+    private static boolean hasNonBlankPropertyOrEnv(String propertyName, String envName) {
+        String propertyValue = System.getProperty(propertyName);
+        if (propertyValue != null && !propertyValue.isBlank()) {
+            return true;
+        }
+        String envValue = System.getenv(envName);
+        return envValue != null && !envValue.isBlank();
     }
 
     private static boolean hasNonBlankSystemStorageDir() {

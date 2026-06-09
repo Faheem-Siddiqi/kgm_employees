@@ -25,6 +25,7 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Image;
 import java.awt.Window;
+import java.net.URL;
 
 public class HeaderPanel extends JPanel {
     private static final Color TEXT_PRIMARY = new Color(28, 36, 46);
@@ -89,7 +90,13 @@ public class HeaderPanel extends JPanel {
     }
 
     private ImageIcon loadLogo() {
-        ImageIcon icon = new ImageIcon("images/Logo.jpg");
+        ImageIcon icon = loadClasspathIcon("/images/Logo.jpg");
+        if (icon.getIconWidth() <= 0) {
+            icon = loadClasspathIcon("/images/Header.jpg");
+        }
+        if (icon.getIconWidth() <= 0) {
+            icon = new ImageIcon("images/Logo.jpg");
+        }
         if (icon.getIconWidth() <= 0) {
             icon = new ImageIcon("images/Header.jpg");
         }
@@ -100,6 +107,11 @@ public class HeaderPanel extends JPanel {
         int height = Math.max(34, Math.round(width * (icon.getIconHeight() / (float) icon.getIconWidth())));
         Image image = icon.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
         return new ImageIcon(image);
+    }
+
+    private ImageIcon loadClasspathIcon(String resourcePath) {
+        URL resource = HeaderPanel.class.getResource(resourcePath);
+        return resource == null ? new ImageIcon() : new ImageIcon(resource);
     }
 
     private JButton createLogoutButton() {

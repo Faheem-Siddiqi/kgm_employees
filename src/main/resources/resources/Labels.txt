@@ -1,0 +1,24 @@
+Application Back
+Application Front
+Appointment Letter Back
+Appointment Letter Front
+Clearance Certificate
+CNIC Back
+CNIC Front
+Covid Certificate
+Disciplinary I
+Disciplinary II
+Disciplinary III
+Employee Photo
+EOBI
+Final Settlement
+Interview Forms
+Medical Document
+Miscellaneous I
+Miscellaneous II
+Miscellaneous III
+Payment Voucher
+Service Certificate
+Social Security Card
+Resign Application
+Trial Card

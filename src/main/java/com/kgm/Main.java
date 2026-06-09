@@ -1,8 +1,5 @@
 package com.kgm;
 import com.kgm.config.DatabaseConfig;
-import com.kgm.ui.LoginView;
-import com.kgm.util.ApplicationStartup;
-import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import java.awt.Color;
 
@@ -21,11 +18,7 @@ public class Main {
         System.out.println("  Database   : " + DatabaseConfig.databaseName());
         System.out.println("========================================");
 
-        SwingUtilities.invokeLater(() -> {
-            ApplicationStartup.startSilently();
-            LoginView loginView = new LoginView();
-            loginView.setVisible(true);
-        });
+        StartupController.start();
     }
 
     private static void applyButtonTextDefaults() {
