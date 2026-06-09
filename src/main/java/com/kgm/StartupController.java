@@ -7,21 +7,25 @@ import com.kgm.ui.LoginView;
 import com.kgm.util.ApplicationStartup;
 
 import javax.swing.SwingUtilities;
-import javax.swing.SwingWorker;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 public final class StartupController {
+    private static final Object WINDOW_LIFECYCLE_LOCK = new Object();
+    private static boolean windowLifecycleActive;
+
     private StartupController() {
     }
 
     public static void start() {
+        DatabaseConnection.setConnectionFailureListener(null);
+        RuntimeException startupFailure = initializeSafely();
         DatabaseConnection.setConnectionFailureListener(DatabaseSetupView::showConnectionFailure);
-        SwingUtilities.invokeLater(StartupController::startApplicationCheck);
+        showStartupResult(startupFailure);
     }
 
     public static void showLoginWindow() {
         new LoginView().setVisible(true);
+        keepJvmAliveForApplication();
         System.out.println("KGM Ex-Employees app started");
     }
 
@@ -33,39 +37,53 @@ public final class StartupController {
         ApplicationStartup.initializeBlocking();
     }
 
-    private static void startApplicationCheck() {
-        new SwingWorker<RuntimeException, Void>() {
-            @Override
-            protected RuntimeException doInBackground() {
-                return initializeSafely();
+    private static void showStartupResult(RuntimeException startupFailure) {
+        Runnable openWindow = () -> {
+            if (startupFailure == null) {
+                showLoginWindow();
+            } else {
+                DatabaseSetupView.showStartupFailure(startupFailure);
+                keepJvmAliveForApplication();
+                System.out.println("KGM Ex-Employees app opened database setup guide");
             }
+        };
 
-            @Override
-            protected void done() {
-                RuntimeException startupFailure = startupResult();
-                if (startupFailure == null) {
-                    showLoginWindow();
-                } else {
-                    DatabaseSetupView.showStartupFailure(startupFailure);
-                    System.out.println("KGM Ex-Employees app opened database setup guide");
-                }
+        if (SwingUtilities.isEventDispatchThread()) {
+            openWindow.run();
+            return;
+        }
+
+        try {
+            SwingUtilities.invokeAndWait(openWindow);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Application startup was interrupted.", exception);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Application window could not be opened.", exception);
+        }
+    }
+
+    private static void keepJvmAliveForApplication() {
+        synchronized (WINDOW_LIFECYCLE_LOCK) {
+            if (windowLifecycleActive) {
+                return;
             }
+            windowLifecycleActive = true;
+        }
 
-            private RuntimeException startupResult() {
-                try {
-                    return get();
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    return new IllegalStateException("Application startup was interrupted.", exception);
-                } catch (ExecutionException exception) {
-                    Throwable cause = exception.getCause();
-                    if (cause instanceof RuntimeException runtimeException) {
-                        return runtimeException;
+        Thread lifecycleThread = new Thread(() -> {
+            try {
+                synchronized (WINDOW_LIFECYCLE_LOCK) {
+                    while (windowLifecycleActive) {
+                        WINDOW_LIFECYCLE_LOCK.wait();
                     }
-                    return new IllegalStateException("Application startup failed.", cause);
                 }
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
             }
-        }.execute();
+        }, "KGM-Window-Lifecycle");
+        lifecycleThread.setDaemon(false);
+        lifecycleThread.start();
     }
 
     private static RuntimeException initializeSafely() {
