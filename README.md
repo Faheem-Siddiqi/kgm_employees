@@ -238,7 +238,7 @@ The project follows a layered desktop-application architecture:
 
 7. Document Handling
    EmployeeDocumentUploadPanel -> dynamic search, single upload, or Upload All filename matching for the configured document fields
-   -> configured employee storage root, saved in DB as employees/{employeeCode}/documents paths
+   -> configured employee storage root, saved in DB as employees/{employeeCode}/{file} paths
    EmployeeDocumentViewPanel -> searchable saved documents, locked-document checks, single or Upload All upload for missing documents
    -> missing documents uploaded through detail update
 
@@ -439,7 +439,7 @@ Additional styling colors used in the document upload interface:
 - Empty values, blank strings, `N/A`, `n/a`, `NA`, `NULL`, and `-` are treated as placeholders and are not written as updates.
 - `EMPLOYEE_CODE` is the record key and stays locked in the detail screen.
 - Document fields are record-safe: if a document path already exists in the database, that document remains marked `Locked`, can be viewed from the detail screen, and cannot be replaced.
-- If a document field is empty or a placeholder, the detail screen allows upload. The file is copied under the active employee storage root and the logical database path is saved as `employees/{employeeCode}/documents/{file}` on Update.
+- If a document field is empty or a placeholder, the detail screen allows upload. The file is copied under the active employee storage root and the logical database path is saved as `employees/{employeeCode}/{file}` on Update.
 - Profile image follows the same safety rule: it can be uploaded only when `EMP_IMG` is empty or a placeholder.
 - Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be a real JPG/JPEG image and must match a document label, Employee field name, storage filename, or supported alias from the bundled `src/main/resources/resources/Labels.txt` after normalizing spaces, underscores, punctuation, and case.
 - Document/photo upload size is controlled by `AppConfig.documentUploadMaxBytes()`, which reads `kgm.document.upload.max.bytes`, then `KGM_DOCUMENT_UPLOAD_MAX_BYTES`, then `.env`, then defaults to `409600` bytes (400 KB). Commas and underscores are accepted in the value, for example `614,400` or `1_024_000`.
@@ -516,13 +516,12 @@ Settings can be passed through JVM properties, OS environment variables, or `.en
 | `KGM_ADMIN_USER` | `kgm.admin.user` | Application admin username |
 | `KGM_ADMIN_PASSWORD` | `kgm.admin.password` | Application admin password |
 | `FIELD_SETTINGS` | `kgm.field.settings.password` | Field Management password for adding, editing, deleting, or changing required field settings |
-| `KGM_EMPLOYEE_STORAGE_ON_SERVER` | `kgm.employee.storage.on.server` | `true` treats `KGM_EMPLOYEE_STORAGE_DIR` as the shared/server employee storage root; `false` treats it as the local employee storage root |
-| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local or LAN folder for employee photos and documents. If blank or missing in `.env` while local mode is active, startup writes `resources/employees` and uses that app-relative folder |
-| `KGM_EMPLOYEE_STORAGE_SERVER_DIR` | `kgm.employee.storage.server.dir` | Optional server-folder override when `KGM_EMPLOYEE_STORAGE_ON_SERVER=true`; when set, it takes priority over `KGM_EMPLOYEE_STORAGE_DIR` |
+| `KGM_EMPLOYEE_STORAGE_ON_SERVER` | `kgm.employee.storage.on.server` | `false` stores employee files in a local folder on this PC/app install; `true` stores employee files in a shared UNC/LAN folder |
+| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | The only employee storage path. Use `resources/employees` or another local path for local mode, or a UNC path like `\\192.168.2.93\employees` for shared-folder mode. If blank or missing in `.env` while local mode is active, startup writes `resources/employees` and uses that app-relative folder |
 | `KGM_DOCUMENT_UPLOAD_MAX_BYTES` | `kgm.document.upload.max.bytes` | Maximum prepared JPG/JPEG document/photo upload size in bytes; files above it use the best JPEG quality that fits |
 | `KGM_ENV_FILE` | `kgm.env.file` | Optional absolute path to a specific `.env` file |
 
-Employee documents keep logical database paths such as `employees/EMP001/documents/CNIC_FRONT.jpg`; only the physical storage root changes. Startup, Add Employee, View Employee File, Upload All, bulk folder upload, preview, and report/download flows all resolve through `EmployeeStorageUtil`, so changing the storage mode or path in `.env` moves future reads/writes to the same root without code changes. Existing legacy files under `resources/employees` and root `employees` remain readable as fallbacks when a saved DB path points there.
+Employee documents keep logical database paths such as `employees/EMP001/CNIC_FRONT.jpg`; only the physical storage root changes. Startup, Add Employee, View Employee File, Upload All, bulk folder upload, preview, and report/download flows all resolve through `EmployeeStorageUtil`, so changing the storage mode or path in `.env` moves future reads/writes to the same root without code changes. Existing legacy files under `resources/employees`, root `employees`, and older nested paths such as `employees/EMP001/documents/CNIC_FRONT.jpg` remain readable as fallbacks when a saved DB path points there.
 
 For a protected app-local folder, keep:
 

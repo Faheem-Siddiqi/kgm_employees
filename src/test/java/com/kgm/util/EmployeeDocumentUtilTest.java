@@ -31,7 +31,6 @@ class EmployeeDocumentUtilTest {
     private static final String DOT_ENV_FILE_PROPERTY = "kgm.env.file";
     private static final String EMPLOYEE_STORAGE_PROPERTY = "kgm.employee.storage.dir";
     private static final String EMPLOYEE_STORAGE_ON_SERVER_PROPERTY = "kgm.employee.storage.on.server";
-    private static final String EMPLOYEE_SERVER_STORAGE_PROPERTY = "kgm.employee.storage.server.dir";
     private final String originalUserDir = System.getProperty("user.dir");
     private final String originalJavaHome = System.getProperty("java.home");
 
@@ -44,7 +43,6 @@ class EmployeeDocumentUtilTest {
         System.clearProperty(DOT_ENV_FILE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY);
-        System.clearProperty(EMPLOYEE_SERVER_STORAGE_PROPERTY);
         System.setProperty("user.dir", originalUserDir);
         System.setProperty("java.home", originalJavaHome);
     }
@@ -253,25 +251,6 @@ class EmployeeDocumentUtilTest {
         assertTrue(Files.exists(copied));
         assertEquals(copied.toFile(), EmployeeDocumentUtil.resolveStoredFile(dbPath));
         assertStorageRootProtected(sharedRoot);
-    }
-
-    @Test
-    void serverStorageOverrideTakesPriorityWhenConfigured() throws IOException {
-        Path serverRoot = tempDir.resolve("server-employees");
-        Path sharedRoot = tempDir.resolve("shared-employees");
-        System.setProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY, "true");
-        System.setProperty(EMPLOYEE_SERVER_STORAGE_PROPERTY, serverRoot.toString());
-        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, sharedRoot.toString());
-        File source = writeJpeg(tempDir.resolve("EOBI.jpg"), 160, 100, 0.9f);
-
-        String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage("EMP:003", 2, source);
-
-        assertEquals("employees/EMP_003/EOBI.jpg", dbPath);
-        Path copied = serverRoot.resolve("EMP_003").resolve("EOBI.jpg");
-        assertTrue(Files.exists(copied));
-        assertEquals(copied.toFile(), EmployeeDocumentUtil.resolveStoredFile(dbPath));
-        assertFalse(Files.exists(sharedRoot));
-        assertStorageRootProtected(serverRoot);
     }
 
     @Test

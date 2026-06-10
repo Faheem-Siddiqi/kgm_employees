@@ -18,7 +18,6 @@ class AppConfigTest {
     private static final String DOT_ENV_FILE_PROPERTY = "kgm.env.file";
     private static final String EMPLOYEE_STORAGE_PROPERTY = "kgm.employee.storage.dir";
     private static final String EMPLOYEE_STORAGE_ON_SERVER_PROPERTY = "kgm.employee.storage.on.server";
-    private static final String EMPLOYEE_SERVER_STORAGE_PROPERTY = "kgm.employee.storage.server.dir";
     private static final long DEFAULT_UPLOAD_LIMIT = 400L * 1024L;
     private final String originalUserDir = System.getProperty("user.dir");
     private final String originalJavaHome = System.getProperty("java.home");
@@ -33,7 +32,6 @@ class AppConfigTest {
         System.clearProperty(DOT_ENV_FILE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY);
-        System.clearProperty(EMPLOYEE_SERVER_STORAGE_PROPERTY);
         System.setProperty("user.dir", originalUserDir);
         System.setProperty("java.home", originalJavaHome);
     }
@@ -105,19 +103,6 @@ class AppConfigTest {
     }
 
     @Test
-    void employeeStorageDirectoryUsesServerOverrideBeforeSharedStoragePath() {
-        System.setProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY, "true");
-        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, "shared-employee-data");
-        System.setProperty(EMPLOYEE_SERVER_STORAGE_PROPERTY, "server-override-data");
-
-        Path expected = Path.of(System.getProperty("user.dir"), "server-override-data")
-                .toAbsolutePath()
-                .normalize();
-
-        assertEquals(expected, AppConfig.employeeStorageDirectory());
-    }
-
-    @Test
     void employeeStorageDirectoryUsesProjectResourcesWhenLocalPathIsBlank() throws IOException {
         Path projectDir = tempDir.resolve("project-with-blank-env");
         Files.createDirectories(projectDir);
@@ -156,7 +141,6 @@ class AppConfigTest {
         Files.createDirectories(projectDir);
         Files.writeString(env, """
                 KGM_EMPLOYEE_STORAGE_ON_SERVER=false
-                KGM_EMPLOYEE_STORAGE_SERVER_DIR=\\\\old-server\\old-share
                 KGM_EMPLOYEE_STORAGE_DIR=resources/employees
                 """);
         System.setProperty(DOT_ENV_FILE_PROPERTY, env.toString());
@@ -165,7 +149,6 @@ class AppConfigTest {
 
         String updated = Files.readString(env);
         assertTrue(updated.contains("KGM_EMPLOYEE_STORAGE_ON_SERVER=true"));
-        assertTrue(updated.contains("KGM_EMPLOYEE_STORAGE_SERVER_DIR=\\\\192.168.2.93\\employees"));
         assertTrue(updated.contains("KGM_EMPLOYEE_STORAGE_DIR=\\\\192.168.2.93\\employees"));
     }
 }

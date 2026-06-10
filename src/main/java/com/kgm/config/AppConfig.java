@@ -18,8 +18,6 @@ public final class AppConfig {
     private static final String EMPLOYEE_STORAGE_DIR_PROPERTY = "kgm.employee.storage.dir";
     private static final String EMPLOYEE_STORAGE_DIR_ENV = "KGM_EMPLOYEE_STORAGE_DIR";
     private static final String EMPLOYEE_STORAGE_ON_SERVER_ENV = "KGM_EMPLOYEE_STORAGE_ON_SERVER";
-    private static final String EMPLOYEE_STORAGE_SERVER_DIR_PROPERTY = "kgm.employee.storage.server.dir";
-    private static final String EMPLOYEE_STORAGE_SERVER_DIR_ENV = "KGM_EMPLOYEE_STORAGE_SERVER_DIR";
     private static final long DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES = 400L * 1024L;
     private static final int DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES = 15;
     private static final Pattern WINDOWS_ENV_TOKEN = Pattern.compile("%([A-Za-z0-9_]+)%");
@@ -75,11 +73,8 @@ public final class AppConfig {
 
     private static Path serverEmployeeStorageDirectory() {
         String configured = firstNonBlank(
-                System.getProperty(EMPLOYEE_STORAGE_SERVER_DIR_PROPERTY),
-                System.getenv(EMPLOYEE_STORAGE_SERVER_DIR_ENV),
                 System.getProperty(EMPLOYEE_STORAGE_DIR_PROPERTY),
                 System.getenv(EMPLOYEE_STORAGE_DIR_ENV),
-                loadDotEnv().get(EMPLOYEE_STORAGE_SERVER_DIR_ENV),
                 loadDotEnv().get(EMPLOYEE_STORAGE_DIR_ENV)
         );
         if (configured != null && !configured.isBlank()) {
@@ -133,7 +128,6 @@ public final class AppConfig {
         }
 
         boolean changed = setDotEnvValue(lines, EMPLOYEE_STORAGE_ON_SERVER_ENV, "true");
-        changed = setDotEnvValue(lines, EMPLOYEE_STORAGE_SERVER_DIR_ENV, uncPath.trim()) || changed;
         changed = setDotEnvValue(lines, EMPLOYEE_STORAGE_DIR_ENV, uncPath.trim()) || changed;
 
         if (!changed) {
