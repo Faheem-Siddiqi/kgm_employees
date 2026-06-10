@@ -73,10 +73,7 @@ public final class EmployeeStorageUtil {
     }
 
     public static Path ensureDocumentDirectory(String employeeCode) throws IOException {
-        Path directory = ensureStorageRoot()
-                .resolve(pathSegment(employeeCode))
-                .resolve(DOCUMENTS_DIR)
-                .normalize();
+        Path directory = ensureEmployeeDirectory(employeeCode);
         Files.createDirectories(directory);
         return directory;
     }
@@ -86,7 +83,7 @@ public final class EmployeeStorageUtil {
     }
 
     public static Path documentDirectory(String employeeCode) {
-        return employeeDirectory(employeeCode).resolve(DOCUMENTS_DIR).normalize();
+        return employeeDirectory(employeeCode);
     }
 
     public static String profileImagePath(String employeeCode) {
@@ -94,7 +91,7 @@ public final class EmployeeStorageUtil {
     }
 
     public static String documentPath(String employeeCode, String storageName) {
-        return logicalEmployeePath(employeeCode, DOCUMENTS_DIR + "/" + fileNameSegment(storageName));
+        return logicalEmployeePath(employeeCode, fileNameSegment(storageName));
     }
 
     public static File resolveStoredFile(String storedPath) {
@@ -105,7 +102,15 @@ public final class EmployeeStorageUtil {
         String trimmed = storedPath.trim();
         Path raw = Path.of(trimmed);
         if (raw.isAbsolute()) {
-            return raw.normalize().toFile();
+            Path normalizedRaw = raw.normalize();
+            if (Files.exists(normalizedRaw)) {
+                return normalizedRaw.toFile();
+            }
+            Path remapped = resolveAbsolutePathFromConfiguredStorage(normalizedRaw);
+            if (Files.exists(remapped)) {
+                return remapped.toFile();
+            }
+            return remapped.toFile();
         }
 
         Path configured = resolveConfiguredPath(trimmed);
@@ -140,6 +145,30 @@ public final class EmployeeStorageUtil {
             return resolveUnderStorage(normalized.substring(prefix.length()));
         }
         return Path.of(System.getProperty("user.dir")).resolve(storedPath).normalize();
+    }
+
+    private static Path resolveAbsolutePathFromConfiguredStorage(Path absolutePath) {
+        Path relative = relativeFromEmployeesSegment(absolutePath);
+        if (relative == null) {
+            return absolutePath;
+        }
+        return resolveUnderStorage(relative.toString());
+    }
+
+    private static Path relativeFromEmployeesSegment(Path path) {
+        if (path == null) {
+            return null;
+        }
+        for (int index = 0; index < path.getNameCount(); index++) {
+            if (!LOGICAL_ROOT.equalsIgnoreCase(path.getName(index).toString())) {
+                continue;
+            }
+            if (index + 1 >= path.getNameCount()) {
+                return Path.of("");
+            }
+            return path.subpath(index + 1, path.getNameCount());
+        }
+        return null;
     }
 
     private static Path resolveLegacyConfiguredPath(String storedPath) {

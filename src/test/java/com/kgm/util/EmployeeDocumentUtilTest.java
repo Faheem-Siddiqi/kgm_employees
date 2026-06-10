@@ -218,11 +218,25 @@ class EmployeeDocumentUtilTest {
 
         String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage("EMP/001", 0, source);
 
-        assertEquals("employees/EMP_001/documents/CNIC_FRONT.jpg", dbPath);
-        Path copied = storageRoot.resolve("EMP_001").resolve("documents").resolve("CNIC_FRONT.jpg");
+        assertEquals("employees/EMP_001/CNIC_FRONT.jpg", dbPath);
+        Path copied = storageRoot.resolve("EMP_001").resolve("CNIC_FRONT.jpg");
         assertTrue(Files.exists(copied));
         assertEquals(copied.toFile(), EmployeeDocumentUtil.resolveStoredFile(dbPath));
         assertStorageRootProtected(storageRoot);
+    }
+
+    @Test
+    void numericEmployeeCodeUsesExactFolderNameWithoutExtraZeros() throws IOException {
+        Path storageRoot = tempDir.resolve("employee-storage");
+        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, storageRoot.toString());
+        File source = writeJpeg(tempDir.resolve("CNIC_FRONT.jpg"), 160, 100, 0.9f);
+
+        String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage("1", 0, source);
+
+        assertEquals("employees/1/CNIC_FRONT.jpg", dbPath);
+        assertTrue(Files.exists(storageRoot.resolve("1").resolve("CNIC_FRONT.jpg")));
+        assertFalse(Files.exists(storageRoot.resolve("001")));
+        assertFalse(Files.exists(storageRoot.resolve("1").resolve("documents")));
     }
 
     @Test
@@ -234,8 +248,8 @@ class EmployeeDocumentUtilTest {
 
         String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage("EMP:002", 1, source);
 
-        assertEquals("employees/EMP_002/documents/CNIC_BACK.jpg", dbPath);
-        Path copied = sharedRoot.resolve("EMP_002").resolve("documents").resolve("CNIC_BACK.jpg");
+        assertEquals("employees/EMP_002/CNIC_BACK.jpg", dbPath);
+        Path copied = sharedRoot.resolve("EMP_002").resolve("CNIC_BACK.jpg");
         assertTrue(Files.exists(copied));
         assertEquals(copied.toFile(), EmployeeDocumentUtil.resolveStoredFile(dbPath));
         assertStorageRootProtected(sharedRoot);
@@ -252,12 +266,38 @@ class EmployeeDocumentUtilTest {
 
         String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage("EMP:003", 2, source);
 
-        assertEquals("employees/EMP_003/documents/EOBI.jpg", dbPath);
-        Path copied = serverRoot.resolve("EMP_003").resolve("documents").resolve("EOBI.jpg");
+        assertEquals("employees/EMP_003/EOBI.jpg", dbPath);
+        Path copied = serverRoot.resolve("EMP_003").resolve("EOBI.jpg");
         assertTrue(Files.exists(copied));
         assertEquals(copied.toFile(), EmployeeDocumentUtil.resolveStoredFile(dbPath));
         assertFalse(Files.exists(sharedRoot));
         assertStorageRootProtected(serverRoot);
+    }
+
+    @Test
+    void resolveStoredFileRemapsMissingAbsolutePathFromAnotherPcToConfiguredStorage() throws IOException {
+        Path storageRoot = tempDir.resolve("shared-employees");
+        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, storageRoot.toString());
+        Path copied = storageRoot.resolve("1").resolve("CNIC_FRONT.jpg");
+        Files.createDirectories(copied.getParent());
+        Files.writeString(copied, "image-placeholder");
+
+        File resolved = EmployeeDocumentUtil.resolveStoredFile("C:\\OldPc\\KGM\\employees\\1\\CNIC_FRONT.jpg");
+
+        assertEquals(copied.toFile(), resolved);
+    }
+
+    @Test
+    void resolveStoredFileStillSupportsLegacyNestedDocumentsPath() throws IOException {
+        Path storageRoot = tempDir.resolve("shared-employees");
+        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, storageRoot.toString());
+        Path copied = storageRoot.resolve("1").resolve("documents").resolve("CNIC_FRONT.jpg");
+        Files.createDirectories(copied.getParent());
+        Files.writeString(copied, "image-placeholder");
+
+        File resolved = EmployeeDocumentUtil.resolveStoredFile("employees/1/documents/CNIC_FRONT.jpg");
+
+        assertEquals(copied.toFile(), resolved);
     }
 
     @Test

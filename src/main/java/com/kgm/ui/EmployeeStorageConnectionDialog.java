@@ -285,12 +285,12 @@ public final class EmployeeStorageConnectionDialog {
                     try {
                         WindowsNetworkShareConnector.ConnectionResult result = get();
                         if (!result.connected()) {
-                            showConnectionFailed(expected);
+                            showConnectionFailed(expected, result.message());
                             return;
                         }
                         finishIfAccessible(expected);
                     } catch (Exception exception) {
-                        showConnectionFailed(expected);
+                        showConnectionFailed(expected, exception.getMessage());
                     } finally {
                         if (password != null) {
                             Arrays.fill(password, '\0');
@@ -316,7 +316,7 @@ public final class EmployeeStorageConnectionDialog {
                 if (message != null && message.contains("does not have write permission")) {
                     showError("The folder is connected, but the app does not have write permission. Please contact IT or check shared folder permissions.\n\nExpected folder:\n" + expected);
                 } else {
-                    showConnectionFailed(expected);
+                    showConnectionFailed(expected, message);
                 }
                 return false;
             }
@@ -343,7 +343,22 @@ public final class EmployeeStorageConnectionDialog {
         }
 
         private void showConnectionFailed(String expected) {
-            showError("Connection failed. Please check the server IP, shared folder name, username, password, and LAN connection.\n\nExpected folder:\n" + expected);
+            showConnectionFailed(expected, "");
+        }
+
+        private void showConnectionFailed(String expected, String commandMessage) {
+            StringBuilder message = new StringBuilder();
+            message.append("Status: Connection failed.\n");
+            message.append("Please re-enter the shared folder details and try again.\n\n");
+            message.append("Please check the server IP, shared folder name, username, password, and LAN connection.\n\n");
+            message.append("Expected folder:\n").append(expected);
+
+            String cleanCommandMessage = cleanStatusDetails(commandMessage);
+            if (!cleanCommandMessage.isBlank()) {
+                message.append("\n\nWindows message:\n").append(cleanCommandMessage);
+            }
+
+            showError(message.toString());
         }
 
         private void showError(String message) {
@@ -444,6 +459,24 @@ public final class EmployeeStorageConnectionDialog {
                     .replace("&", "&amp;")
                     .replace("<", "&lt;")
                     .replace(">", "&gt;");
+        }
+
+        private String cleanStatusDetails(String value) {
+            if (value == null || value.isBlank()) {
+                return "";
+            }
+            StringBuilder clean = new StringBuilder();
+            for (String line : value.replace("\r", "\n").split("\n")) {
+                String trimmed = line.trim();
+                if (trimmed.isBlank()) {
+                    continue;
+                }
+                if (!clean.isEmpty()) {
+                    clean.append("\n");
+                }
+                clean.append(trimmed);
+            }
+            return clean.toString();
         }
 
         @FunctionalInterface
