@@ -516,9 +516,9 @@ Settings can be passed through JVM properties, OS environment variables, or `.en
 | `KGM_ADMIN_USER` | `kgm.admin.user` | Application admin username |
 | `KGM_ADMIN_PASSWORD` | `kgm.admin.password` | Application admin password |
 | `FIELD_SETTINGS` | `kgm.field.settings.password` | Field Management password for adding, editing, deleting, or changing required field settings |
-| `KGM_EMPLOYEE_STORAGE_ON_SERVER` | `kgm.employee.storage.on.server` | `true` stores under the app/server `employees/` folder and ignores `KGM_EMPLOYEE_STORAGE_DIR`; `false` uses `KGM_EMPLOYEE_STORAGE_DIR` |
-| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local or LAN folder for employee photos and documents when server storage is disabled. If blank or missing in `.env`, startup writes `resources/employees` and uses that app-relative folder |
-| `KGM_EMPLOYEE_STORAGE_SERVER_DIR` | `kgm.employee.storage.server.dir` | Optional app/server folder override when `KGM_EMPLOYEE_STORAGE_ON_SERVER=true` |
+| `KGM_EMPLOYEE_STORAGE_ON_SERVER` | `kgm.employee.storage.on.server` | `true` treats `KGM_EMPLOYEE_STORAGE_DIR` as the shared/server employee storage root; `false` treats it as the local employee storage root |
+| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | Local or LAN folder for employee photos and documents. If blank or missing in `.env` while local mode is active, startup writes `resources/employees` and uses that app-relative folder |
+| `KGM_EMPLOYEE_STORAGE_SERVER_DIR` | `kgm.employee.storage.server.dir` | Optional server-folder override when `KGM_EMPLOYEE_STORAGE_ON_SERVER=true`; when set, it takes priority over `KGM_EMPLOYEE_STORAGE_DIR` |
 | `KGM_DOCUMENT_UPLOAD_MAX_BYTES` | `kgm.document.upload.max.bytes` | Maximum prepared JPG/JPEG document/photo upload size in bytes; files above it use the best JPEG quality that fits |
 | `KGM_ENV_FILE` | `kgm.env.file` | Optional absolute path to a specific `.env` file |
 
@@ -534,8 +534,8 @@ KGM_EMPLOYEE_STORAGE_DIR=resources/employees
 For a LAN/shared folder, use a UNC path that the Windows user can access:
 
 ```text
-KGM_EMPLOYEE_STORAGE_ON_SERVER=false
-KGM_EMPLOYEE_STORAGE_DIR=\\SERVER\Shared\KGMExEmployees
+KGM_EMPLOYEE_STORAGE_ON_SERVER=true
+KGM_EMPLOYEE_STORAGE_DIR=\\192.168.2.93\employees
 ```
 
 ### Startup

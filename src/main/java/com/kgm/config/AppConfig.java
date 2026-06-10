@@ -49,15 +49,20 @@ public final class AppConfig {
             return serverEmployeeStorageDirectory();
         }
 
+        String configured = configuredEmployeeStorageDir();
+        if (configured == null || configured.isBlank()) {
+            return defaultLocalEmployeeStorageDirectory();
+        }
+        return configuredPath(configured);
+    }
+
+    private static String configuredEmployeeStorageDir() {
         String configured = setting(
                 EMPLOYEE_STORAGE_DIR_PROPERTY,
                 EMPLOYEE_STORAGE_DIR_ENV,
                 ""
         );
-        if (configured == null || configured.isBlank()) {
-            return defaultLocalEmployeeStorageDirectory();
-        }
-        return configuredPath(configured);
+        return configured == null ? "" : configured;
     }
 
     public static boolean employeeStorageOnServer() {
@@ -69,10 +74,13 @@ public final class AppConfig {
     }
 
     private static Path serverEmployeeStorageDirectory() {
-        String configured = setting(
-                EMPLOYEE_STORAGE_SERVER_DIR_PROPERTY,
-                EMPLOYEE_STORAGE_SERVER_DIR_ENV,
-                ""
+        String configured = firstNonBlank(
+                System.getProperty(EMPLOYEE_STORAGE_SERVER_DIR_PROPERTY),
+                System.getenv(EMPLOYEE_STORAGE_SERVER_DIR_ENV),
+                System.getProperty(EMPLOYEE_STORAGE_DIR_PROPERTY),
+                System.getenv(EMPLOYEE_STORAGE_DIR_ENV),
+                loadDotEnv().get(EMPLOYEE_STORAGE_SERVER_DIR_ENV),
+                loadDotEnv().get(EMPLOYEE_STORAGE_DIR_ENV)
         );
         if (configured != null && !configured.isBlank()) {
             return configuredPath(configured);
@@ -111,6 +119,32 @@ public final class AppConfig {
 
     public static Path activeDotEnvPath() {
         return dotEnvPath();
+    }
+
+    public static void saveEmployeeServerStorageDirectory(String uncPath) throws IOException {
+        if (uncPath == null || uncPath.isBlank()) {
+            throw new IllegalArgumentException("Employee storage server path is required.");
+        }
+
+        Path path = dotEnvPath();
+        List<String> lines = new ArrayList<>();
+        if (Files.isRegularFile(path)) {
+            lines.addAll(Files.readAllLines(path));
+        }
+
+        boolean changed = setDotEnvValue(lines, EMPLOYEE_STORAGE_ON_SERVER_ENV, "true");
+        changed = setDotEnvValue(lines, EMPLOYEE_STORAGE_SERVER_DIR_ENV, uncPath.trim()) || changed;
+        changed = setDotEnvValue(lines, EMPLOYEE_STORAGE_DIR_ENV, uncPath.trim()) || changed;
+
+        if (!changed) {
+            return;
+        }
+
+        Path parent = path.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Files.write(path, lines);
     }
 
     public static boolean dotEnvFileExists() {
@@ -186,6 +220,26 @@ public final class AppConfig {
         return true;
     }
 
+    private static boolean setDotEnvValue(List<String> lines, String key, String value) {
+        for (int index = 0; index < lines.size(); index++) {
+            EnvLine envLine = parseEnvLine(lines.get(index));
+            if (envLine == null || !key.equals(envLine.key())) {
+                continue;
+            }
+            if (value.equals(envLine.value())) {
+                return false;
+            }
+            lines.set(index, key + "=" + value);
+            return true;
+        }
+
+        if (!lines.isEmpty() && !lines.get(lines.size() - 1).isBlank()) {
+            lines.add("");
+        }
+        lines.add(key + "=" + value);
+        return true;
+    }
+
     public static String setting(String propertyName, String envName, String defaultValue) {
         String propertyValue = System.getProperty(propertyName);
         if (propertyValue != null && !propertyValue.isBlank()) {
@@ -230,6 +284,18 @@ public final class AppConfig {
 
     private static String normalizeNumber(String value) {
         return value == null ? "" : value.trim().replace(",", "").replace("_", "");
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 
     private static Map<String, String> loadDotEnv() {
@@ -385,6 +451,9 @@ public final class AppConfig {
     }
 
     private static Path configBaseDirectory() {
+        if (isPackagedRuntime()) {
+            return packagedRuntimeBaseDirectory();
+        }
         Path envPath = dotEnvPath();
         Path parent = envPath.getParent();
         if (parent != null && parent.getFileName() != null

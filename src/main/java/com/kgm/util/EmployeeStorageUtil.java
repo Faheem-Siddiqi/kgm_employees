@@ -4,9 +4,11 @@ import com.kgm.config.AppConfig;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 public final class EmployeeStorageUtil {
     private static final String LOGICAL_ROOT = "employees";
@@ -25,8 +27,43 @@ public final class EmployeeStorageUtil {
         AppConfig.ensureLocalEmployeeStorageSetting();
         Path root = storageRoot();
         Files.createDirectories(root);
+        verifyReadWriteAccess(root);
         protectStorageRootFromGit(root);
         return root;
+    }
+
+    public static boolean isLikelyStorageAccessFailure(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase().contains("employee storage folder could not be prepared")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    public static void verifyReadWriteAccess(Path root) throws IOException {
+        if (!Files.isDirectory(root)) {
+            throw new IOException("Employee storage folder is not available: " + root);
+        }
+        if (!Files.isReadable(root)) {
+            throw new IOException("Employee storage folder is not readable: " + root);
+        }
+
+        Path testFile = root.resolve(".kgm-storage-test-" + UUID.randomUUID() + ".tmp").normalize();
+        if (!testFile.startsWith(root)) {
+            throw new IOException("Employee storage folder test file could not be prepared.");
+        }
+
+        try (OutputStream output = Files.newOutputStream(testFile)) {
+            output.write("kgm-storage-test".getBytes(StandardCharsets.UTF_8));
+        } catch (IOException exception) {
+            throw new IOException("The folder is connected, but the app does not have write permission. Please contact IT or check shared folder permissions.", exception);
+        } finally {
+            Files.deleteIfExists(testFile);
+        }
     }
 
     public static Path ensureEmployeeDirectory(String employeeCode) throws IOException {

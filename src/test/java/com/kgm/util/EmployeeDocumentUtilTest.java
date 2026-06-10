@@ -28,10 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EmployeeDocumentUtilTest {
     private static final String DOCUMENT_UPLOAD_PROPERTY = "kgm.document.upload.max.bytes";
+    private static final String DOT_ENV_FILE_PROPERTY = "kgm.env.file";
     private static final String EMPLOYEE_STORAGE_PROPERTY = "kgm.employee.storage.dir";
     private static final String EMPLOYEE_STORAGE_ON_SERVER_PROPERTY = "kgm.employee.storage.on.server";
     private static final String EMPLOYEE_SERVER_STORAGE_PROPERTY = "kgm.employee.storage.server.dir";
     private final String originalUserDir = System.getProperty("user.dir");
+    private final String originalJavaHome = System.getProperty("java.home");
 
     @TempDir
     Path tempDir;
@@ -39,10 +41,12 @@ class EmployeeDocumentUtilTest {
     @AfterEach
     void clearUploadLimitProperty() {
         System.clearProperty(DOCUMENT_UPLOAD_PROPERTY);
+        System.clearProperty(DOT_ENV_FILE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY);
         System.clearProperty(EMPLOYEE_SERVER_STORAGE_PROPERTY);
         System.setProperty("user.dir", originalUserDir);
+        System.setProperty("java.home", originalJavaHome);
     }
 
     @Test
@@ -222,21 +226,37 @@ class EmployeeDocumentUtilTest {
     }
 
     @Test
-    void serverStorageModeUsesServerRootAndIgnoresLocalEmployeeStoragePath() throws IOException {
-        Path serverRoot = tempDir.resolve("server-employees");
-        Path localRoot = tempDir.resolve("local-employees");
+    void serverStorageModeUsesConfiguredEmployeeStoragePath() throws IOException {
+        Path sharedRoot = tempDir.resolve("shared-employees");
         System.setProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY, "true");
-        System.setProperty(EMPLOYEE_SERVER_STORAGE_PROPERTY, serverRoot.toString());
-        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, localRoot.toString());
+        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, sharedRoot.toString());
         File source = writeJpeg(tempDir.resolve("CNIC_BACK.jpg"), 160, 100, 0.9f);
 
         String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage("EMP:002", 1, source);
 
         assertEquals("employees/EMP_002/documents/CNIC_BACK.jpg", dbPath);
-        Path copied = serverRoot.resolve("EMP_002").resolve("documents").resolve("CNIC_BACK.jpg");
+        Path copied = sharedRoot.resolve("EMP_002").resolve("documents").resolve("CNIC_BACK.jpg");
         assertTrue(Files.exists(copied));
         assertEquals(copied.toFile(), EmployeeDocumentUtil.resolveStoredFile(dbPath));
-        assertFalse(Files.exists(localRoot));
+        assertStorageRootProtected(sharedRoot);
+    }
+
+    @Test
+    void serverStorageOverrideTakesPriorityWhenConfigured() throws IOException {
+        Path serverRoot = tempDir.resolve("server-employees");
+        Path sharedRoot = tempDir.resolve("shared-employees");
+        System.setProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY, "true");
+        System.setProperty(EMPLOYEE_SERVER_STORAGE_PROPERTY, serverRoot.toString());
+        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, sharedRoot.toString());
+        File source = writeJpeg(tempDir.resolve("EOBI.jpg"), 160, 100, 0.9f);
+
+        String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage("EMP:003", 2, source);
+
+        assertEquals("employees/EMP_003/documents/EOBI.jpg", dbPath);
+        Path copied = serverRoot.resolve("EMP_003").resolve("documents").resolve("EOBI.jpg");
+        assertTrue(Files.exists(copied));
+        assertEquals(copied.toFile(), EmployeeDocumentUtil.resolveStoredFile(dbPath));
+        assertFalse(Files.exists(sharedRoot));
         assertStorageRootProtected(serverRoot);
     }
 
@@ -251,6 +271,25 @@ class EmployeeDocumentUtilTest {
         Path root = EmployeeStorageUtil.ensureStorageRoot();
 
         Path expected = projectDir.resolve("resources").resolve("employees").toAbsolutePath().normalize();
+        assertEquals(expected, root);
+        assertTrue(Files.isDirectory(expected));
+        assertStorageRootProtected(expected);
+    }
+
+    @Test
+    void packagedRelativeResourcesEmployeesPathIsCreatedUnderAppFolder() throws IOException {
+        Path projectDir = tempDir.resolve("project-for-packaged-run");
+        Path appDir = tempDir.resolve("packaged-app");
+        Files.createDirectories(projectDir);
+        Files.createDirectories(appDir.resolve("runtime"));
+        Files.writeString(appDir.resolve(".env"),
+                "KGM_EMPLOYEE_STORAGE_ON_SERVER=false\nKGM_EMPLOYEE_STORAGE_DIR=resources/employees\n");
+        System.setProperty("user.dir", projectDir.toString());
+        System.setProperty("java.home", appDir.resolve("runtime").toString());
+
+        Path root = EmployeeStorageUtil.ensureStorageRoot();
+
+        Path expected = appDir.resolve("resources").resolve("employees").toAbsolutePath().normalize();
         assertEquals(expected, root);
         assertTrue(Files.isDirectory(expected));
         assertStorageRootProtected(expected);

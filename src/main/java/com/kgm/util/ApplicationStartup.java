@@ -3,6 +3,7 @@ package com.kgm.util;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.database.DatabaseInitializer;
 import com.kgm.ui.DatabaseConnectionStatusView;
+import com.kgm.ui.EmployeeStorageConnectionDialog;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.styling.DialogHelper;
 
@@ -114,6 +115,8 @@ public final class ApplicationStartup {
                                 "Database and field settings could not be prepared.",
                                 failure
                         ));
+                    } else if (EmployeeStorageUtil.isLikelyStorageAccessFailure(failure)) {
+                        showEmployeeStorageConnectionFailure();
                     } else {
                         showStartupFailure(failure);
                     }
@@ -209,6 +212,40 @@ public final class ApplicationStartup {
             for (ReadyWaiter waiter : waiters) {
                 waiter.closeLoader();
                 DialogHelper.error(waiter.parent(), "Startup Failed", message);
+                runOnEdt(waiter.onFailure());
+            }
+        });
+    }
+
+    private static void showEmployeeStorageConnectionFailure() {
+        List<ReadyWaiter> waiters;
+        synchronized (LOCK) {
+            ready = false;
+            waiters = new ArrayList<>(readyWaiters);
+            readyWaiters.clear();
+            startupPhase = StartupPhase.IDLE;
+            startupWorker = null;
+        }
+        runOnEdt(() -> {
+            cancelDelayedNotice();
+            stopAutoRetry();
+            if (statusView != null) {
+                statusView.closeView();
+                statusView = null;
+            }
+
+            Component parent = waiters.isEmpty() ? null : waiters.get(0).parent();
+            for (ReadyWaiter waiter : waiters) {
+                waiter.closeLoader();
+            }
+
+            boolean connected = EmployeeStorageConnectionDialog.showUntilConnected(parent);
+            if (connected) {
+                ensureStarted();
+                return;
+            }
+
+            for (ReadyWaiter waiter : waiters) {
                 runOnEdt(waiter.onFailure());
             }
         });
