@@ -60,8 +60,9 @@ public final class ApplicationStartup {
         LoadingOverlay.Handle loader = LoadingOverlay.show(
                 parent,
                 "Login Successful",
-                "Starting application and preparing database and field settings..."
+                phaseMessage(currentPhase())
         );
+        loader.setProgress(phaseProgress(currentPhase()));
         synchronized (LOCK) {
             runNow = ready;
             if (!runNow) {
@@ -73,6 +74,7 @@ public final class ApplicationStartup {
             runOnEdt(onReady);
             return;
         }
+        updateReadyWaitersForPhase(currentPhase());
         ensureStarted();
     }
 
@@ -144,10 +146,20 @@ public final class ApplicationStartup {
         RuntimeException runtimeFailure = failure instanceof RuntimeException runtimeException
                 ? runtimeException
                 : new IllegalStateException("Database connection failed.", failure);
+        boolean hasWaiters;
         synchronized (LOCK) {
             ready = false;
             startupPhase = StartupPhase.CONNECTING_DATABASE;
+            startupWorker = null;
+            hasWaiters = !readyWaiters.isEmpty();
         }
+        if (!hasWaiters) {
+            return;
+        }
+        updateReadyWaiters(
+                "Database is not connected yet. Please wait while the app retries the connection... 60%",
+                60
+        );
         runOnEdt(() -> {
             cancelDelayedNotice();
             statusView().showFailure(runtimeFailure);
@@ -184,6 +196,7 @@ public final class ApplicationStartup {
                 statusView = null;
             }
             for (ReadyWaiter waiter : waiters) {
+                waiter.updateLoader(phaseMessage(StartupPhase.READY), phaseProgress(StartupPhase.READY));
                 waiter.closeLoader();
                 runOnEdt(waiter.onReady());
             }
@@ -225,6 +238,9 @@ public final class ApplicationStartup {
             readyWaiters.clear();
             startupPhase = StartupPhase.IDLE;
             startupWorker = null;
+        }
+        if (waiters.isEmpty()) {
+            return;
         }
         runOnEdt(() -> {
             cancelDelayedNotice();
@@ -318,9 +334,44 @@ public final class ApplicationStartup {
         synchronized (LOCK) {
             startupPhase = phase;
         }
+        updateReadyWaitersForPhase(phase);
         if (phase == StartupPhase.LOADING_METADATA) {
             closeDatabaseStatusForMetadata();
         }
+    }
+
+    private static void updateReadyWaitersForPhase(StartupPhase phase) {
+        updateReadyWaiters(phaseMessage(phase), phaseProgress(phase));
+    }
+
+    private static void updateReadyWaiters(String message, int progress) {
+        List<ReadyWaiter> waiters;
+        synchronized (LOCK) {
+            waiters = new ArrayList<>(readyWaiters);
+        }
+        for (ReadyWaiter waiter : waiters) {
+            waiter.updateLoader(message, progress);
+        }
+    }
+
+    private static String phaseMessage(StartupPhase phase) {
+        return switch (phase) {
+            case PREPARING_STORAGE -> "Checking employee storage folder and LAN share access... 20%";
+            case CONNECTING_DATABASE -> "Connecting to MySQL database and preparing required tables... 60%";
+            case LOADING_METADATA -> "Loading field settings and document configuration... 90%";
+            case READY -> "Application is ready... 100%";
+            case IDLE -> "Preparing application in the background. This may take a moment after login... 10%";
+        };
+    }
+
+    private static int phaseProgress(StartupPhase phase) {
+        return switch (phase) {
+            case IDLE -> 10;
+            case PREPARING_STORAGE -> 20;
+            case CONNECTING_DATABASE -> 60;
+            case LOADING_METADATA -> 90;
+            case READY -> 100;
+        };
     }
 
     private static void closeDatabaseStatusForMetadata() {
@@ -368,6 +419,13 @@ public final class ApplicationStartup {
     }
 
     private record ReadyWaiter(Component parent, Runnable onReady, Runnable onFailure, LoadingOverlay.Handle loader) {
+        private void updateLoader(String message, int progress) {
+            if (loader != null) {
+                loader.setMessage(message);
+                loader.setProgress(progress);
+            }
+        }
+
         private void closeLoader() {
             if (loader != null) {
                 loader.close();

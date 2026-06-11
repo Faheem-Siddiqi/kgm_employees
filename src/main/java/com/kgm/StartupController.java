@@ -3,12 +3,9 @@ package com.kgm;
 import com.kgm.config.AppConfig;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.ui.DatabaseSetupView;
-import com.kgm.ui.EmployeeStorageConnectionDialog;
 import com.kgm.ui.LoginView;
 import com.kgm.util.ApplicationStartup;
-import com.kgm.util.EmployeeStorageUtil;
 
-import java.lang.reflect.InvocationTargetException;
 import javax.swing.SwingUtilities;
 import java.util.List;
 
@@ -19,10 +16,12 @@ public final class StartupController {
     }
 
     public static void start() {
-        DatabaseConnection.setConnectionFailureListener(null);
-        RuntimeException startupFailure = initializeSafely();
+        RuntimeException startupFailure = configurationFailure();
         DatabaseConnection.setConnectionFailureListener(DatabaseSetupView::showConnectionFailure);
         showStartupResult(startupFailure);
+        if (startupFailure == null) {
+            ApplicationStartup.startSilently();
+        }
         waitForApplicationExit();
     }
 
@@ -77,43 +76,6 @@ public final class StartupController {
                     return;
                 }
             }
-        }
-    }
-
-    private static RuntimeException initializeSafely() {
-        RuntimeException configurationFailure = configurationFailure();
-        if (configurationFailure != null) {
-            return configurationFailure;
-        }
-        while (true) {
-            try {
-                ApplicationStartup.initializeBlocking();
-                return null;
-            } catch (RuntimeException exception) {
-                if (!EmployeeStorageUtil.isLikelyStorageAccessFailure(exception)) {
-                    return exception;
-                }
-                boolean connected = showEmployeeStorageConnectionDialog();
-                if (!connected) {
-                    return exception;
-                }
-            }
-        }
-    }
-
-    private static boolean showEmployeeStorageConnectionDialog() {
-        if (SwingUtilities.isEventDispatchThread()) {
-            return EmployeeStorageConnectionDialog.showUntilConnected(null);
-        }
-        final boolean[] connected = {false};
-        try {
-            SwingUtilities.invokeAndWait(() -> connected[0] = EmployeeStorageConnectionDialog.showUntilConnected(null));
-            return connected[0];
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            return false;
-        } catch (InvocationTargetException exception) {
-            throw new IllegalStateException("Employee storage connection dialog could not be opened.", exception);
         }
     }
 
