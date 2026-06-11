@@ -13,6 +13,8 @@ import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
+import javax.swing.JScrollPane;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
@@ -109,9 +111,11 @@ public final class EmployeeStorageConnectionDialog {
             Window owner = parent == null ? null : SwingUtilities.getWindowAncestor(parent);
             dialog = new JDialog(owner, TITLE, Dialog.ModalityType.APPLICATION_MODAL);
             dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+            dialog.setResizable(true);
             dialog.setContentPane(content());
+            dialog.setPreferredSize(responsiveDialogSize(owner));
             dialog.pack();
-            dialog.setMinimumSize(new Dimension(520, 460));
+            dialog.setMinimumSize(new Dimension(460, 360));
             dialog.setLocationRelativeTo(owner);
             prefillFromConfiguredPath();
         }
@@ -128,8 +132,22 @@ public final class EmployeeStorageConnectionDialog {
                     new EmptyBorder(24, 24, 20, 24)
             ));
 
-            root.add(header(), BorderLayout.NORTH);
-            root.add(form(), BorderLayout.CENTER);
+            JPanel body = new JPanel();
+            body.setOpaque(true);
+            body.setBackground(Color.WHITE);
+            body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+            body.add(header());
+            body.add(form());
+
+            JScrollPane scroll = new JScrollPane(body);
+            scroll.setBorder(null);
+            scroll.setOpaque(true);
+            scroll.getViewport().setOpaque(true);
+            scroll.getViewport().setBackground(Color.WHITE);
+            scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+
+            root.add(scroll, BorderLayout.CENTER);
             root.add(actions(), BorderLayout.SOUTH);
             return root;
         }
@@ -277,7 +295,11 @@ public final class EmployeeStorageConnectionDialog {
             new SwingWorker<WindowsNetworkShareConnector.ConnectionResult, Void>() {
                 @Override
                 protected WindowsNetworkShareConnector.ConnectionResult doInBackground() {
-                    return task.run();
+                    WindowsNetworkShareConnector.ConnectionResult result = task.run();
+                    if (!result.connected()) {
+                        return result;
+                    }
+                    return verifyAndSave(expected);
                 }
 
                 @Override
@@ -288,7 +310,9 @@ public final class EmployeeStorageConnectionDialog {
                             showConnectionFailed(expected, result.message());
                             return;
                         }
-                        finishIfAccessible(expected);
+                        connected = true;
+                        showSuccess("Connected. The app will continue now.");
+                        dialog.dispose();
                     } catch (Exception exception) {
                         showConnectionFailed(expected, exception.getMessage());
                     } finally {
@@ -302,23 +326,20 @@ public final class EmployeeStorageConnectionDialog {
             }.execute();
         }
 
-        private boolean finishIfAccessible(String expected) {
+        private WindowsNetworkShareConnector.ConnectionResult verifyAndSave(String expected) {
             Path folder = Path.of(expected);
             try {
                 EmployeeStorageUtil.verifyReadWriteAccess(folder);
                 AppConfig.saveEmployeeServerStorageDirectory(expected);
-                connected = true;
-                showSuccess("Connected. The app will continue now.");
-                dialog.dispose();
-                return true;
+                return WindowsNetworkShareConnector.ConnectionResult.success();
             } catch (IOException exception) {
                 String message = exception.getMessage();
                 if (message != null && message.contains("does not have write permission")) {
-                    showError("The folder is connected, but the app does not have write permission. Please contact IT or check shared folder permissions.\n\nExpected folder:\n" + expected);
-                } else {
-                    showConnectionFailed(expected, message);
+                    return WindowsNetworkShareConnector.ConnectionResult.failed(
+                            "The folder is connected, but the app does not have write permission. Please contact IT or check shared folder permissions."
+                    );
                 }
-                return false;
+                return WindowsNetworkShareConnector.ConnectionResult.failed(message);
             }
         }
 
@@ -363,7 +384,9 @@ public final class EmployeeStorageConnectionDialog {
 
         private void showError(String message) {
             statusLabel.setForeground(ERROR_TEXT);
-            statusLabel.setText("<html>" + escape(message).replace("\n", "<br>") + "</html>");
+            statusLabel.setText("<html><body style='width: 420px;'>"
+                    + escape(message).replace("\n", "<br>")
+                    + "</body></html>");
         }
 
         private void showSuccess(String message) {
@@ -459,6 +482,15 @@ public final class EmployeeStorageConnectionDialog {
                     .replace("&", "&amp;")
                     .replace("<", "&lt;")
                     .replace(">", "&gt;");
+        }
+
+        private Dimension responsiveDialogSize(Window owner) {
+            Dimension screen = owner == null
+                    ? java.awt.Toolkit.getDefaultToolkit().getScreenSize()
+                    : owner.getGraphicsConfiguration().getBounds().getSize();
+            int width = Math.min(620, Math.max(460, screen.width - 96));
+            int height = Math.min(560, Math.max(360, screen.height - 120));
+            return new Dimension(width, height);
         }
 
         private String cleanStatusDetails(String value) {

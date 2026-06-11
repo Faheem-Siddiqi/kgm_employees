@@ -13,10 +13,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public final class ApplicationStartup {
     private static final int STARTUP_NOTICE_DELAY_MS = 850;
     private static final int AUTO_RETRY_DELAY_MS = 4_000;
+    private static final int STORAGE_CHECK_TIMEOUT_SECONDS = 8;
+    private static final int LONG_WAIT_NOTICE_DELAY_MS = 8_000;
     private static final Object LOCK = new Object();
     private static final List<ReadyWaiter> readyWaiters = new ArrayList<>();
     private static SwingWorker<Void, Void> startupWorker;
@@ -76,6 +81,7 @@ public final class ApplicationStartup {
         }
         updateReadyWaitersForPhase(currentPhase());
         ensureStarted();
+        scheduleLongWaitNotice();
     }
 
     private static SwingWorker<Void, Void> ensureStarted() {
@@ -130,7 +136,7 @@ public final class ApplicationStartup {
     private static void performStartupWork() {
         setStartupPhase(StartupPhase.PREPARING_STORAGE);
         try {
-            EmployeeStorageUtil.ensureStorageRoot();
+            ensureStorageRootWithTimeout();
         } catch (Exception exception) {
             throw new IllegalStateException("Employee storage folder could not be prepared: " + exception.getMessage(), exception);
         }
@@ -230,6 +236,32 @@ public final class ApplicationStartup {
         });
     }
 
+    private static void ensureStorageRootWithTimeout() throws Exception {
+        FutureTask<Void> task = new FutureTask<>(() -> {
+            EmployeeStorageUtil.ensureStorageRoot();
+            return null;
+        });
+        Thread worker = new Thread(task, "KGM employee storage startup check");
+        worker.setDaemon(true);
+        worker.start();
+        try {
+            task.get(STORAGE_CHECK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException exception) {
+            task.cancel(true);
+            throw new IllegalStateException(
+                    "Employee storage folder check timed out after " + STORAGE_CHECK_TIMEOUT_SECONDS
+                            + " seconds. The LAN share may be disconnected or slow.",
+                    exception
+            );
+        } catch (ExecutionException exception) {
+            Throwable cause = rootCause(exception);
+            if (cause instanceof Exception checked) {
+                throw checked;
+            }
+            throw new IllegalStateException(cause);
+        }
+    }
+
     private static void showEmployeeStorageConnectionFailure() {
         List<ReadyWaiter> waiters;
         synchronized (LOCK) {
@@ -296,6 +328,21 @@ public final class ApplicationStartup {
         });
     }
 
+    private static void scheduleLongWaitNotice() {
+        runOnEdt(() -> {
+            Timer timer = new Timer(LONG_WAIT_NOTICE_DELAY_MS, event -> {
+                synchronized (LOCK) {
+                    if (ready || readyWaiters.isEmpty()) {
+                        return;
+                    }
+                }
+                updateReadyWaiters(longWaitMessage(currentPhase()), phaseProgress(currentPhase()));
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+    }
+
     private static void cancelDelayedNotice() {
         if (delayedNoticeTimer != null) {
             delayedNoticeTimer.stop();
@@ -356,11 +403,21 @@ public final class ApplicationStartup {
 
     private static String phaseMessage(StartupPhase phase) {
         return switch (phase) {
-            case PREPARING_STORAGE -> "Checking employee storage folder and LAN share access... 20%";
+            case PREPARING_STORAGE -> "Windows is reconnecting the employee storage folder on the LAN. Please wait... 20%";
             case CONNECTING_DATABASE -> "Connecting to MySQL database and preparing required tables... 60%";
             case LOADING_METADATA -> "Loading field settings and document configuration... 90%";
             case READY -> "Application is ready... 100%";
             case IDLE -> "Preparing application in the background. This may take a moment after login... 10%";
+        };
+    }
+
+    private static String longWaitMessage(StartupPhase phase) {
+        return switch (phase) {
+            case PREPARING_STORAGE -> "Still waiting for the LAN employee storage folder. If it cannot reconnect soon, the app will ask for shared folder details.";
+            case CONNECTING_DATABASE -> "Still connecting to MySQL. Please wait; if the database is offline, the app will show the setup/retry screen.";
+            case LOADING_METADATA -> "Still loading field settings and document configuration. Please wait...";
+            case READY -> "Application is ready... 100%";
+            case IDLE -> "Still preparing the application in the background. Please wait...";
         };
     }
 

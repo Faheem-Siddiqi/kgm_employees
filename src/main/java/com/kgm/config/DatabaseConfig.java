@@ -1,7 +1,7 @@
 package com.kgm.config;
 
 public final class DatabaseConfig {
-    private static final String URL_OPTIONS = "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectTimeout=5000";
+    private static final String URL_OPTIONS = "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectTimeout=5000&socketTimeout=15000";
 
     private DatabaseConfig() {
     }
