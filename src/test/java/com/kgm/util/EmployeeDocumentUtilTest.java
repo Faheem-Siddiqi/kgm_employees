@@ -61,6 +61,19 @@ class EmployeeDocumentUtilTest {
     }
 
     @Test
+    void documentMatcherAcceptsKnownLabelsAndRejectsIncorrectLabels() throws IOException {
+        File valid = writeJpeg(tempDir.resolve("CNIC_FRONT.jpg"), 160, 100, 0.9f);
+        File invalid = writeJpeg(tempDir.resolve("random_wrong_label.jpg"), 160, 100, 0.9f);
+
+        EmployeeDocumentUtil.DocumentMatch validMatch = EmployeeDocumentUtil.matchDocumentForFile(valid);
+        EmployeeDocumentUtil.DocumentMatch invalidMatch = EmployeeDocumentUtil.matchDocumentForFile(invalid);
+
+        assertTrue(validMatch.matched());
+        assertEquals("CNIC Front", EmployeeDocumentUtil.cleanDocumentLabel(validMatch.documentIndex()));
+        assertFalse(invalidMatch.matched());
+    }
+
+    @Test
     void prepareImageForUploadAcceptsReadableJpegUnderConfiguredLimit() throws IOException {
         File source = writeJpeg(tempDir.resolve("CNIC_FRONT.jpg"), 160, 100, 0.9f);
         System.setProperty(DOCUMENT_UPLOAD_PROPERTY, Long.toString(source.length() + 1024));

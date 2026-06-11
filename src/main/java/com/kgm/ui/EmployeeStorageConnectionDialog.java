@@ -29,16 +29,14 @@ import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import java.awt.Rectangle;
 import java.awt.Window;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 
 public final class EmployeeStorageConnectionDialog {
-    private static final String TITLE = "Employee Storage Folder Not Connected";
+    private static final String TITLE = "Storage Folder Needs Connection";
     private static final String DEFAULT_SERVER = "192.168.2.93";
     private static final String DEFAULT_SHARE = "employees";
     private static final Color ERROR_TEXT = new Color(185, 28, 28);
@@ -110,12 +108,12 @@ public final class EmployeeStorageConnectionDialog {
         private DialogController(Component parent) {
             Window owner = parent == null ? null : SwingUtilities.getWindowAncestor(parent);
             dialog = new JDialog(owner, TITLE, Dialog.ModalityType.APPLICATION_MODAL);
-            dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+            dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             dialog.setResizable(true);
             dialog.setContentPane(content());
             dialog.setPreferredSize(responsiveDialogSize(owner));
             dialog.pack();
-            dialog.setMinimumSize(new Dimension(460, 360));
+            dialog.setMinimumSize(new Dimension(380, 360));
             dialog.setLocationRelativeTo(owner);
             prefillFromConfiguredPath();
         }
@@ -126,16 +124,17 @@ public final class EmployeeStorageConnectionDialog {
 
         private JPanel content() {
             JPanel root = new JPanel(new BorderLayout());
-            root.setBackground(Color.WHITE);
+            root.setBackground(UniversalDialogHelper.BACKGROUND);
             root.setBorder(BorderFactory.createCompoundBorder(
                     UniversalDialogHelper.roundedBorder(UniversalDialogHelper.CARD_BORDER, 8, 1),
                     new EmptyBorder(24, 24, 20, 24)
             ));
 
-            JPanel body = new JPanel();
+            JPanel body = new ViewportWidthPanel();
             body.setOpaque(true);
-            body.setBackground(Color.WHITE);
+            body.setBackground(UniversalDialogHelper.BACKGROUND);
             body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+            body.setBorder(new EmptyBorder(0, 0, 0, 14));
             body.add(header());
             body.add(form());
 
@@ -143,7 +142,7 @@ public final class EmployeeStorageConnectionDialog {
             scroll.setBorder(null);
             scroll.setOpaque(true);
             scroll.getViewport().setOpaque(true);
-            scroll.getViewport().setBackground(Color.WHITE);
+            scroll.getViewport().setBackground(UniversalDialogHelper.BACKGROUND);
             scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
             scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
 
@@ -156,43 +155,97 @@ public final class EmployeeStorageConnectionDialog {
             JPanel header = new JPanel();
             header.setOpaque(false);
             header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+            header.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            JPanel titleRow = new JPanel(new BorderLayout(12, 0));
+            titleRow.setOpaque(false);
+            titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
             JLabel title = new JLabel(TITLE);
-            title.setFont(UniversalDialogHelper.mediumFont(18));
+            title.setFont(UniversalDialogHelper.mediumFont(20));
             title.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
             title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+            JButton closeButton = closeButton();
+            titleRow.add(title, BorderLayout.CENTER);
+            titleRow.add(closeButton, BorderLayout.EAST);
+
             JTextArea message = readOnlyText("""
-                    The application cannot access the employee storage folder on the LAN.
-
-                    This folder is required to load and save employee images/documents.
-
-                    Please confirm the shared folder details below. The app will try to connect automatically.
+                    KGM cannot reach the shared employee storage folder right now. Connect it here so employee photos and documents can load and save normally.
                     """);
             message.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-            header.add(title);
+            header.add(titleRow);
             header.add(Box.createVerticalStrut(8));
             header.add(message);
-            header.add(Box.createVerticalStrut(16));
+            header.add(Box.createVerticalStrut(14));
+            header.add(guidanceBox());
+            header.add(Box.createVerticalStrut(18));
             return header;
+        }
+
+        private JPanel guidanceBox() {
+            JPanel box = new JPanel(new BorderLayout(10, 0));
+            box.setOpaque(true);
+            box.setBackground(UniversalDialogHelper.SURFACE);
+            box.setBorder(BorderFactory.createCompoundBorder(
+                    UniversalDialogHelper.roundedBorder(UniversalDialogHelper.CARD_BORDER, 8, 1),
+                    new EmptyBorder(12, 14, 12, 14)
+            ));
+            box.setAlignmentX(Component.LEFT_ALIGNMENT);
+            box.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+
+            JLabel marker = new JLabel("i", JLabel.CENTER);
+            marker.setOpaque(true);
+            marker.setBackground(new Color(224, 242, 254));
+            marker.setForeground(UniversalDialogHelper.PRIMARY);
+            marker.setFont(UniversalDialogHelper.mediumFont(13));
+            marker.setPreferredSize(new Dimension(22, 22));
+
+            JPanel text = new JPanel();
+            text.setOpaque(false);
+            text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+
+            JLabel heading = new JLabel("Check the shared folder details");
+            heading.setFont(UniversalDialogHelper.mediumFont(13));
+            heading.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
+            heading.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            JTextArea detail = readOnlyText(
+                    "Confirm the server, folder name, and login. Then choose Connect. If you are already on the office network, Retry may be enough."
+            );
+            detail.setFont(UniversalDialogHelper.regularFont(12));
+            detail.setForeground(UniversalDialogHelper.MUTED_TEXT);
+            detail.setBackground(UniversalDialogHelper.SURFACE);
+            detail.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            text.add(heading);
+            text.add(Box.createVerticalStrut(3));
+            text.add(detail);
+
+            box.add(marker, BorderLayout.WEST);
+            box.add(text, BorderLayout.CENTER);
+            return box;
         }
 
         private JPanel form() {
             JPanel wrapper = new JPanel(new BorderLayout());
             wrapper.setOpaque(false);
+            wrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-            JPanel grid = new JPanel(new GridBagLayout());
+            JPanel grid = new JPanel();
             grid.setOpaque(false);
+            grid.setLayout(new BoxLayout(grid, BoxLayout.Y_AXIS));
             grid.setBorder(new EmptyBorder(0, 0, 12, 0));
+            grid.setAlignmentX(Component.LEFT_ALIGNMENT);
 
             styleField(serverField);
             styleField(shareField);
             styleField(usernameField);
             styleField(passwordField);
 
-            addRow(grid, 0, "Server IP Address", serverField, "Example: 192.168.2.93");
-            addRow(grid, 1, "Shared Folder Name", shareField, "Example: employees");
+            addRow(grid, 0, "Server address", serverField, "Example: 192.168.2.93");
+            addRow(grid, 1, "Shared folder", shareField, "Example: employees");
             addRow(grid, 2, "Username", usernameField, "Example: KMLGPK\\Attiq.Mughal or kgm534");
             addRow(grid, 3, "Password", passwordField, "");
 
@@ -208,11 +261,11 @@ public final class EmployeeStorageConnectionDialog {
             JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
             actions.setOpaque(false);
 
-            exitButton = secondaryButton("Exit Application");
+            exitButton = secondaryButton("Close");
             retryButton = secondaryButton("Retry");
             connectButton = primaryButton("Connect");
 
-            exitButton.addActionListener(event -> System.exit(0));
+            exitButton.addActionListener(event -> closeDialog());
             retryButton.addActionListener(event -> retryExistingPath());
             connectButton.addActionListener(event -> connect());
 
@@ -223,37 +276,40 @@ public final class EmployeeStorageConnectionDialog {
         }
 
         private void addRow(JPanel panel, int row, String labelText, JTextField field, String hintText) {
-            GridBagConstraints labelConstraints = new GridBagConstraints();
-            labelConstraints.gridx = 0;
-            labelConstraints.gridy = row;
-            labelConstraints.anchor = GridBagConstraints.NORTHWEST;
-            labelConstraints.insets = new Insets(0, 0, 14, 14);
+            JPanel rowPanel = new JPanel();
+            rowPanel.setOpaque(false);
+            rowPanel.setLayout(new BoxLayout(rowPanel, BoxLayout.Y_AXIS));
+            rowPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            rowPanel.setBorder(new EmptyBorder(0, 0, 14, 0));
 
             JLabel label = new JLabel(labelText);
             label.setFont(UniversalDialogHelper.mediumFont(13));
             label.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
-            panel.add(label, labelConstraints);
+            label.setHorizontalAlignment(JLabel.LEFT);
+            label.setAlignmentX(Component.LEFT_ALIGNMENT);
 
             JPanel fieldBlock = new JPanel();
             fieldBlock.setOpaque(false);
             fieldBlock.setLayout(new BoxLayout(fieldBlock, BoxLayout.Y_AXIS));
+            fieldBlock.setAlignmentX(Component.LEFT_ALIGNMENT);
+            fieldBlock.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
             field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+            field.setMinimumSize(new Dimension(0, 34));
+            field.setAlignmentX(Component.LEFT_ALIGNMENT);
             fieldBlock.add(field);
             if (hintText != null && !hintText.isBlank()) {
-                JLabel hint = new JLabel(hintText);
+                JTextArea hint = readOnlyText(hintText);
                 hint.setFont(UniversalDialogHelper.regularFont(11));
                 hint.setForeground(UniversalDialogHelper.MUTED_TEXT);
                 hint.setBorder(new EmptyBorder(4, 2, 0, 0));
+                hint.setAlignmentX(Component.LEFT_ALIGNMENT);
                 fieldBlock.add(hint);
             }
 
-            GridBagConstraints fieldConstraints = new GridBagConstraints();
-            fieldConstraints.gridx = 1;
-            fieldConstraints.gridy = row;
-            fieldConstraints.weightx = 1;
-            fieldConstraints.fill = GridBagConstraints.HORIZONTAL;
-            fieldConstraints.insets = new Insets(0, 0, 14, 0);
-            panel.add(fieldBlock, fieldConstraints);
+            rowPanel.add(label);
+            rowPanel.add(Box.createVerticalStrut(5));
+            rowPanel.add(fieldBlock);
+            panel.add(rowPanel);
         }
 
         private void connect() {
@@ -277,7 +333,7 @@ public final class EmployeeStorageConnectionDialog {
         private void retryExistingPath() {
             String expected = expectedFolder();
             if (expected.isBlank()) {
-                showError("Server IP and shared folder name are required before retry.");
+                showError("Enter the server address and shared folder before retrying.");
                 return;
             }
             runConnectionWorker(
@@ -336,7 +392,7 @@ public final class EmployeeStorageConnectionDialog {
                 String message = exception.getMessage();
                 if (message != null && message.contains("does not have write permission")) {
                     return WindowsNetworkShareConnector.ConnectionResult.failed(
-                            "The folder is connected, but the app does not have write permission. Please contact IT or check shared folder permissions."
+                            "KGM reached the folder, but cannot save files there. Ask IT to allow write access for this account, then try again."
                     );
                 }
                 return WindowsNetworkShareConnector.ConnectionResult.failed(message);
@@ -345,16 +401,16 @@ public final class EmployeeStorageConnectionDialog {
 
         private String validationMessage() {
             if (serverField.getText().trim().isEmpty()) {
-                return "Server IP cannot be empty.";
+                return "Enter the server address.";
             }
             if (shareField.getText().trim().isEmpty()) {
-                return "Shared folder name cannot be empty.";
+                return "Enter the shared folder name.";
             }
             if (usernameField.getText().trim().isEmpty()) {
-                return "Username cannot be empty.";
+                return "Enter the username for this shared folder.";
             }
             if (passwordField.getPassword().length == 0) {
-                return "Password cannot be empty.";
+                return "Enter the password for this shared folder.";
             }
             return "";
         }
@@ -369,10 +425,9 @@ public final class EmployeeStorageConnectionDialog {
 
         private void showConnectionFailed(String expected, String commandMessage) {
             StringBuilder message = new StringBuilder();
-            message.append("Status: Connection failed.\n");
-            message.append("Please re-enter the shared folder details and try again.\n\n");
-            message.append("Please check the server IP, shared folder name, username, password, and LAN connection.\n\n");
-            message.append("Expected folder:\n").append(expected);
+            message.append("We could not connect to the shared folder.\n");
+            message.append("Check the server address, shared folder, username, password, and office network connection.\n\n");
+            message.append("Folder checked:\n").append(expected);
 
             String cleanCommandMessage = cleanStatusDetails(commandMessage);
             if (!cleanCommandMessage.isBlank()) {
@@ -384,7 +439,8 @@ public final class EmployeeStorageConnectionDialog {
 
         private void showError(String message) {
             statusLabel.setForeground(ERROR_TEXT);
-            statusLabel.setText("<html><body style='width: 420px;'>"
+            statusLabel.setText("<html><body style='width: " + statusTextWidth() + "px;'>"
+                    + "<b>Connection needs attention.</b><br>"
                     + escape(message).replace("\n", "<br>")
                     + "</body></html>");
         }
@@ -411,6 +467,10 @@ public final class EmployeeStorageConnectionDialog {
             }
         }
 
+        private void closeDialog() {
+            dialog.dispose();
+        }
+
         private void prefillFromConfiguredPath() {
             String configured = AppConfig.employeeStorageDirectory().toString();
             if (!configured.startsWith("\\\\")) {
@@ -431,16 +491,19 @@ public final class EmployeeStorageConnectionDialog {
             area.setFocusable(false);
             area.setLineWrap(true);
             area.setWrapStyleWord(true);
+            area.setColumns(0);
             area.setOpaque(false);
             area.setFont(UniversalDialogHelper.regularFont(13));
             area.setForeground(UniversalDialogHelper.TEXT_SECONDARY);
             area.setBorder(null);
+            area.setAlignmentX(Component.LEFT_ALIGNMENT);
             return area;
         }
 
         private void styleField(JTextField field) {
             field.setFont(UniversalDialogHelper.regularFont(13));
             field.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
+            field.setBackground(Color.WHITE);
             field.setBorder(BorderFactory.createCompoundBorder(
                     UniversalDialogHelper.roundedBorder(UniversalDialogHelper.CARD_BORDER, 8, 1),
                     new EmptyBorder(7, 10, 7, 10)
@@ -469,6 +532,24 @@ public final class EmployeeStorageConnectionDialog {
             return button;
         }
 
+        private JButton closeButton() {
+            JButton button = new JButton("X");
+            button.setPreferredSize(new Dimension(32, 32));
+            button.setMaximumSize(new Dimension(32, 32));
+            button.setToolTipText("Close dialog");
+            button.setBackground(UniversalDialogHelper.BACKGROUND);
+            button.setForeground(UniversalDialogHelper.MUTED_TEXT);
+            button.setFocusPainted(false);
+            button.setBorder(BorderFactory.createCompoundBorder(
+                    UniversalDialogHelper.roundedBorder(UniversalDialogHelper.CARD_BORDER, 8, 1),
+                    new EmptyBorder(4, 10, 5, 10)
+            ));
+            button.setFont(new Font(UniversalDialogHelper.FONT_FAMILY, Font.BOLD, 12));
+            button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            button.addActionListener(event -> closeDialog());
+            return button;
+        }
+
         private JButton baseButton(String text) {
             JButton button = new JButton(text);
             button.setFocusPainted(false);
@@ -484,11 +565,16 @@ public final class EmployeeStorageConnectionDialog {
                     .replace(">", "&gt;");
         }
 
+        private int statusTextWidth() {
+            int currentWidth = dialog.getWidth() > 0 ? dialog.getWidth() : 460;
+            return Math.max(260, Math.min(480, currentWidth - 120));
+        }
+
         private Dimension responsiveDialogSize(Window owner) {
             Dimension screen = owner == null
                     ? java.awt.Toolkit.getDefaultToolkit().getScreenSize()
                     : owner.getGraphicsConfiguration().getBounds().getSize();
-            int width = Math.min(620, Math.max(460, screen.width - 96));
+            int width = Math.min(620, Math.max(380, screen.width - 96));
             int height = Math.min(560, Math.max(360, screen.height - 120));
             return new Dimension(width, height);
         }
@@ -509,6 +595,33 @@ public final class EmployeeStorageConnectionDialog {
                 clean.append(trimmed);
             }
             return clean.toString();
+        }
+
+        private static final class ViewportWidthPanel extends JPanel implements javax.swing.Scrollable {
+            @Override
+            public Dimension getPreferredScrollableViewportSize() {
+                return getPreferredSize();
+            }
+
+            @Override
+            public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+                return 16;
+            }
+
+            @Override
+            public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+                return Math.max(16, visibleRect.height - 16);
+            }
+
+            @Override
+            public boolean getScrollableTracksViewportWidth() {
+                return true;
+            }
+
+            @Override
+            public boolean getScrollableTracksViewportHeight() {
+                return false;
+            }
         }
 
         @FunctionalInterface

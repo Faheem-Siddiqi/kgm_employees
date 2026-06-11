@@ -342,67 +342,387 @@ public class HomeView extends JFrame {
         if (bulkDocumentActionRunning) {
             return;
         }
-        bulkDocumentActionRunning = true;
-        importBulkDocumentFolders();
+        new BulkUploadRangeDialog().show();
     }
 
     private void importBulkDocumentFolders() {
-        setBulkDocumentButtonBusy();
-        setExcelButtonBusy("Uploading...");
-        LoadingOverlay.Handle loader = LoadingOverlay.show(
-                this,
-                "Uploading Documents",
-                "Reading KGM_EMPLOYEE_STORAGE_DIR and scanning direct Employee-Code folders..."
-        );
-        final ServiceTimeoutGuard[] timeoutGuard = new ServiceTimeoutGuard[1];
-        SwingWorker<BulkFolderDocumentImportService.ImportResult, Void> worker = new SwingWorker<>() {
-            protected BulkFolderDocumentImportService.ImportResult doInBackground() throws Exception {
-                return bulkFolderDocumentImportService.importConfiguredFolder((message, completedFolders, totalFolders, percent) ->
-                        updateExcelLoader(loader, message, percent));
+        chooseBulkDocumentFolders();
+    }
+
+    private final class BulkUploadRangeDialog implements BulkFolderDocumentImportService.ImportControl {
+        private final Object pauseLock = new Object();
+        private final JDialog dialog = new JDialog(HomeView.this, "Bulk Document Upload", Dialog.ModalityType.APPLICATION_MODAL);
+        private final CardLayout cards = new CardLayout();
+        private final JPanel cardPanel = new JPanel(cards);
+        private final JTextField startCodeField = new JTextField();
+        private final JTextField endCodeField = new JTextField();
+        private final JLabel validationLabel = new JLabel(" ");
+        private final JLabel employeeLabel = new JLabel("Employee Code: -");
+        private final JLabel documentLabel = new JLabel("Document: -");
+        private final JLabel countLabel = new JLabel("Uploaded 0 | Skipped 0 | Failed 0 | Duplicate 0 | Discarded 0");
+        private final JLabel statusLabel = new JLabel(UniversalDialogHelper.htmlWrap("Waiting to start..."));
+        private final JProgressBar progressBar = new JProgressBar(0, 100);
+        private final JButton startButton = UniversalDialogHelper.primaryButton("Start Upload", UniversalDialogHelper.PRIMARY);
+        private final JButton cancelButton = UniversalDialogHelper.secondaryButton("Cancel");
+        private final JButton pauseButton = UniversalDialogHelper.secondaryButton("Pause");
+        private final JButton stopButton = UniversalDialogHelper.secondaryButton("Stop");
+        private SwingWorker<BulkFolderDocumentImportService.ImportResult, Void> worker;
+        private volatile boolean running;
+        private volatile boolean paused;
+        private volatile boolean pauseRequested;
+        private volatile boolean stopRequested;
+        private volatile boolean completed;
+
+        private void show() {
+            UniversalDialogHelper.styleDialogWindow(dialog);
+            dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+            dialog.setContentPane(content());
+            dialog.setMinimumSize(new Dimension(460, 360));
+            dialog.setPreferredSize(new Dimension(620, 460));
+            dialog.pack();
+            dialog.setLocationRelativeTo(HomeView.this);
+            dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosing(java.awt.event.WindowEvent event) {
+                    requestClose();
+                }
+            });
+            dialog.setVisible(true);
+        }
+
+        private JPanel content() {
+            JPanel root = new JPanel(new BorderLayout());
+            UniversalDialogHelper.styleRoot(root);
+
+            JPanel header = UniversalDialogHelper.createHeader(
+                    UniversalDialog.Type.INFO,
+                    "Bulk document upload",
+                    this::requestClose
+            );
+            root.add(header, BorderLayout.NORTH);
+
+            cardPanel.setOpaque(false);
+            cardPanel.add(rangePanel(), "range");
+            cardPanel.add(progressPanel(), "progress");
+            root.add(cardPanel, BorderLayout.CENTER);
+            return root;
+        }
+
+        private JPanel rangePanel() {
+            JPanel wrapper = new JPanel(new BorderLayout());
+            wrapper.setOpaque(false);
+            wrapper.setBorder(BorderFactory.createEmptyBorder(8, 24, 20, 24));
+
+            JPanel body = UniversalDialogHelper.createDialogCard();
+            body.add(UniversalDialogHelper.createDialogSectionHeader(
+                    "Select employee code range",
+                    "Only direct folders from the configured bulk upload path will be processed. Folder names must exactly match employee codes in this range."
+            ));
+            body.add(Box.createVerticalStrut(14));
+
+            JPanel grid = new JPanel(new GridBagLayout());
+            grid.setOpaque(false);
+            styleRangeField(startCodeField);
+            styleRangeField(endCodeField);
+            addRangeRow(grid, 0, "Start Code", startCodeField, "Example: 1");
+            addRangeRow(grid, 1, "End Code", endCodeField, "Example: 50");
+            body.add(grid);
+            body.add(Box.createVerticalStrut(10));
+
+            validationLabel.setFont(UniversalDialogHelper.mediumFont(12));
+            validationLabel.setForeground(UniversalDialogHelper.ERROR_ACCENT);
+            body.add(validationLabel);
+
+            wrapper.add(body, BorderLayout.CENTER);
+            wrapper.add(rangeFooter(), BorderLayout.SOUTH);
+            return wrapper;
+        }
+
+        private JPanel rangeFooter() {
+            JPanel footer = UniversalDialogHelper.createFooter();
+            cancelButton.addActionListener(event -> requestClose());
+            startButton.addActionListener(event -> startUpload());
+            footer.add(cancelButton);
+            footer.add(startButton);
+            return footer;
+        }
+
+        private JPanel progressPanel() {
+            JPanel wrapper = new JPanel(new BorderLayout());
+            wrapper.setOpaque(false);
+            wrapper.setBorder(BorderFactory.createEmptyBorder(8, 24, 20, 24));
+
+            JPanel body = UniversalDialogHelper.createDialogCard();
+            body.add(UniversalDialogHelper.createDialogSectionHeader(
+                    "Uploading documents",
+                    "Pause or stop will take effect after the current employee finishes."
+            ));
+            body.add(Box.createVerticalStrut(14));
+
+            progressBar.setStringPainted(true);
+            progressBar.setValue(0);
+            progressBar.setBorderPainted(false);
+            body.add(progressBar);
+            body.add(Box.createVerticalStrut(14));
+
+            employeeLabel.setFont(UniversalDialogHelper.mediumFont(13));
+            documentLabel.setFont(UniversalDialogHelper.regularFont(13));
+            countLabel.setFont(UniversalDialogHelper.mediumFont(12));
+            statusLabel.setFont(UniversalDialogHelper.regularFont(12));
+            statusLabel.setForeground(UniversalDialogHelper.MUTED_TEXT);
+            body.add(employeeLabel);
+            body.add(Box.createVerticalStrut(5));
+            body.add(documentLabel);
+            body.add(Box.createVerticalStrut(10));
+            body.add(countLabel);
+            body.add(Box.createVerticalStrut(10));
+            body.add(statusLabel);
+
+            wrapper.add(body, BorderLayout.CENTER);
+            wrapper.add(progressFooter(), BorderLayout.SOUTH);
+            return wrapper;
+        }
+
+        private JPanel progressFooter() {
+            JPanel footer = UniversalDialogHelper.createFooter();
+            pauseButton.addActionListener(event -> togglePause());
+            stopButton.addActionListener(event -> requestStop());
+            footer.add(pauseButton);
+            footer.add(stopButton);
+            return footer;
+        }
+
+        private void addRangeRow(JPanel panel, int row, String labelText, JTextField field, String hintText) {
+            GridBagConstraints labelConstraints = new GridBagConstraints();
+            labelConstraints.gridx = 0;
+            labelConstraints.gridy = row;
+            labelConstraints.anchor = GridBagConstraints.NORTHWEST;
+            labelConstraints.insets = new Insets(0, 0, 14, 14);
+
+            JLabel label = new JLabel(labelText);
+            label.setFont(UniversalDialogHelper.mediumFont(13));
+            label.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
+            panel.add(label, labelConstraints);
+
+            JPanel fieldBlock = new JPanel();
+            fieldBlock.setOpaque(false);
+            fieldBlock.setLayout(new BoxLayout(fieldBlock, BoxLayout.Y_AXIS));
+            field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+            fieldBlock.add(field);
+
+            JLabel hint = new JLabel(hintText);
+            hint.setFont(UniversalDialogHelper.regularFont(11));
+            hint.setForeground(UniversalDialogHelper.MUTED_TEXT);
+            hint.setBorder(BorderFactory.createEmptyBorder(4, 2, 0, 0));
+            fieldBlock.add(hint);
+
+            GridBagConstraints fieldConstraints = new GridBagConstraints();
+            fieldConstraints.gridx = 1;
+            fieldConstraints.gridy = row;
+            fieldConstraints.weightx = 1;
+            fieldConstraints.fill = GridBagConstraints.HORIZONTAL;
+            fieldConstraints.insets = new Insets(0, 0, 14, 0);
+            panel.add(fieldBlock, fieldConstraints);
+        }
+
+        private void styleRangeField(JTextField field) {
+            field.setFont(UniversalDialogHelper.regularFont(13));
+            field.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
+            field.setBorder(BorderFactory.createCompoundBorder(
+                    UniversalDialogHelper.roundedBorder(UniversalDialogHelper.CARD_BORDER, 8, 1),
+                    BorderFactory.createEmptyBorder(7, 10, 7, 10)
+            ));
+        }
+
+        private void startUpload() {
+            Range range = validatedRange();
+            if (range == null) {
+                return;
             }
 
-            protected void done() {
-                finishTimeoutGuard(timeoutGuard);
-                loader.close();
-                bulkDocumentActionRunning = false;
-                setBulkDocumentButtonReady();
-                setExcelButtonReady();
-                if (timedOut(timeoutGuard)) {
-                    return;
-                }
-                try {
-                    BulkFolderDocumentImportService.ImportResult result = get();
-                    showBulkDocumentImportResult(result);
-                    if (result.uploadedCount() > 0) {
-                        reloadHomeData();
-                    }
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    DialogHelper.error(HomeView.this, "Bulk upload stopped", "Document folder upload was interrupted.");
-                } catch (CancellationException exception) {
-                    DialogHelper.error(HomeView.this, "Bulk upload stopped", "Document folder upload was cancelled.");
-                } catch (ExecutionException exception) {
-                    Throwable cause = exception.getCause();
-                    DialogHelper.error(
-                            HomeView.this,
-                            "Bulk upload failed",
-                            "Document folder upload could not be completed.\n\n" + rootMessage(cause == null ? exception : cause)
+            running = true;
+            completed = false;
+            bulkDocumentActionRunning = true;
+            setBulkDocumentButtonBusy();
+            setExcelButtonBusy("Uploading...");
+            cards.show(cardPanel, "progress");
+
+            worker = new SwingWorker<>() {
+                @Override
+                protected BulkFolderDocumentImportService.ImportResult doInBackground() throws Exception {
+                    return bulkFolderDocumentImportService.importConfiguredFolderRange(
+                            range.start(),
+                            range.end(),
+                            new BulkFolderDocumentImportService.ProgressListener() {
+                                @Override
+                                public void onProgress(String message, int completedFolders, int totalFolders, int percent) {
+                                    SwingUtilities.invokeLater(() -> showInlineStatus(message));
+                                }
+
+                                @Override
+                                public void onProgressDetail(BulkFolderDocumentImportService.ProgressDetail detail) {
+                                    SwingUtilities.invokeLater(() -> updateProgress(detail));
+                                }
+                            },
+                            BulkUploadRangeDialog.this
                     );
                 }
-            }
-        };
-        timeoutGuard[0] = startServiceTimeout(
-                worker,
-                loader,
-                "Bulk upload timeout",
-                "Document folder upload ran for more than " + longServiceTimeoutLabel() + " and was stopped.\nTry fewer folders, check file sizes, and start again.",
-                () -> {
+
+                @Override
+                protected void done() {
+                    completed = true;
+                    running = false;
                     bulkDocumentActionRunning = false;
                     setBulkDocumentButtonReady();
                     setExcelButtonReady();
+                    pauseButton.setEnabled(false);
+                    stopButton.setEnabled(false);
+                    try {
+                        BulkFolderDocumentImportService.ImportResult result = get();
+                        dialog.dispose();
+                        showBulkDocumentImportResult(result);
+                        if (result.uploadedCount() > 0) {
+                            reloadHomeData();
+                        }
+                    } catch (InterruptedException exception) {
+                        Thread.currentThread().interrupt();
+                        showInlineStatus("Bulk upload was interrupted.");
+                    } catch (CancellationException exception) {
+                        showInlineStatus("Bulk upload was cancelled.");
+                    } catch (ExecutionException exception) {
+                        Throwable cause = exception.getCause();
+                        showInlineStatus("Bulk upload failed: " + rootMessage(cause == null ? exception : cause));
+                    }
                 }
-        );
-        worker.execute();
+            };
+            worker.execute();
+        }
+
+        private Range validatedRange() {
+            String startText = startCodeField.getText().trim();
+            String endText = endCodeField.getText().trim();
+            if (startText.isEmpty() || endText.isEmpty()) {
+                showValidation("Start Code and End Code are required.");
+                return null;
+            }
+            long start;
+            long end;
+            try {
+                start = Long.parseLong(startText);
+                end = Long.parseLong(endText);
+            } catch (NumberFormatException exception) {
+                showValidation("Employee codes must be numbers only.");
+                return null;
+            }
+            if (start <= 0 || end <= 0) {
+                showValidation("Employee codes must be greater than zero.");
+                return null;
+            }
+            if (start > end) {
+                showValidation("Start Code cannot be greater than End Code.");
+                return null;
+            }
+            if (end - start > 10_000) {
+                showValidation("Range is too large. Choose 10,000 employee codes or fewer.");
+                return null;
+            }
+            validationLabel.setText(" ");
+            return new Range(start, end);
+        }
+
+        private void showValidation(String message) {
+            validationLabel.setText(UniversalDialogHelper.htmlWrap(message));
+        }
+
+        private void updateProgress(BulkFolderDocumentImportService.ProgressDetail detail) {
+            progressBar.setValue(detail.percent());
+            progressBar.setString(detail.percent() + "%");
+            employeeLabel.setText("Employee Code: " + blankDash(detail.employeeCode()));
+            documentLabel.setText("Document: " + blankDash(detail.documentName()));
+            countLabel.setText("Uploaded " + detail.uploadedCount()
+                    + " | Skipped " + detail.skippedCount()
+                    + " | Failed " + detail.failedCount()
+                    + " | Duplicate " + detail.duplicateCount()
+                    + " | Discarded " + detail.discardedCount());
+            statusLabel.setText(UniversalDialogHelper.htmlWrap(detail.status()));
+        }
+
+        private void togglePause() {
+            if (!running || completed || stopRequested) {
+                return;
+            }
+            synchronized (pauseLock) {
+                if (paused) {
+                    paused = false;
+                    pauseRequested = false;
+                    pauseButton.setText("Pause");
+                    showInlineStatus("Resuming upload...");
+                    pauseLock.notifyAll();
+                } else {
+                    pauseRequested = true;
+                    pauseButton.setEnabled(false);
+                    showInlineStatus("Pausing after current employee completes...");
+                }
+            }
+        }
+
+        private void requestStop() {
+            if (!running || completed || stopRequested) {
+                return;
+            }
+            stopRequested = true;
+            stopButton.setEnabled(false);
+            pauseButton.setEnabled(false);
+            synchronized (pauseLock) {
+                paused = false;
+                pauseRequested = false;
+                pauseLock.notifyAll();
+            }
+            showInlineStatus("Stopping after current employee completes...");
+        }
+
+        private void requestClose() {
+            if (!running || completed) {
+                dialog.dispose();
+                return;
+            }
+            requestStop();
+            showInlineStatus("Closing after current employee completes...");
+        }
+
+        private void showInlineStatus(String message) {
+            statusLabel.setText(UniversalDialogHelper.htmlWrap(message));
+        }
+
+        @Override
+        public boolean stopRequested() {
+            return stopRequested;
+        }
+
+        @Override
+        public void waitIfPaused() throws InterruptedException {
+            synchronized (pauseLock) {
+                if (pauseRequested && !stopRequested) {
+                    paused = true;
+                    pauseRequested = false;
+                    SwingUtilities.invokeLater(() -> {
+                        pauseButton.setEnabled(true);
+                        pauseButton.setText("Resume");
+                        showInlineStatus("Paused. Choose Resume to continue.");
+                    });
+                }
+                while (paused && !stopRequested) {
+                    pauseLock.wait();
+                }
+            }
+        }
+
+        private String blankDash(String value) {
+            return value == null || value.isBlank() ? "-" : value;
+        }
+
+        private record Range(long start, long end) {
+        }
     }
 
     private void showBulkDocumentImportResult(BulkFolderDocumentImportService.ImportResult result) {
@@ -557,13 +877,14 @@ public class HomeView extends JFrame {
         } else if (result.skippedCount() == 0) {
             status = "All matched documents were uploaded successfully.";
         } else {
-            status = "Upload finished with items to review.";
+            status = "Upload finished. Some files were skipped, failed, or discarded for review.";
         }
         return status
                 + "\nUploaded: " + result.uploadedCount() + " document" + plural(result.uploadedCount())
                 + "\nNeeds review: " + result.skippedCount() + " item" + plural(result.skippedCount())
                 + "\nSource folder: " + displayPath(result.sourceDirectory())
                 + "\nCompression: " + (result.compressionEnabled() ? "On" : "Off")
+                + "\nOnly correctly labeled files are uploaded. Incorrect labels are discarded and listed below."
                 + "\nOnly files directly inside each Employee-Code folder were checked. Nested folders were ignored.";
     }
 
@@ -610,21 +931,11 @@ public class HomeView extends JFrame {
         for (BulkFolderDocumentImportService.EmployeeUploadSummary employee : employees) {
             card.add(Box.createVerticalStrut(10));
             card.add(folderLink("Employee-Code: " + employee.displayName(), employee.folder()));
-            addSummaryParagraph(card, "Uploaded images", detailTexts(employee.uploadedDetails()), background);
-            addSummaryParagraph(
-                    card,
-                    "Skipped images",
-                    detailTexts(employee.skippedDetails()),
-                    background
-            );
-            addSummaryParagraph(
-                    card,
-                    "No matching document label",
-                    employee.noMatchFiles(),
-                    background
-            );
+            addGroupedDetailSections(card, detailGroupsByStatus(employee.uploadedDetails()), background);
+            addGroupedDetailSections(card, detailGroupsByStatus(employee.skippedDetails()), background);
+            addGroupedIssue(card, "Discarded - incorrect document label", employee.noMatchFiles(), background);
             for (Map.Entry<String, java.util.List<String>> failure : employee.failedByReason().entrySet()) {
-                addSummaryParagraph(card, failure.getKey(), failure.getValue(), background);
+                addGroupedIssue(card, failure.getKey(), failure.getValue(), background);
             }
         }
         return card;
@@ -635,6 +946,34 @@ public class HomeView extends JFrame {
             return;
         }
         card.add(wrappedText(label + ": " + String.join(", ", values), background));
+    }
+
+    private void addGroupedDetailSections(
+            JPanel card,
+            Map<String, java.util.List<String>> groups,
+            Color background
+    ) {
+        if (groups == null || groups.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, java.util.List<String>> group : groups.entrySet()) {
+            addGroupedIssue(card, group.getKey(), group.getValue(), background);
+        }
+    }
+
+    private void addGroupedIssue(JPanel card, String title, java.util.List<String> values, Color background) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+        StringBuilder text = new StringBuilder(title == null || title.isBlank() ? "Review needed" : title.trim());
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            text.append("\n- ").append(value.trim());
+        }
+        card.add(wrappedText(text.toString(), background));
+        card.add(Box.createVerticalStrut(6));
     }
 
     private JPanel folderErrorsCard(java.util.List<BulkFolderDocumentImportService.FolderError> errors) {
@@ -658,6 +997,34 @@ public class HomeView extends JFrame {
             values.add(detail.displayText());
         }
         return values;
+    }
+
+    private Map<String, java.util.List<String>> detailGroupsByStatus(
+            java.util.List<BulkFolderDocumentImportService.DocumentUploadDetail> details
+    ) {
+        Map<String, java.util.List<String>> groups = new LinkedHashMap<>();
+        if (details == null) {
+            return groups;
+        }
+        for (BulkFolderDocumentImportService.DocumentUploadDetail detail : details) {
+            String status = detail.status() == null || detail.status().isBlank()
+                    ? "Document updated"
+                    : detail.status();
+            groups.computeIfAbsent(status, key -> new java.util.ArrayList<>()).add(detailFileText(detail));
+        }
+        return groups;
+    }
+
+    private String detailFileText(BulkFolderDocumentImportService.DocumentUploadDetail detail) {
+        String label = detail.label() == null ? "" : detail.label().trim();
+        String fileName = detail.fileName() == null ? "" : detail.fileName().trim();
+        if (label.isBlank()) {
+            return fileName.isBlank() ? "-" : fileName;
+        }
+        if (fileName.isBlank()) {
+            return label;
+        }
+        return label + " (" + fileName + ")";
     }
 
     private String displayPath(File file) {

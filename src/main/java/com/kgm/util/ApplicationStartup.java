@@ -20,7 +20,7 @@ import java.util.concurrent.TimeoutException;
 public final class ApplicationStartup {
     private static final int STARTUP_NOTICE_DELAY_MS = 850;
     private static final int AUTO_RETRY_DELAY_MS = 4_000;
-    private static final int STORAGE_CHECK_TIMEOUT_SECONDS = 8;
+    private static final int STORAGE_CHECK_TIMEOUT_SECONDS = 3;
     private static final int LONG_WAIT_NOTICE_DELAY_MS = 8_000;
     private static final Object LOCK = new Object();
     private static final List<ReadyWaiter> readyWaiters = new ArrayList<>();
