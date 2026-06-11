@@ -326,12 +326,16 @@ public final class EmployeeDocumentUtil {
     }
 
     public static PreparedUploadFile prepareImageForUpload(File file) {
+        return prepareImageForUpload(file, true);
+    }
+
+    public static PreparedUploadFile prepareImageForUpload(File file, boolean compressWhenNeeded) {
         String validationMessage = validateUploadImageType(file);
         if (validationMessage != null) {
             return PreparedUploadFile.rejected(file, validationMessage);
         }
         long maxBytes = maxUploadSizeBytes();
-        if (file.length() <= maxBytes) {
+        if (file.length() <= maxBytes || !compressWhenNeeded) {
             try {
                 if (!isReadableJpegFile(file)) {
                     return PreparedUploadFile.rejected(file, "Please select a valid JPG or JPEG image.");

@@ -1,8 +1,10 @@
 package com.kgm.service;
 
+import com.kgm.config.AppConfig;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.model.Employee;
 import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.EmployeeStorageUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,7 +23,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class BulkFolderDocumentImportService {
-    public static final int MAX_FOLDERS = 50;
     private static final Pattern DIGIT_SEQUENCE = Pattern.compile("\\d{1,18}");
     private static final Pattern LABELED_DIGIT_SEQUENCE = Pattern.compile(
             "(?i)(?:employee|emp|id|code)\\D{0,12}(\\d{1,18})"
@@ -35,21 +36,35 @@ public class BulkFolderDocumentImportService {
 
     public ImportResult importFolders(File[] selectedFolders, ProgressListener progressListener) throws IOException {
         List<File> folders = validFolders(selectedFolders);
-        if (folders.size() > MAX_FOLDERS) {
-            throw new IllegalArgumentException("Maximum " + MAX_FOLDERS + " employee folders can be uploaded at once.");
-        }
+        boolean compressionEnabled = AppConfig.bulkImportCompressionEnabled();
+        ImportSummary summary = new ImportSummary(null, compressionEnabled);
+        return importFolders(folders, summary, compressionEnabled, progressListener);
+    }
 
-        ImportSummary summary = new ImportSummary();
+    public ImportResult importConfiguredFolder(ProgressListener progressListener) throws IOException {
+        Path sourceRoot = AppConfig.bulkImportFolderDirectory();
+        boolean compressionEnabled = AppConfig.bulkImportCompressionEnabled();
+        ImportSummary summary = new ImportSummary(sourceRoot.toFile(), compressionEnabled);
+        List<File> folders = configuredEmployeeFolders(sourceRoot, summary);
+        return importFolders(folders, summary, compressionEnabled, progressListener);
+    }
+
+    private ImportResult importFolders(
+            List<File> folders,
+            ImportSummary summary,
+            boolean compressionEnabled,
+            ProgressListener progressListener
+    ) throws IOException {
         int total = folders.size();
-        report(progressListener, "Preparing folder upload...", 0, total);
+        report(progressListener, "Preparing bulk import from configured employee folders...", 0, total);
 
         try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
             Set<String> processedEmployeeFolders = new HashSet<>();
             for (int index = 0; index < folders.size(); index++) {
                 File folder = folders.get(index);
-                reportFolderStep(progressListener, "Scanning " + folder.getName() + "...", index, total, 0, 4);
-                processFolder(folder, dao, summary, progressListener, index, total, processedEmployeeFolders);
-                reportFolderStep(progressListener, "Processed " + folder.getName() + ".", index, total, 4, 4);
+                reportFolderStep(progressListener, "Scanning Employee-Code " + folder.getName() + "...", index, total, 0, 4);
+                processFolder(folder, dao, summary, progressListener, index, total, processedEmployeeFolders, compressionEnabled);
+                reportFolderStep(progressListener, "Processed Employee-Code " + folder.getName() + ".", index, total, 4, 4);
             }
         }
 
@@ -64,29 +79,31 @@ public class BulkFolderDocumentImportService {
             ProgressListener progressListener,
             int folderIndex,
             int totalFolders,
-            Set<String> processedEmployeeFolders
+            Set<String> processedEmployeeFolders,
+            boolean compressionEnabled
     ) {
         String folderKey = folder.getName() == null ? "" : folder.getName().trim();
         if (folderKey.isEmpty()) {
-            summary.error(folder, "No employee record matched this folder name.");
+            summary.error(folder, "Folder name is blank. Rename it to an Employee-Code.");
             return;
         }
 
-        reportFolderStep(progressListener, "Finding employee for folder " + folderKey + "...", folderIndex, totalFolders, 1, 4);
+        reportFolderStep(progressListener, "Finding Employee-Code " + folderKey + " in database...", folderIndex, totalFolders, 1, 4);
         EmployeeFolder employeeFolder = findEmployeeFolder(folder, dao);
         if (employeeFolder == null) {
-            summary.error(folder, "No employee record matched this folder name.");
+            summary.error(folder, "Missing Employee-Code in database: " + folderKey);
             return;
         }
         folder = employeeFolder.folder();
-        if (!processedEmployeeFolders.add(folder.getAbsolutePath())) {
-            return;
-        }
         folderKey = folder.getName() == null ? "" : folder.getName().trim();
         Employee employee = employeeFolder.employee();
         String employeeCode = employee.getEMPLOYEE_CODE();
         if (employeeCode == null || employeeCode.isBlank()) {
             summary.error(folder, "Employee record has no employee code.");
+            return;
+        }
+        if (!processedEmployeeFolders.add(employeeCode)) {
+            summary.error(folder, "Employee-Code was already processed in this import: " + employeeCode);
             return;
         }
         summary.employee(employeeCode, employee.getEMP_NAME(), folder);
@@ -107,7 +124,7 @@ public class BulkFolderDocumentImportService {
             File file = files.get(fileIndex);
             reportFileStep(
                     progressListener,
-                    "Checking " + employeeCode + " / " + file.getName() + "...",
+                    "Checking Employee-Code " + employeeCode + " / " + file.getName() + "...",
                     folderIndex,
                     totalFolders,
                     fileIndex,
@@ -131,24 +148,46 @@ public class BulkFolderDocumentImportService {
             int documentIndex = match.documentIndex();
             String documentLabel = EmployeeDocumentUtil.cleanDocumentLabel(documentIndex);
             if (EmployeeDocumentUtil.hasStoredPath(EmployeeDocumentUtil.documentPath(employee, documentIndex))) {
-                summary.alreadyExists(employeeCode, documentLabel);
+                summary.skippedDocument(employeeCode, documentLabel, file.getName(), "Already saved in database; left unchanged");
+                continue;
+            }
+            Path storageTarget = storageTargetPath(employeeCode, documentIndex);
+            if (Files.isRegularFile(storageTarget)) {
+                if (isSameFile(file.toPath(), storageTarget)) {
+                    EmployeeDocumentUtil.setDocumentPath(update, documentIndex, storageLogicalPath(employeeCode, documentIndex));
+                    matchedThisFolder.add(documentIndex);
+                    uploadedForEmployee++;
+                    summary.uploadedDocument(
+                            employeeCode,
+                            documentLabel,
+                            file.getName(),
+                            "Already in employee storage; database path saved without copying"
+                    );
+                    continue;
+                }
+                summary.skippedDocument(
+                        employeeCode,
+                        documentLabel,
+                        file.getName(),
+                        "File already exists in employee storage; left unchanged"
+                );
                 continue;
             }
             if (matchedThisFolder.contains(documentIndex)) {
                 summary.failed(employeeCode, "Duplicate document label in folder", documentLabel);
                 continue;
             }
-            if (EmployeeDocumentUtil.shouldCompressBeforeUpload(file)) {
+            if (compressionEnabled && EmployeeDocumentUtil.shouldCompressBeforeUpload(file)) {
                 reportFileStep(
                         progressListener,
-                        "Compressing " + employeeCode + " / " + documentLabel + "...",
+                        "Compressing Employee-Code " + employeeCode + " / " + documentLabel + "...",
                         folderIndex,
                         totalFolders,
                         fileIndex,
                         files.size()
                 );
             }
-            EmployeeDocumentUtil.PreparedUploadFile prepared = EmployeeDocumentUtil.prepareImageForUpload(file);
+            EmployeeDocumentUtil.PreparedUploadFile prepared = EmployeeDocumentUtil.prepareImageForUpload(file, compressionEnabled);
             if (!prepared.ready()) {
                 summary.failed(employeeCode, failureReason(prepared.message()), file.getName());
                 continue;
@@ -157,7 +196,7 @@ public class BulkFolderDocumentImportService {
             try {
                 reportFileStep(
                         progressListener,
-                        "Uploading " + employeeCode + " / " + documentLabel + "...",
+                        "Uploading Employee-Code " + employeeCode + " / " + documentLabel + "...",
                         folderIndex,
                         totalFolders,
                         fileIndex,
@@ -167,7 +206,7 @@ public class BulkFolderDocumentImportService {
                 EmployeeDocumentUtil.setDocumentPath(update, documentIndex, dbPath);
                 matchedThisFolder.add(documentIndex);
                 uploadedForEmployee++;
-                summary.uploadedDocument(employeeCode, documentLabel);
+                summary.uploadedDocument(employeeCode, documentLabel, file.getName(), uploadStatus(file, prepared, compressionEnabled));
             } catch (IOException exception) {
                 summary.failed(employeeCode, failureReason("Upload failed: " + exception.getMessage()), file.getName());
             } finally {
@@ -215,22 +254,53 @@ public class BulkFolderDocumentImportService {
     }
 
     private EmployeeFolder findEmployeeFolder(File folder, EmployeeRecordDao dao) {
-        File candidate = folder;
-        Set<String> attemptedLookupNames = new HashSet<>();
-        for (int depth = 0; candidate != null && depth < 5; depth++) {
-            String name = candidate.getName() == null ? "" : candidate.getName().trim();
-            for (String lookupName : employeeFolderLookupNames(name)) {
-                if (!attemptedLookupNames.add(lookupName)) {
-                    continue;
-                }
-                Employee employee = dao.getEmployeeDocumentsByCodeOrId(lookupName);
-                if (employee != null) {
-                    return new EmployeeFolder(candidate, employee);
-                }
-            }
-            candidate = candidate.getParentFile();
+        String name = folder == null || folder.getName() == null ? "" : folder.getName().trim();
+        if (name.isBlank()) {
+            return null;
+        }
+        Employee employee = dao.getEmployeeDocumentsByCode(name);
+        if (employee != null) {
+            return new EmployeeFolder(folder, employee);
         }
         return null;
+    }
+
+    private Path storageTargetPath(String employeeCode, int documentIndex) {
+        String storageName = EmployeeDocumentUtil.documentType(documentIndex).storageName();
+        return EmployeeStorageUtil.employeeDirectory(employeeCode).resolve(storageName).normalize();
+    }
+
+    private String storageLogicalPath(String employeeCode, int documentIndex) {
+        String storageName = EmployeeDocumentUtil.documentType(documentIndex).storageName();
+        if (EmployeeDocumentUtil.isProfileImageDocument(documentIndex)) {
+            return EmployeeStorageUtil.profileImagePath(employeeCode);
+        }
+        return EmployeeStorageUtil.documentPath(employeeCode, storageName);
+    }
+
+    private boolean isSameFile(Path first, Path second) {
+        try {
+            return Files.isSameFile(first, second);
+        } catch (IOException exception) {
+            return first.toAbsolutePath().normalize().equals(second.toAbsolutePath().normalize());
+        }
+    }
+
+    private String uploadStatus(
+            File source,
+            EmployeeDocumentUtil.PreparedUploadFile prepared,
+            boolean compressionEnabled
+    ) {
+        String originalSize = EmployeeDocumentUtil.formatSize(source.length());
+        if (!compressionEnabled) {
+            return "Compression off; uploaded original file (" + originalSize + ")";
+        }
+        if (prepared.compressed()) {
+            return prepared.message() == null || prepared.message().isBlank()
+                    ? "Compressed before upload"
+                    : prepared.message();
+        }
+        return "No compression needed (" + originalSize + ")";
     }
 
     static List<String> employeeFolderLookupNames(String folderName) {
@@ -311,6 +381,38 @@ public class BulkFolderDocumentImportService {
         return new ArrayList<>(folders.values());
     }
 
+    private List<File> configuredEmployeeFolders(Path sourceRoot, ImportSummary summary) {
+        if (sourceRoot == null) {
+            summary.error(null, "KGM_EMPLOYEE_STORAGE_DIR is not configured.");
+            return List.of();
+        }
+        if (!Files.isDirectory(sourceRoot)) {
+            summary.error(sourceRoot.toFile(), "Bulk import source folder was not found: " + sourceRoot);
+            return List.of();
+        }
+        try (var stream = Files.list(sourceRoot)) {
+            List<Path> entries = stream
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+            List<File> folders = new ArrayList<>();
+            for (Path entry : entries) {
+                if (Files.isDirectory(entry)) {
+                    folders.add(entry.toFile());
+                } else {
+                    summary.error(entry.toFile(),
+                            "Invalid item in bulk import folder. Only direct Employee-Code folders are processed.");
+                }
+            }
+            if (folders.isEmpty()) {
+                summary.error(sourceRoot.toFile(), "No employee folders found directly inside configured bulk import folder.");
+            }
+            return folders;
+        } catch (IOException exception) {
+            summary.error(sourceRoot.toFile(), "Bulk import source folder could not be read: " + exception.getMessage());
+            return List.of();
+        }
+    }
+
     private File selectedFolder(File selected) {
         if (selected == null) {
             return null;
@@ -376,6 +478,8 @@ public class BulkFolderDocumentImportService {
     }
 
     public record ImportResult(
+            File sourceDirectory,
+            boolean compressionEnabled,
             List<UploadedEmployee> uploadedEmployees,
             List<FolderError> folderErrors,
             List<EmployeeUploadSummary> employeeSummaries
@@ -403,6 +507,19 @@ public class BulkFolderDocumentImportService {
     public record UploadedEmployee(String employeeCode, List<String> labels) {
     }
 
+    public record DocumentUploadDetail(String label, String fileName, String status) {
+        public String displayText() {
+            StringBuilder text = new StringBuilder(label == null || label.isBlank() ? fileName : label);
+            if (fileName != null && !fileName.isBlank()) {
+                text.append(" (").append(fileName).append(")");
+            }
+            if (status != null && !status.isBlank()) {
+                text.append(" - ").append(status);
+            }
+            return text.toString();
+        }
+    }
+
     public record FolderError(String folderName, File folder, List<String> messages) {
     }
 
@@ -411,7 +528,9 @@ public class BulkFolderDocumentImportService {
             String employeeName,
             File folder,
             List<String> uploadedLabels,
+            List<DocumentUploadDetail> uploadedDetails,
             List<String> alreadyExistingLabels,
+            List<DocumentUploadDetail> skippedDetails,
             List<String> noMatchFiles,
             Map<String, List<String>> failedByReason
     ) {
@@ -423,7 +542,7 @@ public class BulkFolderDocumentImportService {
         }
 
         public int skippedCount() {
-            int count = alreadyExistingLabels.size() + noMatchFiles.size();
+            int count = skippedDetails.size() + noMatchFiles.size();
             for (List<String> items : failedByReason.values()) {
                 count += items.size();
             }
@@ -442,19 +561,30 @@ public class BulkFolderDocumentImportService {
     }
 
     private static final class ImportSummary {
+        private final File sourceDirectory;
+        private final boolean compressionEnabled;
         private final Map<String, EmployeeSummaryBuilder> employeesByCode = new LinkedHashMap<>();
         private final Map<String, FolderErrorBuilder> errorsByFolder = new LinkedHashMap<>();
+
+        private ImportSummary(File sourceDirectory, boolean compressionEnabled) {
+            this.sourceDirectory = sourceDirectory;
+            this.compressionEnabled = compressionEnabled;
+        }
 
         private void employee(String employeeCode, String employeeName, File folder) {
             employee(employeeCode).update(employeeName, folder);
         }
 
-        private void uploadedDocument(String employeeCode, String label) {
-            employee(employeeCode).uploaded(label);
+        private void uploadedDocument(String employeeCode, String label, String fileName, String status) {
+            employee(employeeCode).uploaded(label, fileName, status);
         }
 
         private void alreadyExists(String employeeCode, String label) {
-            employee(employeeCode).alreadyExists(label);
+            employee(employeeCode).alreadyExists(label, "", "Already saved; left unchanged");
+        }
+
+        private void skippedDocument(String employeeCode, String label, String fileName, String status) {
+            employee(employeeCode).alreadyExists(label, fileName, status);
         }
 
         private void noMatch(String employeeCode, String fileName) {
@@ -494,6 +624,8 @@ public class BulkFolderDocumentImportService {
                 folderErrors.add(new FolderError(builder.folderName, builder.folder, List.copyOf(builder.messages)));
             }
             return new ImportResult(
+                    sourceDirectory,
+                    compressionEnabled,
                     List.copyOf(uploadedEmployees),
                     List.copyOf(folderErrors),
                     List.copyOf(employeeSummaries)
@@ -516,7 +648,9 @@ public class BulkFolderDocumentImportService {
             private String employeeName;
             private File folder;
             private final List<String> uploadedLabels = new ArrayList<>();
+            private final List<DocumentUploadDetail> uploadedDetails = new ArrayList<>();
             private final List<String> alreadyExistingLabels = new ArrayList<>();
+            private final List<DocumentUploadDetail> skippedDetails = new ArrayList<>();
             private final List<String> noMatchFiles = new ArrayList<>();
             private final Map<String, List<String>> failedByReason = new LinkedHashMap<>();
 
@@ -533,12 +667,14 @@ public class BulkFolderDocumentImportService {
                 }
             }
 
-            private void uploaded(String label) {
+            private void uploaded(String label, String fileName, String status) {
                 addUnique(uploadedLabels, label);
+                uploadedDetails.add(new DocumentUploadDetail(label, fileName, status));
             }
 
-            private void alreadyExists(String label) {
+            private void alreadyExists(String label, String fileName, String status) {
                 addUnique(alreadyExistingLabels, label);
+                skippedDetails.add(new DocumentUploadDetail(label, fileName, status));
             }
 
             private void noMatch(String fileName) {
@@ -572,7 +708,9 @@ public class BulkFolderDocumentImportService {
                         employeeName,
                         folder,
                         List.copyOf(uploadedLabels),
+                        List.copyOf(uploadedDetails),
                         List.copyOf(alreadyExistingLabels),
+                        List.copyOf(skippedDetails),
                         List.copyOf(noMatchFiles),
                         Collections.unmodifiableMap(copiedFailures)
                 );

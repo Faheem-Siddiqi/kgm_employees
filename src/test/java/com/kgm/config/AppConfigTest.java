@@ -18,6 +18,7 @@ class AppConfigTest {
     private static final String DOT_ENV_FILE_PROPERTY = "kgm.env.file";
     private static final String EMPLOYEE_STORAGE_PROPERTY = "kgm.employee.storage.dir";
     private static final String EMPLOYEE_STORAGE_ON_SERVER_PROPERTY = "kgm.employee.storage.on.server";
+    private static final String BULK_IMPORT_COMPRESSION_PROPERTY = "kgm.bulk.import.compression";
     private static final long DEFAULT_UPLOAD_LIMIT = 400L * 1024L;
     private final String originalUserDir = System.getProperty("user.dir");
     private final String originalJavaHome = System.getProperty("java.home");
@@ -32,6 +33,7 @@ class AppConfigTest {
         System.clearProperty(DOT_ENV_FILE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY);
+        System.clearProperty(BULK_IMPORT_COMPRESSION_PROPERTY);
         System.setProperty("user.dir", originalUserDir);
         System.setProperty("java.home", originalJavaHome);
     }
@@ -57,6 +59,38 @@ class AppConfigTest {
 
         System.setProperty(DOCUMENT_UPLOAD_PROPERTY, "not-a-number");
         assertEquals(DEFAULT_UPLOAD_LIMIT, AppConfig.documentUploadMaxBytes());
+    }
+
+    @Test
+    void documentUploadMaxBytesSupportsUnprefixedEnvAliasFromDotEnv() throws IOException {
+        Path projectDir = tempDir.resolve("upload-alias-env");
+        Path env = projectDir.resolve(".env");
+        Files.createDirectories(projectDir);
+        Files.writeString(env, "DOCUMENT_UPLOAD_MAX_BYTES=600000\n");
+        System.setProperty(DOT_ENV_FILE_PROPERTY, env.toString());
+
+        assertEquals(600_000L, AppConfig.documentUploadMaxBytes());
+    }
+
+    @Test
+    void bulkImportFolderDirectoryUsesEmployeeStoragePath() {
+        System.setProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY, "false");
+        System.setProperty(EMPLOYEE_STORAGE_PROPERTY, "custom-employee-data");
+
+        Path expected = Path.of(System.getProperty("user.dir"), "custom-employee-data")
+                .toAbsolutePath()
+                .normalize();
+
+        assertEquals(expected, AppConfig.bulkImportFolderDirectory());
+    }
+
+    @Test
+    void bulkImportCompressionParsesBooleanSwitch() {
+        System.setProperty(BULK_IMPORT_COMPRESSION_PROPERTY, "false");
+        assertFalse(AppConfig.bulkImportCompressionEnabled());
+
+        System.setProperty(BULK_IMPORT_COMPRESSION_PROPERTY, "true");
+        assertTrue(AppConfig.bulkImportCompressionEnabled());
     }
 
     @Test

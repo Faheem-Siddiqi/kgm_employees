@@ -621,7 +621,8 @@ public class DatabaseSetupView extends JFrame {
 
                 KGM_EMPLOYEE_STORAGE_ON_SERVER=false
                 KGM_EMPLOYEE_STORAGE_DIR=resources/employees
-                KGM_DOCUMENT_UPLOAD_MAX_BYTES=409600
+                KGM_DOCUMENT_UPLOAD_MAX_BYTES=600000
+                BULK_IMPORT_COMPRESSION=true
                 KGM_LONG_SERVICE_TIMEOUT_MINUTES=15
                 """;
     }

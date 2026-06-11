@@ -18,6 +18,8 @@ public final class AppConfig {
     private static final String EMPLOYEE_STORAGE_DIR_PROPERTY = "kgm.employee.storage.dir";
     private static final String EMPLOYEE_STORAGE_DIR_ENV = "KGM_EMPLOYEE_STORAGE_DIR";
     private static final String EMPLOYEE_STORAGE_ON_SERVER_ENV = "KGM_EMPLOYEE_STORAGE_ON_SERVER";
+    private static final String BULK_IMPORT_COMPRESSION_PROPERTY = "kgm.bulk.import.compression";
+    private static final String BULK_IMPORT_COMPRESSION_ENV = "BULK_IMPORT_COMPRESSION";
     private static final long DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES = 400L * 1024L;
     private static final int DEFAULT_LONG_SERVICE_TIMEOUT_MINUTES = 15;
     private static final Pattern WINDOWS_ENV_TOKEN = Pattern.compile("%([A-Za-z0-9_]+)%");
@@ -96,10 +98,30 @@ public final class AppConfig {
     }
 
     public static long documentUploadMaxBytes() {
-        return positiveLongSetting(
+        String configured = setting(
                 "kgm.document.upload.max.bytes",
                 "KGM_DOCUMENT_UPLOAD_MAX_BYTES",
-                DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES
+                ""
+        );
+        if (configured == null || configured.isBlank()) {
+            configured = setting(
+                    "kgm.document.upload.max.bytes",
+                    "DOCUMENT_UPLOAD_MAX_BYTES",
+                    Long.toString(DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES)
+            );
+        }
+        return positiveLong(configured, DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES);
+    }
+
+    public static Path bulkImportFolderDirectory() {
+        return employeeStorageDirectory();
+    }
+
+    public static boolean bulkImportCompressionEnabled() {
+        return booleanSetting(
+                BULK_IMPORT_COMPRESSION_PROPERTY,
+                BULK_IMPORT_COMPRESSION_ENV,
+                true
         );
     }
 
@@ -255,6 +277,10 @@ public final class AppConfig {
 
     private static long positiveLongSetting(String propertyName, String envName, long defaultValue) {
         String configured = setting(propertyName, envName, Long.toString(defaultValue));
+        return positiveLong(configured, defaultValue);
+    }
+
+    private static long positiveLong(String configured, long defaultValue) {
         try {
             long parsed = Long.parseLong(normalizeNumber(configured));
             return parsed > 0 ? parsed : defaultValue;

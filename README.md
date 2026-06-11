@@ -241,6 +241,8 @@ The project follows a layered desktop-application architecture:
    -> configured employee storage root, saved in DB as employees/{employeeCode}/{file} paths
    EmployeeDocumentViewPanel -> searchable saved documents, locked-document checks, single or Upload All upload for missing documents
    -> missing documents uploaded through detail update
+   Home bulk upload -> reads KGM_EMPLOYEE_STORAGE_DIR -> scans direct Employee-Code child folders only
+   -> exact folder-name-to-EMPLOYEE_CODE match -> skips already saved DB/storage images -> grouped responsive result dialog
 
 8. Download Employee Report Package
    EmployeeDetailView selection dialog -> EmployeeReportService -> EmployeeRecordDao.getFullEmployeeByCode
@@ -442,14 +444,16 @@ Additional styling colors used in the document upload interface:
 - If a document field is empty or a placeholder, the detail screen allows upload. The file is copied under the active employee storage root and the logical database path is saved as `employees/{employeeCode}/{file}` on Update.
 - Profile image follows the same safety rule: it can be uploaded only when `EMP_IMG` is empty or a placeholder.
 - Registration and detail document upload both support `Upload All` for multiple files. Each selected file must be a real JPG/JPEG image and must match a document label, Employee field name, storage filename, or supported alias from the bundled `src/main/resources/resources/Labels.txt` after normalizing spaces, underscores, punctuation, and case.
-- Document/photo upload size is controlled by `AppConfig.documentUploadMaxBytes()`, which reads `kgm.document.upload.max.bytes`, then `KGM_DOCUMENT_UPLOAD_MAX_BYTES`, then `.env`, then defaults to `409600` bytes (400 KB). Commas and underscores are accepted in the value, for example `614,400` or `1_024_000`.
+- Document/photo upload size is controlled by `AppConfig.documentUploadMaxBytes()`, which reads `kgm.document.upload.max.bytes`, then `KGM_DOCUMENT_UPLOAD_MAX_BYTES`, then the compatible `.env` alias `DOCUMENT_UPLOAD_MAX_BYTES`, then defaults to `409600` bytes (400 KB). Commas and underscores are accepted in the value, for example `614,400` or `1_024_000`.
 - If a selected JPG/JPEG is above the configured upload limit, the app dynamically searches for the best JPEG quality that fits before saving. It does not resize, crop, rotate, or scale the image, and it verifies that the compressed width and height match the original image.
-- Compression applies to employee photo uploads, Add Employee document uploads, View Employee Details document uploads, `Upload All`, single upload/replace for missing documents, and the Home dashboard bulk folder document upload. Excel import/export is not part of this flow.
-- Bulk upload saves time by rejecting unsupported file types, unmatched names, locked DB documents, and duplicate matches before compression work starts. Compressed temp files are cleaned after home bulk copies and when pending panel uploads are replaced or cleared.
+- Compression applies to employee photo uploads, Add Employee document uploads, View Employee Details document uploads, `Upload All`, and single upload/replace for missing documents. Home dashboard bulk folder upload follows `BULK_IMPORT_COMPRESSION`: when `true`, oversized JPG/JPEG files are compressed using `KGM_DOCUMENT_UPLOAD_MAX_BYTES`; when `false`, valid JPG/JPEG files are copied as-is. Excel import/export is not part of this flow.
+- Home dashboard bulk upload reads the configured `KGM_EMPLOYEE_STORAGE_DIR`; users do not select folders manually. Put one direct child folder per `Employee-Code` inside the employee storage folder. The folder name must exactly match `EMPLOYEE_CODE` in the database. Nested folders are ignored.
+- Bulk upload saves time by rejecting unsupported file types, unmatched names, locked/already-saved DB documents, existing storage files with the same saved name, and duplicate matches before compression work starts. Compressed temp files are cleaned after home bulk copies and when pending panel uploads are replaced or cleared.
 - If a JPG/JPEG cannot be compressed under the configured limit without keeping the same dimensions, the file is rejected and the user sees the normal upload warning.
 - Upload matching accepts database-style names such as `SS_CARD` and user-facing names such as `Social Security Card`; files are saved using the configured storage filename for the matching document type.
 - Detail document upload keeps saved DB document records locked. If `Upload All` includes a file matching an already-saved document, the file is skipped and the dialog explains that the document already exists in DB and cannot be replaced.
-- After a bulk upload attempt, the user receives a summary showing how many documents are ready to save and which files were discarded with the reason.
+- After a bulk upload attempt, the user receives a responsive UniversalDialog-style summary grouped by `Employee-Code`, including uploaded images, skipped images, missing employee codes, invalid/unreadable folders, compression status, and errors. Large result content scrolls inside the dialog.
+- Startup opens Login immediately. Employee storage, MySQL, and field/document metadata preparation run in the background while the user types credentials. If checks are still running after login, the loader shows percentage-based phases: LAN/storage reconnect, DB/schema preparation, field/document metadata, and ready.
 - Employee detail downloads first ask what to include: PDF profile, all saved documents, `All Documents (PDF)`, or specific saved document names when `All saved documents` is turned off. Saved records with missing source files are still named in the picker so the user can see their status.
 - `All Documents (PDF)` merges only available saved document images, excludes the employee profile photo, starts each document on a new page, preserves image size, splits tall images across pages when needed, and does not add a header or footer.
 - Employee detail navigation paints an immediate shell before database queries run, then uses the shared `LoadingOverlay` instead of skeleton placeholders. The header loads first, then the Basic, Others, and Documents tabs lazy-load their own field projections only when opened. Dashboard, Download Profile, and Update actions stay fixed outside the tab scroll area.
@@ -517,8 +521,9 @@ Settings can be passed through JVM properties, OS environment variables, or `.en
 | `KGM_ADMIN_PASSWORD` | `kgm.admin.password` | Application admin password |
 | `FIELD_SETTINGS` | `kgm.field.settings.password` | Field Management password for adding, editing, deleting, or changing required field settings |
 | `KGM_EMPLOYEE_STORAGE_ON_SERVER` | `kgm.employee.storage.on.server` | `false` stores employee files in a local folder on this PC/app install; `true` stores employee files in a shared UNC/LAN folder |
-| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | The only employee storage path. Use `resources/employees` or another local path for local mode, or a UNC path like `\\192.168.2.93\employees` for shared-folder mode. If blank or missing in `.env` while local mode is active, startup writes `resources/employees` and uses that app-relative folder |
-| `KGM_DOCUMENT_UPLOAD_MAX_BYTES` | `kgm.document.upload.max.bytes` | Maximum prepared JPG/JPEG document/photo upload size in bytes; files above it use the best JPEG quality that fits |
+| `KGM_EMPLOYEE_STORAGE_DIR` | `kgm.employee.storage.dir` | The only employee storage path. Use `resources/employees` or another local path for local mode, or a UNC path like `\\192.168.2.93\employees` for shared-folder mode. Home dashboard bulk upload scans this same folder. If blank or missing in `.env` while local mode is active, startup writes `resources/employees` and uses that app-relative folder |
+| `BULK_IMPORT_COMPRESSION` | `kgm.bulk.import.compression` | `true` compresses oversized JPG/JPEG files during Home bulk import; `false` uploads valid JPG/JPEG files as-is |
+| `KGM_DOCUMENT_UPLOAD_MAX_BYTES` / `DOCUMENT_UPLOAD_MAX_BYTES` | `kgm.document.upload.max.bytes` | Maximum prepared JPG/JPEG document/photo upload size in bytes; files above it use the best JPEG quality that fits when compression is enabled |
 | `KGM_ENV_FILE` | `kgm.env.file` | Optional absolute path to a specific `.env` file |
 
 Employee documents keep logical database paths such as `employees/EMP001/CNIC_FRONT.jpg`; only the physical storage root changes. Startup, Add Employee, View Employee File, Upload All, bulk folder upload, preview, and report/download flows all resolve through `EmployeeStorageUtil`, so changing the storage mode or path in `.env` moves future reads/writes to the same root without code changes. Existing legacy files under `resources/employees`, root `employees`, and older nested paths such as `employees/EMP001/documents/CNIC_FRONT.jpg` remain readable as fallbacks when a saved DB path points there.
@@ -536,6 +541,35 @@ For a LAN/shared folder, use a UNC path that the Windows user can access:
 KGM_EMPLOYEE_STORAGE_ON_SERVER=true
 KGM_EMPLOYEE_STORAGE_DIR=\\192.168.2.93\employees
 ```
+
+For Home dashboard bulk import, use the same employee storage folder:
+
+```text
+KGM_EMPLOYEE_STORAGE_DIR=resources/employees
+BULK_IMPORT_COMPRESSION=true
+KGM_DOCUMENT_UPLOAD_MAX_BYTES=600000
+```
+
+The same storage folder may also point to a LAN/shared folder:
+
+```text
+KGM_EMPLOYEE_STORAGE_DIR=D:/EmployeeDocuments
+# or
+KGM_EMPLOYEE_STORAGE_DIR=\\192.168.2.93\employees
+```
+
+Expected source-folder layout:
+
+```text
+resources/employees/
+  1/
+    CNIC_FRONT.jpg
+    CNIC_BACK.jpg
+  2/
+    FINAL_SETTLEMENT.jpg
+```
+
+Only folders directly inside `KGM_EMPLOYEE_STORAGE_DIR` are scanned, and each folder name is treated as the exact `Employee-Code`. Files inside nested folders are ignored. If a file is already physically in the employee storage folder but the DB path is missing, bulk import saves the DB path without copying the file again.
 
 ### Startup
 

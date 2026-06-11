@@ -343,68 +343,21 @@ public class HomeView extends JFrame {
             return;
         }
         bulkDocumentActionRunning = true;
-        setBulkDocumentButtonOpening();
-        SwingWorker<File[], Void> pickerWorker = new SwingWorker<>() {
-            @Override
-            protected File[] doInBackground() {
-                return FileUploadCard.chooseDirectories(
-                        HomeView.this,
-                        "Select up to " + BulkFolderDocumentImportService.MAX_FOLDERS + " employee folders"
-                );
-            }
-
-            @Override
-            protected void done() {
-                try {
-                    File[] selectedFolders = get();
-                    if (selectedFolders.length == 0) {
-                        bulkDocumentActionRunning = false;
-                        setBulkDocumentButtonReady();
-                        return;
-                    }
-                    if (selectedFolders.length > BulkFolderDocumentImportService.MAX_FOLDERS) {
-                        bulkDocumentActionRunning = false;
-                        setBulkDocumentButtonReady();
-                        DialogHelper.warning(
-                                HomeView.this,
-                                "Too Many Folders",
-                                "Select up to " + BulkFolderDocumentImportService.MAX_FOLDERS + " employee folders at once."
-                        );
-                        return;
-                    }
-                    importBulkDocumentFolders(selectedFolders);
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    bulkDocumentActionRunning = false;
-                    setBulkDocumentButtonReady();
-                    DialogHelper.error(HomeView.this, "Bulk upload stopped", "Folder selection was interrupted.");
-                } catch (ExecutionException exception) {
-                    bulkDocumentActionRunning = false;
-                    setBulkDocumentButtonReady();
-                    Throwable cause = exception.getCause();
-                    showExcelServiceError(
-                            "Bulk document upload failed",
-                            "The bulk document upload could not be started.",
-                            cause == null ? exception : cause
-                    );
-                }
-            }
-        };
-        pickerWorker.execute();
+        importBulkDocumentFolders();
     }
 
-    private void importBulkDocumentFolders(File[] folders) {
+    private void importBulkDocumentFolders() {
         setBulkDocumentButtonBusy();
         setExcelButtonBusy("Uploading...");
         LoadingOverlay.Handle loader = LoadingOverlay.show(
                 this,
                 "Uploading Documents",
-                "Scanning employee folders..."
+                "Reading KGM_EMPLOYEE_STORAGE_DIR and scanning direct Employee-Code folders..."
         );
         final ServiceTimeoutGuard[] timeoutGuard = new ServiceTimeoutGuard[1];
         SwingWorker<BulkFolderDocumentImportService.ImportResult, Void> worker = new SwingWorker<>() {
             protected BulkFolderDocumentImportService.ImportResult doInBackground() throws Exception {
-                return bulkFolderDocumentImportService.importFolders(folders, (message, completedFolders, totalFolders, percent) ->
+                return bulkFolderDocumentImportService.importConfiguredFolder((message, completedFolders, totalFolders, percent) ->
                         updateExcelLoader(loader, message, percent));
             }
 
@@ -582,7 +535,7 @@ public class HomeView extends JFrame {
             return "Some folders or files need attention. The upload results are grouped below.";
         }
         if (result.uploadedCount() == 0) {
-            return "No matching documents were found in the selected folders.";
+            return "No matching documents were found in the configured bulk import folder.";
         }
         return "Matched documents were saved to the correct employee records.";
     }
@@ -609,7 +562,9 @@ public class HomeView extends JFrame {
         return status
                 + "\nUploaded: " + result.uploadedCount() + " document" + plural(result.uploadedCount())
                 + "\nNeeds review: " + result.skippedCount() + " item" + plural(result.skippedCount())
-                + "\nOnly files directly inside each selected employee folder were checked.";
+                + "\nSource folder: " + displayPath(result.sourceDirectory())
+                + "\nCompression: " + (result.compressionEnabled() ? "On" : "Off")
+                + "\nOnly files directly inside each Employee-Code folder were checked. Nested folders were ignored.";
     }
 
     private JPanel successfulUploadsCard(BulkFolderDocumentImportService.ImportResult result) {
@@ -625,6 +580,14 @@ public class HomeView extends JFrame {
                         + " uploaded for " + employeeCount + " employee" + plural(employeeCount) + ".",
                 UniversalDialogHelper.surface(UniversalDialog.Type.SUCCESS)
         ));
+        for (BulkFolderDocumentImportService.EmployeeUploadSummary employee : result.employeeSummaries()) {
+            if (employee.uploadedDetails().isEmpty()) {
+                continue;
+            }
+            card.add(Box.createVerticalStrut(8));
+            card.add(folderLink("Employee-Code: " + employee.displayName(), employee.folder()));
+            addSummaryParagraph(card, "Uploaded images", detailTexts(employee.uploadedDetails()), UniversalDialogHelper.surface(UniversalDialog.Type.SUCCESS));
+        }
         return card;
     }
 
@@ -646,12 +609,12 @@ public class HomeView extends JFrame {
         card.add(sectionHeading("Needs attention"));
         for (BulkFolderDocumentImportService.EmployeeUploadSummary employee : employees) {
             card.add(Box.createVerticalStrut(10));
-            card.add(folderLink("Employee folder: " + employee.displayName(), employee.folder()));
-            addUploadedCountParagraph(card, employee.uploadedLabels().size(), background);
+            card.add(folderLink("Employee-Code: " + employee.displayName(), employee.folder()));
+            addSummaryParagraph(card, "Uploaded images", detailTexts(employee.uploadedDetails()), background);
             addSummaryParagraph(
                     card,
-                    "Already saved, left unchanged",
-                    employee.alreadyExistingLabels(),
+                    "Skipped images",
+                    detailTexts(employee.skippedDetails()),
                     background
             );
             addSummaryParagraph(
@@ -667,16 +630,6 @@ public class HomeView extends JFrame {
         return card;
     }
 
-    private void addUploadedCountParagraph(JPanel card, int uploadedCount, Color background) {
-        if (uploadedCount <= 0) {
-            return;
-        }
-        card.add(wrappedText(
-                "Uploaded successfully: " + uploadedCount + " document" + plural(uploadedCount),
-                background
-        ));
-    }
-
     private void addSummaryParagraph(JPanel card, String label, java.util.List<String> values, Color background) {
         if (values == null || values.isEmpty()) {
             return;
@@ -687,13 +640,28 @@ public class HomeView extends JFrame {
     private JPanel folderErrorsCard(java.util.List<BulkFolderDocumentImportService.FolderError> errors) {
         Color background = UniversalDialogHelper.surface(UniversalDialog.Type.ERROR);
         JPanel card = resultCard(background, UniversalDialogHelper.border(UniversalDialog.Type.ERROR));
-        card.add(sectionHeading("Folder issues"));
+        card.add(sectionHeading("Missing Employee-Code / folder issues"));
         for (BulkFolderDocumentImportService.FolderError error : errors) {
             card.add(Box.createVerticalStrut(10));
-            card.add(folderLink("Folder: " + error.folderName(), error.folder()));
+            card.add(folderLink("Employee-Code folder: " + error.folderName(), error.folder()));
             card.add(wrappedText(String.join("\n", error.messages()), background));
         }
         return card;
+    }
+
+    private java.util.List<String> detailTexts(java.util.List<BulkFolderDocumentImportService.DocumentUploadDetail> details) {
+        java.util.List<String> values = new java.util.ArrayList<>();
+        if (details == null) {
+            return values;
+        }
+        for (BulkFolderDocumentImportService.DocumentUploadDetail detail : details) {
+            values.add(detail.displayText());
+        }
+        return values;
+    }
+
+    private String displayPath(File file) {
+        return file == null ? "Configured bulk import folder" : file.getPath();
     }
 
     private JPanel resultCard(Color background, Color border) {
