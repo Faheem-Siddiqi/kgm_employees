@@ -18,6 +18,10 @@ class AppConfigTest {
     private static final String DOT_ENV_FILE_PROPERTY = "kgm.env.file";
     private static final String EMPLOYEE_STORAGE_PROPERTY = "kgm.employee.storage.dir";
     private static final String EMPLOYEE_STORAGE_ON_SERVER_PROPERTY = "kgm.employee.storage.on.server";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_SERVER_PROPERTY = "kgm.employee.storage.default.server";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_SHARE_PROPERTY = "kgm.employee.storage.default.share";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_USERNAME_PROPERTY = "kgm.employee.storage.default.username";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_PASSWORD_PROPERTY = "kgm.employee.storage.default.password";
     private static final String BULK_IMPORT_COMPRESSION_PROPERTY = "kgm.bulk.import.compression";
     private static final long DEFAULT_UPLOAD_LIMIT = 400L * 1024L;
     private final String originalUserDir = System.getProperty("user.dir");
@@ -33,6 +37,10 @@ class AppConfigTest {
         System.clearProperty(DOT_ENV_FILE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_PROPERTY);
         System.clearProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY);
+        System.clearProperty(EMPLOYEE_STORAGE_DEFAULT_SERVER_PROPERTY);
+        System.clearProperty(EMPLOYEE_STORAGE_DEFAULT_SHARE_PROPERTY);
+        System.clearProperty(EMPLOYEE_STORAGE_DEFAULT_USERNAME_PROPERTY);
+        System.clearProperty(EMPLOYEE_STORAGE_DEFAULT_PASSWORD_PROPERTY);
         System.clearProperty(BULK_IMPORT_COMPRESSION_PROPERTY);
         System.setProperty("user.dir", originalUserDir);
         System.setProperty("java.home", originalJavaHome);
@@ -110,6 +118,19 @@ class AppConfigTest {
 
         System.setProperty(EMPLOYEE_STORAGE_ON_SERVER_PROPERTY, "not-a-boolean");
         assertFalse(AppConfig.employeeStorageOnServer());
+    }
+
+    @Test
+    void employeeStorageDialogDefaultsUseConfiguredValues() {
+        System.setProperty(EMPLOYEE_STORAGE_DEFAULT_SERVER_PROPERTY, "10.0.0.5");
+        System.setProperty(EMPLOYEE_STORAGE_DEFAULT_SHARE_PROPERTY, "staff");
+        System.setProperty(EMPLOYEE_STORAGE_DEFAULT_USERNAME_PROPERTY, "KMLGPK\\User");
+        System.setProperty(EMPLOYEE_STORAGE_DEFAULT_PASSWORD_PROPERTY, "secret");
+
+        assertEquals("10.0.0.5", AppConfig.employeeStorageDefaultServer());
+        assertEquals("staff", AppConfig.employeeStorageDefaultShare());
+        assertEquals("KMLGPK\\User", AppConfig.employeeStorageDefaultUsername());
+        assertEquals("secret", AppConfig.employeeStorageDefaultPassword());
     }
 
     @Test

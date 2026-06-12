@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 public final class WindowsNetworkShareConnector {
-    private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(15);
+    private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(6);
 
     private WindowsNetworkShareConnector() {
     }
@@ -45,7 +45,7 @@ public final class WindowsNetworkShareConnector {
             boolean finished = process.waitFor(COMMAND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
             if (!finished) {
                 process.destroyForcibly();
-                return ConnectionResult.failed("Connection timed out after 15 seconds. Please check LAN connection and try again.");
+                return ConnectionResult.failed("Connection timed out after 6 seconds. Check the server address, LAN/VPN connection, shared folder name, username, and password.");
             }
             String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             if (process.exitValue() == 0 || isAlreadyConnected(output)) {

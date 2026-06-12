@@ -178,6 +178,13 @@ public class LoadingOverlay extends JPanel {
             SwingUtilities.invokeLater(() -> overlay.setMessageText(message));
         }
 
+        public void setTitle(String title) {
+            if (overlay == null) {
+                return;
+            }
+            SwingUtilities.invokeLater(() -> overlay.titleLabel.setText(blankToDefault(title, "Working")));
+        }
+
         public void setProgress(int value) {
             if (overlay == null) {
                 return;

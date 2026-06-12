@@ -18,6 +18,14 @@ public final class AppConfig {
     private static final String EMPLOYEE_STORAGE_DIR_PROPERTY = "kgm.employee.storage.dir";
     private static final String EMPLOYEE_STORAGE_DIR_ENV = "KGM_EMPLOYEE_STORAGE_DIR";
     private static final String EMPLOYEE_STORAGE_ON_SERVER_ENV = "KGM_EMPLOYEE_STORAGE_ON_SERVER";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_SERVER_PROPERTY = "kgm.employee.storage.default.server";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_SERVER_ENV = "KGM_EMPLOYEE_STORAGE_DEFAULT_SERVER";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_SHARE_PROPERTY = "kgm.employee.storage.default.share";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_SHARE_ENV = "KGM_EMPLOYEE_STORAGE_DEFAULT_SHARE";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_USERNAME_PROPERTY = "kgm.employee.storage.default.username";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_USERNAME_ENV = "KGM_EMPLOYEE_STORAGE_DEFAULT_USERNAME";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_PASSWORD_PROPERTY = "kgm.employee.storage.default.password";
+    private static final String EMPLOYEE_STORAGE_DEFAULT_PASSWORD_ENV = "KGM_EMPLOYEE_STORAGE_DEFAULT_PASSWORD";
     private static final String BULK_IMPORT_COMPRESSION_PROPERTY = "kgm.bulk.import.compression";
     private static final String BULK_IMPORT_COMPRESSION_ENV = "BULK_IMPORT_COMPRESSION";
     private static final long DEFAULT_DOCUMENT_UPLOAD_MAX_BYTES = 400L * 1024L;
@@ -70,6 +78,38 @@ public final class AppConfig {
                 "kgm.employee.storage.on.server",
                 EMPLOYEE_STORAGE_ON_SERVER_ENV,
                 false
+        );
+    }
+
+    public static String employeeStorageDefaultServer() {
+        return setting(
+                EMPLOYEE_STORAGE_DEFAULT_SERVER_PROPERTY,
+                EMPLOYEE_STORAGE_DEFAULT_SERVER_ENV,
+                "192.168.2.93"
+        );
+    }
+
+    public static String employeeStorageDefaultShare() {
+        return setting(
+                EMPLOYEE_STORAGE_DEFAULT_SHARE_PROPERTY,
+                EMPLOYEE_STORAGE_DEFAULT_SHARE_ENV,
+                "employees"
+        );
+    }
+
+    public static String employeeStorageDefaultUsername() {
+        return setting(
+                EMPLOYEE_STORAGE_DEFAULT_USERNAME_PROPERTY,
+                EMPLOYEE_STORAGE_DEFAULT_USERNAME_ENV,
+                "kgm534"
+        );
+    }
+
+    public static String employeeStorageDefaultPassword() {
+        return setting(
+                EMPLOYEE_STORAGE_DEFAULT_PASSWORD_PROPERTY,
+                EMPLOYEE_STORAGE_DEFAULT_PASSWORD_ENV,
+                "AM@12345"
         );
     }
 

@@ -19,6 +19,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.WindowConstants;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
@@ -37,9 +38,10 @@ import java.util.Arrays;
 
 public final class EmployeeStorageConnectionDialog {
     private static final String TITLE = "Storage Folder Needs Connection";
-    private static final String DEFAULT_SERVER = "192.168.2.93";
-    private static final String DEFAULT_SHARE = "employees";
     private static final Color ERROR_TEXT = new Color(185, 28, 28);
+    private static final Color ERROR_SURFACE = new Color(254, 242, 242);
+    private static final Color ERROR_BORDER = new Color(254, 202, 202);
+    private static final Color ERROR_BADGE = new Color(254, 226, 226);
     private static final Color SUCCESS_TEXT = new Color(21, 128, 61);
 
     private EmployeeStorageConnectionDialog() {
@@ -95,14 +97,19 @@ public final class EmployeeStorageConnectionDialog {
 
     private static final class DialogController {
         private final JDialog dialog;
-        private final JTextField serverField = new JTextField(DEFAULT_SERVER);
-        private final JTextField shareField = new JTextField(DEFAULT_SHARE);
-        private final JTextField usernameField = new JTextField();
-        private final JPasswordField passwordField = new JPasswordField();
+        private final JTextField serverField = new JTextField(AppConfig.employeeStorageDefaultServer());
+        private final JTextField shareField = new JTextField(AppConfig.employeeStorageDefaultShare());
+        private final JTextField usernameField = new JTextField(AppConfig.employeeStorageDefaultUsername());
+        private final JPasswordField passwordField = new JPasswordField(AppConfig.employeeStorageDefaultPassword());
         private final JLabel statusLabel = new JLabel(" ");
+        private JLabel guidanceHeading;
+        private JTextArea guidanceDetail;
         private JButton exitButton;
         private JButton retryButton;
         private JButton connectButton;
+        private Timer progressTimer;
+        private long progressStartedAtMillis;
+        private int currentProgress;
         private boolean connected;
 
         private DialogController(Component parent) {
@@ -187,18 +194,18 @@ public final class EmployeeStorageConnectionDialog {
         private JPanel guidanceBox() {
             JPanel box = new JPanel(new BorderLayout(10, 0));
             box.setOpaque(true);
-            box.setBackground(UniversalDialogHelper.SURFACE);
+            box.setBackground(ERROR_SURFACE);
             box.setBorder(BorderFactory.createCompoundBorder(
-                    UniversalDialogHelper.roundedBorder(UniversalDialogHelper.CARD_BORDER, 8, 1),
+                    UniversalDialogHelper.roundedBorder(ERROR_BORDER, 8, 1),
                     new EmptyBorder(12, 14, 12, 14)
             ));
             box.setAlignmentX(Component.LEFT_ALIGNMENT);
             box.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
 
-            JLabel marker = new JLabel("i", JLabel.CENTER);
+            JLabel marker = new JLabel("!", JLabel.CENTER);
             marker.setOpaque(true);
-            marker.setBackground(new Color(224, 242, 254));
-            marker.setForeground(UniversalDialogHelper.PRIMARY);
+            marker.setBackground(ERROR_BADGE);
+            marker.setForeground(ERROR_TEXT);
             marker.setFont(UniversalDialogHelper.mediumFont(13));
             marker.setPreferredSize(new Dimension(22, 22));
 
@@ -206,22 +213,22 @@ public final class EmployeeStorageConnectionDialog {
             text.setOpaque(false);
             text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
 
-            JLabel heading = new JLabel("Check the shared folder details");
-            heading.setFont(UniversalDialogHelper.mediumFont(13));
-            heading.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
-            heading.setAlignmentX(Component.LEFT_ALIGNMENT);
+            guidanceHeading = new JLabel("Shared folder details need attention");
+            guidanceHeading.setFont(UniversalDialogHelper.mediumFont(13));
+            guidanceHeading.setForeground(ERROR_TEXT);
+            guidanceHeading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-            JTextArea detail = readOnlyText(
-                    "Confirm the server, folder name, and login. Then choose Connect. If you are already on the office network, Retry may be enough."
+            guidanceDetail = readOnlyText(
+                    "Confirm the server, shared folder, username, and password, then choose Connect. For error details, scroll below the form."
             );
-            detail.setFont(UniversalDialogHelper.regularFont(12));
-            detail.setForeground(UniversalDialogHelper.MUTED_TEXT);
-            detail.setBackground(UniversalDialogHelper.SURFACE);
-            detail.setAlignmentX(Component.LEFT_ALIGNMENT);
+            guidanceDetail.setFont(UniversalDialogHelper.regularFont(12));
+            guidanceDetail.setForeground(ERROR_TEXT);
+            guidanceDetail.setBackground(ERROR_SURFACE);
+            guidanceDetail.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-            text.add(heading);
+            text.add(guidanceHeading);
             text.add(Box.createVerticalStrut(3));
-            text.add(detail);
+            text.add(guidanceDetail);
 
             box.add(marker, BorderLayout.WEST);
             box.add(text, BorderLayout.CENTER);
@@ -244,9 +251,9 @@ public final class EmployeeStorageConnectionDialog {
             styleField(usernameField);
             styleField(passwordField);
 
-            addRow(grid, 0, "Server address", serverField, "Example: 192.168.2.93");
-            addRow(grid, 1, "Shared folder", shareField, "Example: employees");
-            addRow(grid, 2, "Username", usernameField, "Example: KMLGPK\\Attiq.Mughal or kgm534");
+            addRow(grid, 0, "Server address", serverField, "cmd: ipconfig");
+            addRow(grid, 1, "Shared folder", shareField, "");
+            addRow(grid, 2, "Username", usernameField, "cmd: whoami");
             addRow(grid, 3, "Password", passwordField, "");
 
             statusLabel.setFont(UniversalDialogHelper.mediumFont(12));
@@ -324,6 +331,7 @@ public final class EmployeeStorageConnectionDialog {
             String username = usernameField.getText();
             runConnectionWorker(
                     "Connecting to employee storage folder...",
+                    "Connecting...",
                     () -> WindowsNetworkShareConnector.connect(expected, username, password),
                     expected,
                     password
@@ -338,6 +346,7 @@ public final class EmployeeStorageConnectionDialog {
             }
             runConnectionWorker(
                     "Checking employee storage folder...",
+                    "Checking...",
                     () -> WindowsNetworkShareConnector.exists(Path.of(expected))
                             ? WindowsNetworkShareConnector.ConnectionResult.success()
                             : WindowsNetworkShareConnector.ConnectionResult.failed("Folder is not accessible."),
@@ -346,16 +355,23 @@ public final class EmployeeStorageConnectionDialog {
             );
         }
 
-        private void runConnectionWorker(String busyMessage, ConnectionTask task, String expected, char[] password) {
-            setBusy(true, busyMessage);
-            new SwingWorker<WindowsNetworkShareConnector.ConnectionResult, Void>() {
+        private void runConnectionWorker(String busyMessage, String activeButtonText, ConnectionTask task, String expected, char[] password) {
+            setBusy(true, busyMessage, activeButtonText);
+            startProgressTimer();
+            SwingWorker<WindowsNetworkShareConnector.ConnectionResult, Void> worker = new SwingWorker<>() {
                 @Override
                 protected WindowsNetworkShareConnector.ConnectionResult doInBackground() {
-                    WindowsNetworkShareConnector.ConnectionResult result = task.run();
-                    if (!result.connected()) {
-                        return result;
+                    try {
+                        setProgress(10);
+                        WindowsNetworkShareConnector.ConnectionResult result = task.run();
+                        if (!result.connected()) {
+                            return result;
+                        }
+                        setProgress(65);
+                        return verifyAndSave(expected);
+                    } catch (RuntimeException exception) {
+                        return WindowsNetworkShareConnector.ConnectionResult.failed(userMessage(exception));
                     }
-                    return verifyAndSave(expected);
                 }
 
                 @Override
@@ -366,25 +382,37 @@ public final class EmployeeStorageConnectionDialog {
                             showConnectionFailed(expected, result.message());
                             return;
                         }
+                        setProgressStatus(100, "Connected. The app will continue now.");
                         connected = true;
                         showSuccess("Connected. The app will continue now.");
                         dialog.dispose();
                     } catch (Exception exception) {
-                        showConnectionFailed(expected, exception.getMessage());
+                        showConnectionFailed(expected, userMessage(exception));
                     } finally {
+                        stopProgressTimer();
                         if (password != null) {
                             Arrays.fill(password, '\0');
                             passwordField.setText("");
                         }
-                        setBusy(false, null);
+                        setBusy(false, null, null);
                     }
                 }
-            }.execute();
+            };
+            worker.addPropertyChangeListener(event -> {
+                if ("progress".equals(event.getPropertyName())) {
+                    int progress = (int) event.getNewValue();
+                    String label = progress < 65
+                            ? "Connecting to employee storage folder..."
+                            : "Verifying and saving employee storage folder...";
+                    setProgressStatus(progress, label);
+                }
+            });
+            worker.execute();
         }
 
         private WindowsNetworkShareConnector.ConnectionResult verifyAndSave(String expected) {
-            Path folder = Path.of(expected);
             try {
+                Path folder = Path.of(expected);
                 EmployeeStorageUtil.verifyReadWriteAccess(folder);
                 AppConfig.saveEmployeeServerStorageDirectory(expected);
                 return WindowsNetworkShareConnector.ConnectionResult.success();
@@ -396,6 +424,8 @@ public final class EmployeeStorageConnectionDialog {
                     );
                 }
                 return WindowsNetworkShareConnector.ConnectionResult.failed(message);
+            } catch (RuntimeException exception) {
+                return WindowsNetworkShareConnector.ConnectionResult.failed(userMessage(exception));
             }
         }
 
@@ -424,6 +454,7 @@ public final class EmployeeStorageConnectionDialog {
         }
 
         private void showConnectionFailed(String expected, String commandMessage) {
+            showGuidanceError();
             StringBuilder message = new StringBuilder();
             message.append("We could not connect to the shared folder.\n");
             message.append("Check the server address, shared folder, username, password, and office network connection.\n\n");
@@ -446,14 +477,16 @@ public final class EmployeeStorageConnectionDialog {
         }
 
         private void showSuccess(String message) {
+            showGuidanceProgress(100, message);
             statusLabel.setForeground(SUCCESS_TEXT);
             statusLabel.setText(message);
         }
 
-        private void setBusy(boolean busy, String message) {
+        private void setBusy(boolean busy, String message, String activeButtonText) {
             dialog.setCursor(Cursor.getPredefinedCursor(busy ? Cursor.WAIT_CURSOR : Cursor.DEFAULT_CURSOR));
             if (connectButton != null) {
                 connectButton.setEnabled(!busy);
+                connectButton.setText(busy && activeButtonText != null ? activeButtonText : "Connect");
             }
             if (retryButton != null) {
                 retryButton.setEnabled(!busy);
@@ -462,8 +495,64 @@ public final class EmployeeStorageConnectionDialog {
                 exitButton.setEnabled(!busy);
             }
             if (message != null) {
-                statusLabel.setForeground(UniversalDialogHelper.MUTED_TEXT);
-                statusLabel.setText(message);
+                statusLabel.setText(" ");
+                setProgressStatus(0, message);
+            }
+        }
+
+        private void setProgressStatus(int progress, String message) {
+            int boundedProgress = Math.max(0, Math.min(100, progress));
+            currentProgress = boundedProgress;
+            showGuidanceProgress(boundedProgress, message);
+        }
+
+        private void startProgressTimer() {
+            stopProgressTimer();
+            progressStartedAtMillis = System.currentTimeMillis();
+            progressTimer = new Timer(1000, event -> updateElapsedProgress());
+            progressTimer.setInitialDelay(1000);
+            progressTimer.start();
+        }
+
+        private void stopProgressTimer() {
+            if (progressTimer != null) {
+                progressTimer.stop();
+                progressTimer = null;
+            }
+        }
+
+        private void updateElapsedProgress() {
+            if (currentProgress >= 65) {
+                return;
+            }
+
+            long elapsedSeconds = Math.max(1, (System.currentTimeMillis() - progressStartedAtMillis) / 1000L);
+            if (elapsedSeconds >= 5) {
+                setProgressStatus(80, "Still waiting for Windows; this will stop soon if the server does not respond.");
+            } else if (elapsedSeconds >= 3) {
+                setProgressStatus(45, "Waiting for the shared folder server to respond...");
+            } else if (elapsedSeconds >= 2) {
+                setProgressStatus(30, "Sending username and password to Windows...");
+            } else {
+                setProgressStatus(15, "Starting Windows shared-folder connection...");
+            }
+        }
+
+        private void showGuidanceProgress(int progress, String message) {
+            if (guidanceHeading != null) {
+                guidanceHeading.setText(progress + "% - " + message);
+            }
+            if (guidanceDetail != null) {
+                guidanceDetail.setText("Please wait while KGM checks the shared storage folder. If it fails, the real error will appear below the form.");
+            }
+        }
+
+        private void showGuidanceError() {
+            if (guidanceHeading != null) {
+                guidanceHeading.setText("Shared folder details need attention");
+            }
+            if (guidanceDetail != null) {
+                guidanceDetail.setText("Confirm the server, shared folder, username, and password, then choose Connect. For error details, scroll below the form.");
             }
         }
 
@@ -472,17 +561,21 @@ public final class EmployeeStorageConnectionDialog {
         }
 
         private void prefillFromConfiguredPath() {
-            String configured = AppConfig.employeeStorageDirectory().toString();
-            if (!configured.startsWith("\\\\")) {
-                return;
+            try {
+                String configured = AppConfig.employeeStorageDirectory().toString();
+                if (!configured.startsWith("\\\\")) {
+                    return;
+                }
+                String withoutPrefix = configured.substring(2);
+                int slash = withoutPrefix.indexOf('\\');
+                if (slash <= 0 || slash >= withoutPrefix.length() - 1) {
+                    return;
+                }
+                serverField.setText(withoutPrefix.substring(0, slash));
+                shareField.setText(withoutPrefix.substring(slash + 1));
+            } catch (RuntimeException exception) {
+                showError("Could not read the saved employee storage path.\n" + userMessage(exception));
             }
-            String withoutPrefix = configured.substring(2);
-            int slash = withoutPrefix.indexOf('\\');
-            if (slash <= 0 || slash >= withoutPrefix.length() - 1) {
-                return;
-            }
-            serverField.setText(withoutPrefix.substring(0, slash));
-            shareField.setText(withoutPrefix.substring(slash + 1));
         }
 
         private JTextArea readOnlyText(String text) {
@@ -595,6 +688,22 @@ public final class EmployeeStorageConnectionDialog {
                 clean.append(trimmed);
             }
             return clean.toString();
+        }
+
+        private String userMessage(Exception exception) {
+            if (exception == null) {
+                return "Unknown error.";
+            }
+            String message = exception.getMessage();
+            if (message == null || message.isBlank()) {
+                message = exception.getClass().getSimpleName();
+            }
+            Throwable cause = exception.getCause();
+            if (cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()
+                    && !message.contains(cause.getMessage())) {
+                message = message + "\n" + cause.getMessage();
+            }
+            return message;
         }
 
         private static final class ViewportWidthPanel extends JPanel implements javax.swing.Scrollable {
