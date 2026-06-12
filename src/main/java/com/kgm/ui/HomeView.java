@@ -358,6 +358,7 @@ public class HomeView extends JFrame {
         private final JLabel validationLabel = new JLabel(" ");
         private final JLabel employeeLabel = new JLabel("Employee Code: -");
         private final JLabel documentLabel = new JLabel("Document: -");
+        private final JLabel stopNoticeLabel = new JLabel(" ");
         private final JLabel countLabel = new JLabel("Uploaded 0 | Skipped 0 | Failed 0 | Duplicate 0 | Discarded 0");
         private final JLabel statusLabel = new JLabel(UniversalDialogHelper.htmlWrap("Waiting to start..."));
         private final JProgressBar progressBar = new JProgressBar(0, 100);
@@ -375,6 +376,7 @@ public class HomeView extends JFrame {
             dialog.setContentPane(content());
             dialog.setMinimumSize(new Dimension(540, 420));
             dialog.setPreferredSize(new Dimension(700, 540));
+            styleStopButton();
             dialog.pack();
             dialog.setLocationRelativeTo(HomeView.this);
             dialog.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -407,23 +409,25 @@ public class HomeView extends JFrame {
         private JPanel rangePanel() {
             JPanel wrapper = new JPanel(new BorderLayout());
             wrapper.setOpaque(false);
-            wrapper.setBorder(BorderFactory.createEmptyBorder(10, 24, 22, 24));
+            wrapper.setBorder(BorderFactory.createEmptyBorder(8, 24, 22, 24));
 
             JPanel body = UniversalDialogHelper.createDialogCard();
             body.add(UniversalDialogHelper.createDialogSectionHeader(
-                    "Select employee code range",
-                    "Only direct folders from the configured bulk upload path will be processed. Folder names must exactly match employee codes in this range."
+                    "Choose employee codes",
+                    "KGM will process only direct folders in this range from the configured bulk upload path."
             ));
-            body.add(Box.createVerticalStrut(14));
+            body.add(Box.createVerticalStrut(18));
 
             JPanel grid = new JPanel(new GridBagLayout());
             grid.setOpaque(false);
+            grid.setAlignmentX(Component.LEFT_ALIGNMENT);
+            grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, 116));
             styleRangeField(startCodeField);
             styleRangeField(endCodeField);
             addRangeRow(grid, 0, "Start Code", startCodeField, "Example: 1");
             addRangeRow(grid, 1, "End Code", endCodeField, "Example: 50");
             body.add(grid);
-            body.add(Box.createVerticalStrut(14));
+            body.add(Box.createVerticalStrut(16));
             body.add(bulkUploadSettingsBox());
             body.add(Box.createVerticalStrut(12));
 
@@ -453,7 +457,7 @@ public class HomeView extends JFrame {
             JPanel body = UniversalDialogHelper.createDialogCard();
             body.add(UniversalDialogHelper.createDialogSectionHeader(
                     "Uploading documents",
-                    "Stop will take effect after the current employee finishes."
+                    "KGM shows the current employee, current file, and upload action while the import runs."
             ));
             body.add(Box.createVerticalStrut(14));
 
@@ -473,6 +477,11 @@ public class HomeView extends JFrame {
             body.add(bulkUploadSettingsBox());
             body.add(Box.createVerticalStrut(14));
             body.add(statusLabel);
+            stopNoticeLabel.setFont(UniversalDialogHelper.mediumFont(12));
+            stopNoticeLabel.setForeground(UniversalDialogHelper.ERROR_ACCENT);
+            stopNoticeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            body.add(Box.createVerticalStrut(6));
+            body.add(stopNoticeLabel);
 
             wrapper.add(body, BorderLayout.CENTER);
             wrapper.add(progressFooter(), BorderLayout.SOUTH);
@@ -481,6 +490,7 @@ public class HomeView extends JFrame {
 
         private JPanel progressFooter() {
             JPanel footer = UniversalDialogHelper.createFooter();
+            footer.setBorder(BorderFactory.createEmptyBorder(14, 0, 0, 0));
             stopButton.addActionListener(event -> requestStop());
             footer.add(stopButton);
             return footer;
@@ -526,7 +536,7 @@ public class HomeView extends JFrame {
             labelConstraints.gridx = 0;
             labelConstraints.gridy = row;
             labelConstraints.anchor = GridBagConstraints.NORTHWEST;
-            labelConstraints.insets = new Insets(2, 0, 18, 16);
+            labelConstraints.insets = new Insets(3, 0, 14, 18);
 
             JLabel label = new JLabel(labelText);
             label.setFont(UniversalDialogHelper.mediumFont(13));
@@ -550,8 +560,17 @@ public class HomeView extends JFrame {
             fieldConstraints.gridy = row;
             fieldConstraints.weightx = 1;
             fieldConstraints.fill = GridBagConstraints.HORIZONTAL;
-            fieldConstraints.insets = new Insets(0, 0, 18, 0);
+            fieldConstraints.insets = new Insets(0, 0, 14, 0);
             panel.add(fieldBlock, fieldConstraints);
+        }
+
+        private void styleStopButton() {
+            stopButton.setBackground(UniversalDialogHelper.ERROR_ACCENT);
+            stopButton.setForeground(Color.WHITE);
+            stopButton.setBorder(BorderFactory.createCompoundBorder(
+                    UniversalDialogHelper.roundedBorder(UniversalDialogHelper.ERROR_ACCENT, 6, 1),
+                    BorderFactory.createEmptyBorder(8, 14, 8, 14)
+            ));
         }
 
         private void styleRangeField(JTextField field) {
@@ -665,8 +684,8 @@ public class HomeView extends JFrame {
         private void updateProgress(BulkFolderDocumentImportService.ProgressDetail detail) {
             progressBar.setValue(detail.percent());
             progressBar.setString(detail.percent() + "%");
-            employeeLabel.setText("Employee Code: " + blankDash(detail.employeeCode()));
-            documentLabel.setText("Document: " + blankDash(detail.documentName()));
+            employeeLabel.setText(employeeProgressText(detail));
+            documentLabel.setText(fileProgressText(detail));
             countLabel.setText("Uploaded " + detail.uploadedCount()
                     + " | Skipped " + detail.skippedCount()
                     + " | Failed " + detail.failedCount()
@@ -681,7 +700,9 @@ public class HomeView extends JFrame {
             }
             stopRequested = true;
             stopButton.setEnabled(false);
-            showInlineStatus("Stopping after current employee completes...");
+            stopButton.setText("Stopping...");
+            stopNoticeLabel.setText("Stopping safely after the current employee finishes.");
+            showInlineStatus("The upload will stop after KGM finishes the employee currently in progress.");
         }
 
         private void requestClose() {
@@ -690,7 +711,8 @@ public class HomeView extends JFrame {
                 return;
             }
             requestStop();
-            showInlineStatus("Closing after current employee completes...");
+            stopNoticeLabel.setText("Closing after the current employee finishes.");
+            showInlineStatus("The dialog will close after KGM finishes the employee currently in progress.");
         }
 
         private void showInlineStatus(String message) {
@@ -708,6 +730,23 @@ public class HomeView extends JFrame {
 
         private String blankDash(String value) {
             return value == null || value.isBlank() ? "-" : value;
+        }
+
+        private String employeeProgressText(BulkFolderDocumentImportService.ProgressDetail detail) {
+            String employee = blankDash(detail.employeeCode());
+            if (detail.totalEmployees() <= 0) {
+                return "Employee Code: " + employee;
+            }
+            int current = Math.min(detail.totalEmployees(), Math.max(1, detail.completedEmployees() + 1));
+            return "Employee " + current + " of " + detail.totalEmployees() + ": " + employee;
+        }
+
+        private String fileProgressText(BulkFolderDocumentImportService.ProgressDetail detail) {
+            String file = blankDash(detail.documentName());
+            if (detail.totalFiles() <= 0 || detail.currentFile() <= 0) {
+                return "File: " + file;
+            }
+            return "File " + detail.currentFile() + " of " + detail.totalFiles() + ": " + file;
         }
 
         private record Range(long start, long end) {
@@ -873,8 +912,7 @@ public class HomeView extends JFrame {
                 + "\nNeeds review: " + result.skippedCount() + " item" + plural(result.skippedCount())
                 + "\nSource folder: " + displayPath(result.sourceDirectory())
                 + "\nImage handling: " + (result.compressionEnabled() ? "Large files are optimized before upload" : "Original JPG/JPEG files are used")
-                + "\nOnly correctly labeled files are uploaded. Incorrect labels are discarded and listed below."
-                + "\nOnly files directly inside each Employee-Code folder were checked. Nested folders were ignored.";
+            ;
     }
 
     private JPanel successfulUploadsCard(BulkFolderDocumentImportService.ImportResult result) {
@@ -966,14 +1004,18 @@ public class HomeView extends JFrame {
         if (values == null || values.isEmpty()) {
             return;
         }
-        StringBuilder text = new StringBuilder(title == null || title.isBlank() ? "Review needed" : title.trim());
+        java.util.List<String> cleanValues = new java.util.ArrayList<>();
         for (String value : values) {
             if (value == null || value.isBlank()) {
                 continue;
             }
-            text.append("\n- ").append(value.trim());
+            cleanValues.add(value.trim());
         }
-        card.add(wrappedText(text.toString(), background));
+        if (cleanValues.isEmpty()) {
+            return;
+        }
+        String cleanTitle = title == null || title.isBlank() ? "Review needed" : title.trim();
+        card.add(wrappedText(cleanTitle + ": " + String.join(", ", cleanValues), background));
         card.add(Box.createVerticalStrut(6));
     }
 
@@ -1050,7 +1092,28 @@ public class HomeView extends JFrame {
         if (fileName.isBlank()) {
             return label;
         }
+        if (sameDocumentName(label, fileName)) {
+            return fileName;
+        }
         return label + " (" + fileName + ")";
+    }
+
+    private boolean sameDocumentName(String label, String fileName) {
+        String cleanLabel = normalizeDocumentName(label);
+        String cleanFileName = fileName == null ? "" : fileName.trim();
+        int dot = cleanFileName.lastIndexOf('.');
+        if (dot > 0) {
+            cleanFileName = cleanFileName.substring(0, dot);
+        }
+        String cleanFile = normalizeDocumentName(cleanFileName);
+        return !cleanLabel.isBlank() && cleanLabel.equals(cleanFile);
+    }
+
+    private String normalizeDocumentName(String value) {
+        return value == null ? "" : value
+                .trim()
+                .toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "");
     }
 
     private String displayPath(File file) {

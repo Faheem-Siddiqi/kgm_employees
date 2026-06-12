@@ -32,6 +32,8 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Rectangle;
 import java.awt.Window;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -110,12 +112,19 @@ public final class EmployeeStorageConnectionDialog {
         private Timer progressTimer;
         private long progressStartedAtMillis;
         private int currentProgress;
+        private boolean busy;
         private boolean connected;
 
         private DialogController(Component parent) {
             Window owner = parent == null ? null : SwingUtilities.getWindowAncestor(parent);
             dialog = new JDialog(owner, TITLE, Dialog.ModalityType.APPLICATION_MODAL);
-            dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+            dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+            dialog.addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowClosing(WindowEvent event) {
+                    closeDialog();
+                }
+            });
             dialog.setResizable(true);
             dialog.setContentPane(content());
             dialog.setPreferredSize(responsiveDialogSize(owner));
@@ -396,7 +405,9 @@ public final class EmployeeStorageConnectionDialog {
                         stopProgressTimer();
                         if (password != null) {
                             Arrays.fill(password, '\0');
-                            passwordField.setText("");
+                            if (connected) {
+                                passwordField.setText("");
+                            }
                         }
                         setBusy(false, null, null);
                     }
@@ -487,6 +498,7 @@ public final class EmployeeStorageConnectionDialog {
         }
 
         private void setBusy(boolean busy, String message, String activeButtonText) {
+            this.busy = busy;
             dialog.setCursor(Cursor.getPredefinedCursor(busy ? Cursor.WAIT_CURSOR : Cursor.DEFAULT_CURSOR));
             if (connectButton != null) {
                 connectButton.setEnabled(!busy);
@@ -561,7 +573,15 @@ public final class EmployeeStorageConnectionDialog {
         }
 
         private void closeDialog() {
-            dialog.dispose();
+            if (connected) {
+                dialog.dispose();
+                return;
+            }
+            if (busy) {
+                showError("KGM is still checking the shared folder. Please wait for this attempt to finish, then use Retry or Connect.");
+                return;
+            }
+            showError("Employee storage is required before the app can continue. Fix the details, then choose Connect. If Windows was already connected, choose Retry.");
         }
 
         private void prefillFromConfiguredPath() {

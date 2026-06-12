@@ -59,6 +59,8 @@ public class BulkFolderDocumentImportService {
             int discardedCount,
             int completedEmployees,
             int totalEmployees,
+            int currentFile,
+            int totalFiles,
             int percent
     ) {
     }
@@ -363,8 +365,18 @@ public class BulkFolderDocumentImportService {
         }
 
         summary.employee(employeeCode, employee.getEMP_NAME(), folder);
-        reportDetail(progressListener, counters, employeeCode, "", "Reading files for Employee Code " + employeeCode + "...", folderIndex, totalFolders, percentFor(folderIndex, totalFolders));
         List<File> files = documentFiles(folder, summary, folderKey);
+        reportDetail(
+                progressListener,
+                counters,
+                employeeCode,
+                "",
+                "Employee " + (folderIndex + 1) + " of " + totalFolders + ": found " + files.size()
+                        + " file" + (files.size() == 1 ? "" : "s") + " for Employee Code " + employeeCode + ".",
+                folderIndex,
+                totalFolders,
+                percentFor(folderIndex, totalFolders)
+        );
         if (files.isEmpty()) {
             summary.failed(employeeCode, "Empty folder", "No supported document files found directly inside folder");
             counters.failed++;
@@ -384,10 +396,14 @@ public class BulkFolderDocumentImportService {
                     counters,
                     employeeCode,
                     fileName,
-                    "Checking " + fileName + "...",
+                    "Employee " + (folderIndex + 1) + " of " + totalFolders
+                            + ", file " + (fileIndex + 1) + " of " + files.size()
+                            + ": checking " + fileName + ".",
                     folderIndex,
                     totalFolders,
-                    filePercent(folderIndex, totalFolders, fileIndex, files.size())
+                    filePercent(folderIndex, totalFolders, fileIndex, files.size()),
+                    fileIndex + 1,
+                    files.size()
             );
 
             String typeValidation = EmployeeDocumentUtil.validateUploadImageType(file);
@@ -451,10 +467,14 @@ public class BulkFolderDocumentImportService {
                         counters,
                         employeeCode,
                         fileName,
-                        "Compressing " + fileName + "...",
+                        "Employee " + (folderIndex + 1) + " of " + totalFolders
+                                + ", file " + (fileIndex + 1) + " of " + files.size()
+                                + ": compressing " + fileName + ".",
                         folderIndex,
                         totalFolders,
-                        filePercent(folderIndex, totalFolders, fileIndex, files.size())
+                        filePercent(folderIndex, totalFolders, fileIndex, files.size()),
+                        fileIndex + 1,
+                        files.size()
                 );
             }
             EmployeeDocumentUtil.PreparedUploadFile prepared = EmployeeDocumentUtil.prepareImageForUpload(file, compressionEnabled);
@@ -470,10 +490,14 @@ public class BulkFolderDocumentImportService {
                         counters,
                         employeeCode,
                         fileName,
-                        "Uploading " + fileName + "...",
+                        "Employee " + (folderIndex + 1) + " of " + totalFolders
+                                + ", file " + (fileIndex + 1) + " of " + files.size()
+                                + ": uploading " + fileName + ".",
                         folderIndex,
                         totalFolders,
-                        filePercent(folderIndex, totalFolders, fileIndex, files.size())
+                        filePercent(folderIndex, totalFolders, fileIndex, files.size()),
+                        fileIndex + 1,
+                        files.size()
                 );
                 String dbPath = storePreparedDocument(employeeCode, documentIndex, file, prepared);
                 EmployeeDocumentUtil.setDocumentPath(update, documentIndex, dbPath);
@@ -880,6 +904,21 @@ public class BulkFolderDocumentImportService {
             int totalEmployees,
             int percent
     ) {
+        reportDetail(progressListener, counters, employeeCode, documentName, status, completedEmployees, totalEmployees, percent, 0, 0);
+    }
+
+    private void reportDetail(
+            ProgressListener progressListener,
+            ProgressCounters counters,
+            String employeeCode,
+            String documentName,
+            String status,
+            int completedEmployees,
+            int totalEmployees,
+            int percent,
+            int currentFile,
+            int totalFiles
+    ) {
         if (progressListener == null) {
             return;
         }
@@ -894,6 +933,8 @@ public class BulkFolderDocumentImportService {
                 counters.discarded,
                 completedEmployees,
                 totalEmployees,
+                currentFile,
+                totalFiles,
                 percent
         ));
     }
