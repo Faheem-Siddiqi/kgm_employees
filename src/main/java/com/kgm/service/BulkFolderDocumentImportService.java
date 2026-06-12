@@ -257,7 +257,7 @@ public class BulkFolderDocumentImportService {
                 summary.failed(employeeCode, "Duplicate document label in folder", documentLabel);
                 continue;
             }
-            if (compressionEnabled && EmployeeDocumentUtil.shouldCompressBeforeUpload(file)) {
+            if (EmployeeDocumentUtil.shouldCompressBeforeUpload(file, compressionEnabled)) {
                 reportFileStep(
                         progressListener,
                         "Compressing Employee-Code " + employeeCode + " / " + documentLabel + "...",
@@ -411,7 +411,20 @@ public class BulkFolderDocumentImportService {
             }
             Path storageTarget = storageTargetPath(employeeCode, documentIndex);
             if (Files.isRegularFile(storageTarget)) {
-                summary.skippedDocument(employeeCode, documentLabel, fileName, "File already exists in employee storage - not uploaded");
+                if (isSameFile(file.toPath(), storageTarget)) {
+                    EmployeeDocumentUtil.setDocumentPath(update, documentIndex, storageLogicalPath(employeeCode, documentIndex));
+                    matchedThisFolder.add(documentIndex);
+                    uploadedForEmployee++;
+                    counters.uploaded++;
+                    summary.uploadedDocument(
+                            employeeCode,
+                            documentLabel,
+                            fileName,
+                            "Already in employee storage; database path saved without copying"
+                    );
+                    continue;
+                }
+                summary.skippedDocument(employeeCode, documentLabel, fileName, "Different file already exists in employee storage - not uploaded");
                 counters.skipped++;
                 counters.duplicates++;
                 continue;
@@ -422,7 +435,7 @@ public class BulkFolderDocumentImportService {
                 continue;
             }
 
-            if (compressionEnabled && EmployeeDocumentUtil.shouldCompressBeforeUpload(file)) {
+            if (EmployeeDocumentUtil.shouldCompressBeforeUpload(file, compressionEnabled)) {
                 reportDetail(
                         progressListener,
                         counters,

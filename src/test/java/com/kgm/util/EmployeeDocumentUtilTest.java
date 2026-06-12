@@ -214,6 +214,15 @@ class EmployeeDocumentUtilTest {
     }
 
     @Test
+    void explicitBulkCompressionSwitchCanStillRequestCompression() throws IOException {
+        File source = writeJpeg(tempDir.resolve("CNIC_FRONT.jpg"), 900, 700, 1.0f);
+        System.setProperty(DOCUMENT_UPLOAD_PROPERTY, Long.toString(source.length() - 1));
+
+        assertTrue(EmployeeDocumentUtil.shouldCompressBeforeUpload(source, true));
+        assertFalse(EmployeeDocumentUtil.shouldCompressBeforeUpload(source, false));
+    }
+
+    @Test
     void validateImageFileDoesNotRejectReadableJpegOnlyBecauseItExceedsLimit() throws IOException {
         File source = writeJpeg(tempDir.resolve("CNIC_FRONT.jpg"), 160, 100, 0.9f);
         System.setProperty(DOCUMENT_UPLOAD_PROPERTY, Long.toString(source.length() - 1));

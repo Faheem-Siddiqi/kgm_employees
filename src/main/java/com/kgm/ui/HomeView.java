@@ -377,8 +377,8 @@ public class HomeView extends JFrame {
             UniversalDialogHelper.styleDialogWindow(dialog);
             dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             dialog.setContentPane(content());
-            dialog.setMinimumSize(new Dimension(460, 360));
-            dialog.setPreferredSize(new Dimension(620, 460));
+            dialog.setMinimumSize(new Dimension(540, 420));
+            dialog.setPreferredSize(new Dimension(700, 540));
             dialog.pack();
             dialog.setLocationRelativeTo(HomeView.this);
             dialog.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -411,7 +411,7 @@ public class HomeView extends JFrame {
         private JPanel rangePanel() {
             JPanel wrapper = new JPanel(new BorderLayout());
             wrapper.setOpaque(false);
-            wrapper.setBorder(BorderFactory.createEmptyBorder(8, 24, 20, 24));
+            wrapper.setBorder(BorderFactory.createEmptyBorder(10, 24, 22, 24));
 
             JPanel body = UniversalDialogHelper.createDialogCard();
             body.add(UniversalDialogHelper.createDialogSectionHeader(
@@ -427,7 +427,9 @@ public class HomeView extends JFrame {
             addRangeRow(grid, 0, "Start Code", startCodeField, "Example: 1");
             addRangeRow(grid, 1, "End Code", endCodeField, "Example: 50");
             body.add(grid);
-            body.add(Box.createVerticalStrut(10));
+            body.add(Box.createVerticalStrut(14));
+            body.add(bulkUploadSettingsBox());
+            body.add(Box.createVerticalStrut(12));
 
             validationLabel.setFont(UniversalDialogHelper.mediumFont(12));
             validationLabel.setForeground(UniversalDialogHelper.ERROR_ACCENT);
@@ -450,7 +452,7 @@ public class HomeView extends JFrame {
         private JPanel progressPanel() {
             JPanel wrapper = new JPanel(new BorderLayout());
             wrapper.setOpaque(false);
-            wrapper.setBorder(BorderFactory.createEmptyBorder(8, 24, 20, 24));
+            wrapper.setBorder(BorderFactory.createEmptyBorder(10, 24, 22, 24));
 
             JPanel body = UniversalDialogHelper.createDialogCard();
             body.add(UniversalDialogHelper.createDialogSectionHeader(
@@ -463,19 +465,17 @@ public class HomeView extends JFrame {
             progressBar.setValue(0);
             progressBar.setBorderPainted(false);
             body.add(progressBar);
-            body.add(Box.createVerticalStrut(14));
+            body.add(Box.createVerticalStrut(18));
 
             employeeLabel.setFont(UniversalDialogHelper.mediumFont(13));
             documentLabel.setFont(UniversalDialogHelper.regularFont(13));
             countLabel.setFont(UniversalDialogHelper.mediumFont(12));
             statusLabel.setFont(UniversalDialogHelper.regularFont(12));
             statusLabel.setForeground(UniversalDialogHelper.MUTED_TEXT);
-            body.add(employeeLabel);
-            body.add(Box.createVerticalStrut(5));
-            body.add(documentLabel);
-            body.add(Box.createVerticalStrut(10));
-            body.add(countLabel);
-            body.add(Box.createVerticalStrut(10));
+            body.add(progressInfoPanel());
+            body.add(Box.createVerticalStrut(14));
+            body.add(bulkUploadSettingsBox());
+            body.add(Box.createVerticalStrut(14));
             body.add(statusLabel);
 
             wrapper.add(body, BorderLayout.CENTER);
@@ -492,12 +492,47 @@ public class HomeView extends JFrame {
             return footer;
         }
 
+        private JPanel bulkUploadSettingsBox() {
+            boolean compressionEnabled = AppConfig.bulkImportCompressionEnabled();
+            String compression = compressionEnabled
+                    ? "Compression on for files above " + com.kgm.util.EmployeeDocumentUtil.maxUploadSizeLabel()
+                    : "Compression off; valid JPG/JPEG files upload as-is";
+            JPanel box = UniversalDialogHelper.createInfoBox(
+                    "Current upload settings",
+                    "Source: " + AppConfig.bulkImportFolderDirectory() + "<br>" + compression,
+                    compressionEnabled ? new Color(239, 246, 255) : new Color(255, 251, 235),
+                    compressionEnabled ? UniversalDialogHelper.PRIMARY : UniversalDialogHelper.WARNING_ACCENT
+            );
+            box.setBorder(BorderFactory.createCompoundBorder(
+                    UniversalDialogHelper.roundedBorder(
+                            compressionEnabled ? new Color(191, 219, 254) : new Color(253, 230, 138),
+                            8,
+                            1
+                    ),
+                    BorderFactory.createEmptyBorder(12, 14, 12, 14)
+            ));
+            return box;
+        }
+
+        private JPanel progressInfoPanel() {
+            JPanel panel = new JPanel();
+            panel.setOpaque(false);
+            panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+            panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            panel.add(employeeLabel);
+            panel.add(Box.createVerticalStrut(6));
+            panel.add(documentLabel);
+            panel.add(Box.createVerticalStrut(10));
+            panel.add(countLabel);
+            return panel;
+        }
+
         private void addRangeRow(JPanel panel, int row, String labelText, JTextField field, String hintText) {
             GridBagConstraints labelConstraints = new GridBagConstraints();
             labelConstraints.gridx = 0;
             labelConstraints.gridy = row;
             labelConstraints.anchor = GridBagConstraints.NORTHWEST;
-            labelConstraints.insets = new Insets(0, 0, 14, 14);
+            labelConstraints.insets = new Insets(2, 0, 18, 16);
 
             JLabel label = new JLabel(labelText);
             label.setFont(UniversalDialogHelper.mediumFont(13));
@@ -507,13 +542,13 @@ public class HomeView extends JFrame {
             JPanel fieldBlock = new JPanel();
             fieldBlock.setOpaque(false);
             fieldBlock.setLayout(new BoxLayout(fieldBlock, BoxLayout.Y_AXIS));
-            field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+            field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
             fieldBlock.add(field);
 
             JLabel hint = new JLabel(hintText);
             hint.setFont(UniversalDialogHelper.regularFont(11));
             hint.setForeground(UniversalDialogHelper.MUTED_TEXT);
-            hint.setBorder(BorderFactory.createEmptyBorder(4, 2, 0, 0));
+            hint.setBorder(BorderFactory.createEmptyBorder(6, 2, 0, 0));
             fieldBlock.add(hint);
 
             GridBagConstraints fieldConstraints = new GridBagConstraints();
@@ -521,7 +556,7 @@ public class HomeView extends JFrame {
             fieldConstraints.gridy = row;
             fieldConstraints.weightx = 1;
             fieldConstraints.fill = GridBagConstraints.HORIZONTAL;
-            fieldConstraints.insets = new Insets(0, 0, 14, 0);
+            fieldConstraints.insets = new Insets(0, 0, 18, 0);
             panel.add(fieldBlock, fieldConstraints);
         }
 
@@ -530,7 +565,7 @@ public class HomeView extends JFrame {
             field.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
             field.setBorder(BorderFactory.createCompoundBorder(
                     UniversalDialogHelper.roundedBorder(UniversalDialogHelper.CARD_BORDER, 8, 1),
-                    BorderFactory.createEmptyBorder(7, 10, 7, 10)
+                    BorderFactory.createEmptyBorder(9, 12, 9, 12)
             ));
         }
 
@@ -931,7 +966,6 @@ public class HomeView extends JFrame {
         for (BulkFolderDocumentImportService.EmployeeUploadSummary employee : employees) {
             card.add(Box.createVerticalStrut(10));
             card.add(folderLink("Employee-Code: " + employee.displayName(), employee.folder()));
-            addGroupedDetailSections(card, detailGroupsByStatus(employee.uploadedDetails()), background);
             addGroupedDetailSections(card, detailGroupsByStatus(employee.skippedDetails()), background);
             addGroupedIssue(card, "Discarded - incorrect document label", employee.noMatchFiles(), background);
             for (Map.Entry<String, java.util.List<String>> failure : employee.failedByReason().entrySet()) {

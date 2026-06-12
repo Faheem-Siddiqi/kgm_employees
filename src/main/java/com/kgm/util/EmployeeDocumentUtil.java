@@ -606,6 +606,14 @@ public final class EmployeeDocumentUtil {
         return file != null && file.isFile() && isJpegFile(file) && file.length() > maxUploadSizeBytes();
     }
 
+    public static boolean shouldCompressBeforeUpload(File file, boolean compressionEnabled) {
+        return compressionEnabled
+                && file != null
+                && file.isFile()
+                && isJpegFile(file)
+                && file.length() > maxUploadSizeBytes();
+    }
+
     public static boolean isTemporaryUploadFile(File file) {
         if (file == null || file.getName() == null || !file.getName().startsWith(UPLOAD_TEMP_PREFIX)) {
             return false;
