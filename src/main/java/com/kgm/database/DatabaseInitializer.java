@@ -341,8 +341,7 @@ public class DatabaseInitializer {
         try {
             createDatabaseIfNeeded();
         } catch (SQLException e) {
-            System.out.println("=> MySQL database creation failed!");
-            e.printStackTrace();
+            logStartupIssue("MySQL database creation failed", e);
             DatabaseConnection.reportConnectionFailure(e);
             throw startupFailure("MySQL database creation failed.", e);
         }
@@ -367,8 +366,7 @@ public class DatabaseInitializer {
             initialized = true;
 
         } catch (SQLException e) {
-            System.out.println("=> MySQL schema failed!");
-            e.printStackTrace();
+            logStartupIssue("MySQL schema initialization failed", e);
             DatabaseConnection.reportConnectionFailure(e);
             throw startupFailure("MySQL schema initialization failed.", e);
         }
@@ -381,6 +379,13 @@ public class DatabaseInitializer {
 
     private static IllegalStateException startupFailure(String message, SQLException exception) {
         return new IllegalStateException(message + " Check the server connection and database credentials.", exception);
+    }
+
+    private static void logStartupIssue(String context, SQLException exception) {
+        String message = exception == null || exception.getMessage() == null || exception.getMessage().isBlank()
+                ? "No database error message was provided."
+                : exception.getMessage();
+        System.out.println("=> " + context + ": " + message);
     }
 
     private static boolean schemaReady() {

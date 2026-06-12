@@ -97,8 +97,8 @@ public class DatabaseConnectionStatusView extends JFrame {
         runOnEdt(() -> {
             slowConnectionTimer.stop();
             eyebrow.setForeground(ERROR);
-            title.setText("Database connection issue");
-            message.setText("The app cannot reach the configured MySQL server right now. Keep this window open; it will retry automatically and continue when the connection is restored.");
+            title.setText(failureTitle(failure));
+            message.setText(failureMessage(failure));
             connection.setText(connectionInfo());
             retryLabel.setText("Auto retry is active. You can also retry manually after checking MySQL, LAN, VPN, or credentials.");
             progress.setIndeterminate(true);
@@ -389,6 +389,35 @@ public class DatabaseConnectionStatusView extends JFrame {
             current = current.getCause();
         }
         return builder.toString();
+    }
+
+    private static String failureTitle(Throwable failure) {
+        return containsMessage(failure, "access denied")
+                ? "Database login was rejected"
+                : "Database connection issue";
+    }
+
+    private static String failureMessage(Throwable failure) {
+        if (containsMessage(failure, "access denied")) {
+            return "MySQL rejected the configured username or password, or this user is not allowed to connect from this computer. Check KGM_DB_USER, KGM_DB_PASSWORD, and MySQL user permissions, then keep this window open or retry.";
+        }
+        return "The app cannot reach the configured MySQL server right now. Keep this window open; it will retry automatically and continue when the connection is restored.";
+    }
+
+    private static boolean containsMessage(Throwable failure, String needle) {
+        if (needle == null || needle.isBlank()) {
+            return false;
+        }
+        String lowerNeedle = needle.toLowerCase();
+        Throwable current = failure;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase().contains(lowerNeedle)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private static void runOnEdt(Runnable action) {
