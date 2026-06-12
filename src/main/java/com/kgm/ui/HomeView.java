@@ -350,7 +350,6 @@ public class HomeView extends JFrame {
     }
 
     private final class BulkUploadRangeDialog implements BulkFolderDocumentImportService.ImportControl {
-        private final Object pauseLock = new Object();
         private final JDialog dialog = new JDialog(HomeView.this, "Bulk Document Upload", Dialog.ModalityType.APPLICATION_MODAL);
         private final CardLayout cards = new CardLayout();
         private final JPanel cardPanel = new JPanel(cards);
@@ -364,12 +363,9 @@ public class HomeView extends JFrame {
         private final JProgressBar progressBar = new JProgressBar(0, 100);
         private final JButton startButton = UniversalDialogHelper.primaryButton("Start Upload", UniversalDialogHelper.PRIMARY);
         private final JButton cancelButton = UniversalDialogHelper.secondaryButton("Cancel");
-        private final JButton pauseButton = UniversalDialogHelper.secondaryButton("Pause");
         private final JButton stopButton = UniversalDialogHelper.secondaryButton("Stop");
         private SwingWorker<BulkFolderDocumentImportService.ImportResult, Void> worker;
         private volatile boolean running;
-        private volatile boolean paused;
-        private volatile boolean pauseRequested;
         private volatile boolean stopRequested;
         private volatile boolean completed;
 
@@ -457,7 +453,7 @@ public class HomeView extends JFrame {
             JPanel body = UniversalDialogHelper.createDialogCard();
             body.add(UniversalDialogHelper.createDialogSectionHeader(
                     "Uploading documents",
-                    "Pause or stop will take effect after the current employee finishes."
+                    "Stop will take effect after the current employee finishes."
             ));
             body.add(Box.createVerticalStrut(14));
 
@@ -485,9 +481,7 @@ public class HomeView extends JFrame {
 
         private JPanel progressFooter() {
             JPanel footer = UniversalDialogHelper.createFooter();
-            pauseButton.addActionListener(event -> togglePause());
             stopButton.addActionListener(event -> requestStop());
-            footer.add(pauseButton);
             footer.add(stopButton);
             return footer;
         }
@@ -610,7 +604,6 @@ public class HomeView extends JFrame {
                     bulkDocumentActionRunning = false;
                     setBulkDocumentButtonReady();
                     setExcelButtonReady();
-                    pauseButton.setEnabled(false);
                     stopButton.setEnabled(false);
                     try {
                         BulkFolderDocumentImportService.ImportResult result = get();
@@ -682,37 +675,12 @@ public class HomeView extends JFrame {
             statusLabel.setText(UniversalDialogHelper.htmlWrap(detail.status()));
         }
 
-        private void togglePause() {
-            if (!running || completed || stopRequested) {
-                return;
-            }
-            synchronized (pauseLock) {
-                if (paused) {
-                    paused = false;
-                    pauseRequested = false;
-                    pauseButton.setText("Pause");
-                    showInlineStatus("Resuming upload...");
-                    pauseLock.notifyAll();
-                } else {
-                    pauseRequested = true;
-                    pauseButton.setEnabled(false);
-                    showInlineStatus("Pausing after current employee completes...");
-                }
-            }
-        }
-
         private void requestStop() {
             if (!running || completed || stopRequested) {
                 return;
             }
             stopRequested = true;
             stopButton.setEnabled(false);
-            pauseButton.setEnabled(false);
-            synchronized (pauseLock) {
-                paused = false;
-                pauseRequested = false;
-                pauseLock.notifyAll();
-            }
             showInlineStatus("Stopping after current employee completes...");
         }
 
@@ -736,20 +704,6 @@ public class HomeView extends JFrame {
 
         @Override
         public void waitIfPaused() throws InterruptedException {
-            synchronized (pauseLock) {
-                if (pauseRequested && !stopRequested) {
-                    paused = true;
-                    pauseRequested = false;
-                    SwingUtilities.invokeLater(() -> {
-                        pauseButton.setEnabled(true);
-                        pauseButton.setText("Resume");
-                        showInlineStatus("Paused. Choose Resume to continue.");
-                    });
-                }
-                while (paused && !stopRequested) {
-                    pauseLock.wait();
-                }
-            }
         }
 
         private String blankDash(String value) {

@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
@@ -63,6 +64,7 @@ public class BulkFolderDocumentImportService {
     }
 
     public ImportResult importFolders(File[] selectedFolders, ProgressListener progressListener) throws IOException {
+        EmployeeDocumentUtil.refreshDocumentTypes();
         List<File> folders = validFolders(selectedFolders);
         boolean compressionEnabled = AppConfig.bulkImportCompressionEnabled();
         ImportSummary summary = new ImportSummary(null, compressionEnabled);
@@ -70,9 +72,10 @@ public class BulkFolderDocumentImportService {
     }
 
     public ImportResult importConfiguredFolder(ProgressListener progressListener) throws IOException {
+        EmployeeDocumentUtil.refreshDocumentTypes();
         Path sourceRoot = AppConfig.bulkImportFolderDirectory();
         boolean compressionEnabled = AppConfig.bulkImportCompressionEnabled();
-        ImportSummary summary = new ImportSummary(sourceRoot.toFile(), compressionEnabled);
+        ImportSummary summary = new ImportSummary(sourceRoot == null ? null : sourceRoot.toFile(), compressionEnabled);
         List<File> folders = configuredEmployeeFolders(sourceRoot, summary);
         return importFolders(folders, summary, compressionEnabled, progressListener);
     }
@@ -83,9 +86,10 @@ public class BulkFolderDocumentImportService {
             ProgressListener progressListener,
             ImportControl control
     ) throws IOException, InterruptedException {
+        EmployeeDocumentUtil.refreshDocumentTypes();
         Path sourceRoot = AppConfig.bulkImportFolderDirectory();
         boolean compressionEnabled = AppConfig.bulkImportCompressionEnabled();
-        ImportSummary summary = new ImportSummary(sourceRoot.toFile(), compressionEnabled);
+        ImportSummary summary = new ImportSummary(sourceRoot == null ? null : sourceRoot.toFile(), compressionEnabled);
         List<File> folders = configuredEmployeeFoldersInRange(sourceRoot, startCode, endCode, summary);
         return importExactFolders(folders, summary, compressionEnabled, progressListener, control);
     }
@@ -227,6 +231,10 @@ public class BulkFolderDocumentImportService {
             }
             int documentIndex = match.documentIndex();
             String documentLabel = EmployeeDocumentUtil.cleanDocumentLabel(documentIndex);
+            if (matchedThisFolder.contains(documentIndex)) {
+                summary.failed(employeeCode, "Duplicate document label in folder", file.getName());
+                continue;
+            }
             if (EmployeeDocumentUtil.hasStoredPath(EmployeeDocumentUtil.documentPath(employee, documentIndex))) {
                 summary.skippedDocument(employeeCode, documentLabel, file.getName(), "Already saved in database; left unchanged");
                 continue;
@@ -251,10 +259,6 @@ public class BulkFolderDocumentImportService {
                         file.getName(),
                         "File already exists in employee storage; left unchanged"
                 );
-                continue;
-            }
-            if (matchedThisFolder.contains(documentIndex)) {
-                summary.failed(employeeCode, "Duplicate document label in folder", documentLabel);
                 continue;
             }
             if (EmployeeDocumentUtil.shouldCompressBeforeUpload(file, compressionEnabled)) {
@@ -282,7 +286,7 @@ public class BulkFolderDocumentImportService {
                         fileIndex,
                         files.size()
                 );
-                String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage(employeeCode, documentIndex, prepared.file());
+                String dbPath = storePreparedDocument(employeeCode, documentIndex, file, prepared);
                 EmployeeDocumentUtil.setDocumentPath(update, documentIndex, dbPath);
                 matchedThisFolder.add(documentIndex);
                 uploadedForEmployee++;
@@ -403,6 +407,11 @@ public class BulkFolderDocumentImportService {
 
             int documentIndex = match.documentIndex();
             String documentLabel = EmployeeDocumentUtil.cleanDocumentLabel(documentIndex);
+            if (matchedThisFolder.contains(documentIndex)) {
+                summary.failed(employeeCode, "Duplicate document label in folder", fileName);
+                counters.duplicates++;
+                continue;
+            }
             if (EmployeeDocumentUtil.hasStoredPath(EmployeeDocumentUtil.documentPath(employee, documentIndex))) {
                 summary.skippedDocument(employeeCode, documentLabel, fileName, "already exists in DB - not uploaded");
                 counters.skipped++;
@@ -426,11 +435,6 @@ public class BulkFolderDocumentImportService {
                 }
                 summary.skippedDocument(employeeCode, documentLabel, fileName, "Different file already exists in employee storage - not uploaded");
                 counters.skipped++;
-                counters.duplicates++;
-                continue;
-            }
-            if (matchedThisFolder.contains(documentIndex)) {
-                summary.failed(employeeCode, "Duplicate document label in folder", fileName);
                 counters.duplicates++;
                 continue;
             }
@@ -465,7 +469,7 @@ public class BulkFolderDocumentImportService {
                         totalFolders,
                         filePercent(folderIndex, totalFolders, fileIndex, files.size())
                 );
-                String dbPath = EmployeeDocumentUtil.copyDocumentToEmployeeStorage(employeeCode, documentIndex, prepared.file());
+                String dbPath = storePreparedDocument(employeeCode, documentIndex, file, prepared);
                 EmployeeDocumentUtil.setDocumentPath(update, documentIndex, dbPath);
                 matchedThisFolder.add(documentIndex);
                 uploadedForEmployee++;
@@ -543,6 +547,47 @@ public class BulkFolderDocumentImportService {
             return EmployeeStorageUtil.profileImagePath(employeeCode);
         }
         return EmployeeStorageUtil.documentPath(employeeCode, storageName);
+    }
+
+    private String storePreparedDocument(
+            String employeeCode,
+            int documentIndex,
+            File originalSource,
+            EmployeeDocumentUtil.PreparedUploadFile prepared
+    ) throws IOException {
+        Path storageTarget = storageTargetPath(employeeCode, documentIndex);
+        if (!sourceIsInEmployeeStorageDirectory(employeeCode, originalSource)) {
+            return EmployeeDocumentUtil.copyDocumentToEmployeeStorage(employeeCode, documentIndex, prepared.file());
+        }
+
+        Files.createDirectories(storageTarget.getParent());
+        if (prepared.compressed()) {
+            Files.copy(prepared.file().toPath(), storageTarget, StandardCopyOption.REPLACE_EXISTING);
+            deleteOriginalIfDifferent(originalSource, storageTarget);
+        } else {
+            Files.move(originalSource.toPath(), storageTarget, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return storageLogicalPath(employeeCode, documentIndex);
+    }
+
+    private boolean sourceIsInEmployeeStorageDirectory(String employeeCode, File source) {
+        if (source == null || source.getParentFile() == null) {
+            return false;
+        }
+        Path employeeDirectory = EmployeeStorageUtil.employeeDirectory(employeeCode).toAbsolutePath().normalize();
+        Path parent = source.getParentFile().toPath().toAbsolutePath().normalize();
+        return parent.equals(employeeDirectory);
+    }
+
+    private void deleteOriginalIfDifferent(File originalSource, Path storageTarget) throws IOException {
+        if (originalSource == null) {
+            return;
+        }
+        Path originalPath = originalSource.toPath().toAbsolutePath().normalize();
+        Path targetPath = storageTarget.toAbsolutePath().normalize();
+        if (!originalPath.equals(targetPath)) {
+            Files.deleteIfExists(originalPath);
+        }
     }
 
     private boolean isSameFile(Path first, Path second) {
