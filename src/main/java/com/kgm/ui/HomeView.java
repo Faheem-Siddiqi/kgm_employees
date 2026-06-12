@@ -490,7 +490,7 @@ public class HomeView extends JFrame {
             boolean compressionEnabled = AppConfig.bulkImportCompressionEnabled();
             String compression = compressionEnabled
                     ? "Compression on for files above " + com.kgm.util.EmployeeDocumentUtil.maxUploadSizeLabel()
-                    : "Compression off; valid JPG/JPEG files upload as-is";
+                    : "Valid JPG/JPEG files upload as-is";
             JPanel box = UniversalDialogHelper.createInfoBox(
                     "Current upload settings",
                     "Source: " + AppConfig.bulkImportFolderDirectory() + "<br>" + compression,
@@ -872,7 +872,7 @@ public class HomeView extends JFrame {
                 + "\nUploaded: " + result.uploadedCount() + " document" + plural(result.uploadedCount())
                 + "\nNeeds review: " + result.skippedCount() + " item" + plural(result.skippedCount())
                 + "\nSource folder: " + displayPath(result.sourceDirectory())
-                + "\nCompression: " + (result.compressionEnabled() ? "On" : "Off")
+                + "\nImage handling: " + (result.compressionEnabled() ? "Large files are optimized before upload" : "Original JPG/JPEG files are used")
                 + "\nOnly correctly labeled files are uploaded. Incorrect labels are discarded and listed below."
                 + "\nOnly files directly inside each Employee-Code folder were checked. Nested folders were ignored.";
     }

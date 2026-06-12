@@ -232,11 +232,13 @@ public class BulkFolderDocumentImportService {
             int documentIndex = match.documentIndex();
             String documentLabel = EmployeeDocumentUtil.cleanDocumentLabel(documentIndex);
             if (matchedThisFolder.contains(documentIndex)) {
-                summary.failed(employeeCode, "Duplicate document label in folder", file.getName());
+                cleanupExtraMatchedFile(employeeCode, documentIndex, file);
                 continue;
             }
             if (EmployeeDocumentUtil.hasStoredPath(EmployeeDocumentUtil.documentPath(employee, documentIndex))) {
+                cleanupExtraMatchedFile(employeeCode, documentIndex, file);
                 summary.skippedDocument(employeeCode, documentLabel, file.getName(), "Already saved in database; left unchanged");
+                matchedThisFolder.add(documentIndex);
                 continue;
             }
             Path storageTarget = storageTargetPath(employeeCode, documentIndex);
@@ -410,14 +412,14 @@ public class BulkFolderDocumentImportService {
             int documentIndex = match.documentIndex();
             String documentLabel = EmployeeDocumentUtil.cleanDocumentLabel(documentIndex);
             if (matchedThisFolder.contains(documentIndex)) {
-                summary.failed(employeeCode, "Duplicate document label in folder", fileName);
-                counters.duplicates++;
+                cleanupExtraMatchedFile(employeeCode, documentIndex, file);
                 continue;
             }
             if (EmployeeDocumentUtil.hasStoredPath(EmployeeDocumentUtil.documentPath(employee, documentIndex))) {
+                cleanupExtraMatchedFile(employeeCode, documentIndex, file);
                 summary.skippedDocument(employeeCode, documentLabel, fileName, "already exists in DB - not uploaded");
+                matchedThisFolder.add(documentIndex);
                 counters.skipped++;
-                counters.duplicates++;
                 continue;
             }
             Path storageTarget = storageTargetPath(employeeCode, documentIndex);
@@ -580,7 +582,12 @@ public class BulkFolderDocumentImportService {
         }
         Path employeeDirectory = EmployeeStorageUtil.employeeDirectory(employeeCode).toAbsolutePath().normalize();
         Path parent = source.getParentFile().toPath().toAbsolutePath().normalize();
-        return parent.equals(employeeDirectory);
+        try {
+            return Files.isSameFile(parent, employeeDirectory);
+        } catch (IOException exception) {
+            return parent.equals(employeeDirectory)
+                    || parent.toString().equalsIgnoreCase(employeeDirectory.toString());
+        }
     }
 
     private void deleteOriginalIfDifferent(File originalSource, Path storageTarget) throws IOException {
@@ -591,6 +598,20 @@ public class BulkFolderDocumentImportService {
         Path targetPath = storageTarget.toAbsolutePath().normalize();
         if (!originalPath.equals(targetPath)) {
             Files.deleteIfExists(originalPath);
+        }
+    }
+
+    private void cleanupExtraMatchedFile(String employeeCode, int documentIndex, File source) {
+        if (!sourceIsInEmployeeStorageDirectory(employeeCode, source)) {
+            return;
+        }
+        try {
+            Path sourcePath = source.toPath().toAbsolutePath().normalize();
+            Path canonicalTarget = storageTargetPath(employeeCode, documentIndex).toAbsolutePath().normalize();
+            if (!sourcePath.equals(canonicalTarget)) {
+                Files.deleteIfExists(sourcePath);
+            }
+        } catch (IOException ignored) {
         }
     }
 
@@ -609,14 +630,14 @@ public class BulkFolderDocumentImportService {
     ) {
         String originalSize = EmployeeDocumentUtil.formatSize(source.length());
         if (!compressionEnabled) {
-            return "Compression off; uploaded original file (" + originalSize + ")";
+            return "Uploaded (" + originalSize + ")";
         }
         if (prepared.compressed()) {
             return prepared.message() == null || prepared.message().isBlank()
-                    ? "Compressed before upload"
+                    ? "Compressed and uploaded"
                     : prepared.message();
         }
-        return "No compression needed (" + originalSize + ")";
+        return "Uploaded (" + originalSize + ")";
     }
 
     static List<String> employeeFolderLookupNames(String folderName) {
