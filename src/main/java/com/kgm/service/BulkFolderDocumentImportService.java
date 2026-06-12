@@ -253,13 +253,15 @@ public class BulkFolderDocumentImportService {
                     );
                     continue;
                 }
-                summary.skippedDocument(
-                        employeeCode,
-                        documentLabel,
-                        file.getName(),
-                        "File already exists in employee storage; left unchanged"
-                );
-                continue;
+                if (!sourceIsInEmployeeStorageDirectory(employeeCode, file)) {
+                    summary.skippedDocument(
+                            employeeCode,
+                            documentLabel,
+                            file.getName(),
+                            "File already exists in employee storage; left unchanged"
+                    );
+                    continue;
+                }
             }
             if (EmployeeDocumentUtil.shouldCompressBeforeUpload(file, compressionEnabled)) {
                 reportFileStep(
@@ -433,10 +435,12 @@ public class BulkFolderDocumentImportService {
                     );
                     continue;
                 }
-                summary.skippedDocument(employeeCode, documentLabel, fileName, "Different file already exists in employee storage - not uploaded");
-                counters.skipped++;
-                counters.duplicates++;
-                continue;
+                if (!sourceIsInEmployeeStorageDirectory(employeeCode, file)) {
+                    summary.skippedDocument(employeeCode, documentLabel, fileName, "Different file already exists in employee storage - not uploaded");
+                    counters.skipped++;
+                    counters.duplicates++;
+                    continue;
+                }
             }
 
             if (EmployeeDocumentUtil.shouldCompressBeforeUpload(file, compressionEnabled)) {
