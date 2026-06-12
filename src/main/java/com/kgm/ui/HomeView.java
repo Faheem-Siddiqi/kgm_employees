@@ -896,7 +896,7 @@ public class HomeView extends JFrame {
             }
             card.add(Box.createVerticalStrut(8));
             card.add(folderLink("Employee-Code: " + employee.displayName(), employee.folder()));
-            addSummaryParagraph(card, "Uploaded images", detailTexts(employee.uploadedDetails()), UniversalDialogHelper.surface(UniversalDialog.Type.SUCCESS));
+            addGroupedSummaryLines(card, uploadDetailGroups(employee.uploadedDetails()), UniversalDialogHelper.surface(UniversalDialog.Type.SUCCESS));
         }
         return card;
     }
@@ -934,6 +934,19 @@ public class HomeView extends JFrame {
             return;
         }
         card.add(wrappedText(label + ": " + String.join(", ", values), background));
+    }
+
+    private void addGroupedSummaryLines(
+            JPanel card,
+            Map<String, java.util.List<String>> groups,
+            Color background
+    ) {
+        if (groups == null || groups.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, java.util.List<String>> group : groups.entrySet()) {
+            addSummaryParagraph(card, group.getKey(), group.getValue(), background);
+        }
     }
 
     private void addGroupedDetailSections(
@@ -985,6 +998,31 @@ public class HomeView extends JFrame {
             values.add(detail.displayText());
         }
         return values;
+    }
+
+    private Map<String, java.util.List<String>> uploadDetailGroups(
+            java.util.List<BulkFolderDocumentImportService.DocumentUploadDetail> details
+    ) {
+        Map<String, java.util.List<String>> groups = new LinkedHashMap<>();
+        if (details == null) {
+            return groups;
+        }
+        for (BulkFolderDocumentImportService.DocumentUploadDetail detail : details) {
+            String group = uploadStatusGroup(detail.status());
+            groups.computeIfAbsent(group, key -> new java.util.ArrayList<>()).add(detailFileText(detail));
+        }
+        return groups;
+    }
+
+    private String uploadStatusGroup(String status) {
+        String lower = status == null ? "" : status.toLowerCase();
+        if (lower.contains("compressed")) {
+            return "Compressed";
+        }
+        if (lower.contains("already in employee storage")) {
+            return "Path saved";
+        }
+        return "Uploaded";
     }
 
     private Map<String, java.util.List<String>> detailGroupsByStatus(

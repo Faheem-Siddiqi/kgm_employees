@@ -18,10 +18,10 @@ public final class StartupController {
     public static void start() {
         RuntimeException startupFailure = configurationFailure();
         DatabaseConnection.setConnectionFailureListener(DatabaseSetupView::showConnectionFailure);
-        showStartupResult(startupFailure);
         if (startupFailure == null) {
             ApplicationStartup.startSilently();
         }
+        showStartupResult(startupFailure);
         waitForApplicationExit();
     }
 

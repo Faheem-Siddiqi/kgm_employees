@@ -347,9 +347,13 @@ public final class EmployeeStorageConnectionDialog {
             runConnectionWorker(
                     "Checking employee storage folder...",
                     "Checking...",
-                    () -> WindowsNetworkShareConnector.exists(Path.of(expected))
-                            ? WindowsNetworkShareConnector.ConnectionResult.success()
-                            : WindowsNetworkShareConnector.ConnectionResult.failed("Folder is not accessible."),
+                    () -> {
+                        Path folder = Path.of(expected);
+                        if (WindowsNetworkShareConnector.exists(folder)) {
+                            return WindowsNetworkShareConnector.ConnectionResult.success();
+                        }
+                        return WindowsNetworkShareConnector.reconnectStored(expected);
+                    },
                     expected,
                     null
             );

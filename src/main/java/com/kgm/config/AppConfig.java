@@ -81,6 +81,10 @@ public final class AppConfig {
         );
     }
 
+    public static boolean employeeServerStorageDirectoryConfigured() {
+        return configuredEmployeeStorageDir() != null && !configuredEmployeeStorageDir().isBlank();
+    }
+
     public static String employeeStorageDefaultServer() {
         return setting(
                 EMPLOYEE_STORAGE_DEFAULT_SERVER_PROPERTY,
@@ -122,7 +126,7 @@ public final class AppConfig {
         if (configured != null && !configured.isBlank()) {
             return configuredPath(configured);
         }
-        return Path.of(System.getProperty("user.dir"), "employees").toAbsolutePath().normalize();
+        throw new IllegalStateException("KGM_EMPLOYEE_STORAGE_DIR is required when employee storage server mode is enabled.");
     }
 
     private static Path defaultLocalEmployeeStorageDirectory() {

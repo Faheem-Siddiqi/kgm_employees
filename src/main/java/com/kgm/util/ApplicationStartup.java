@@ -9,6 +9,8 @@ import com.kgm.ui.styling.DialogHelper;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -21,7 +23,7 @@ public final class ApplicationStartup {
     private static final int STARTUP_NOTICE_DELAY_MS = 850;
     private static final int POST_LOGIN_OVERLAY_DELAY_MS = 450;
     private static final int AUTO_RETRY_DELAY_MS = 4_000;
-    private static final int STORAGE_CHECK_TIMEOUT_SECONDS = 3;
+    private static final int STORAGE_CHECK_TIMEOUT_SECONDS = 4;
     private static final int LONG_WAIT_NOTICE_DELAY_MS = 8_000;
     private static final Object LOCK = new Object();
     private static final List<ReadyWaiter> readyWaiters = new ArrayList<>();
@@ -63,6 +65,7 @@ public final class ApplicationStartup {
             return;
         }
 
+        ensureStarted();
         ReadyWaiter waiter = new ReadyWaiter(parent, onReady, onFailure);
         synchronized (LOCK) {
             runNow = ready;
@@ -76,7 +79,6 @@ public final class ApplicationStartup {
         }
         schedulePostLoginOverlay(waiter);
         updateReadyWaitersForPhase(currentPhase());
-        ensureStarted();
         scheduleLongWaitNotice();
     }
 
@@ -234,7 +236,7 @@ public final class ApplicationStartup {
 
     private static void ensureStorageRootWithTimeout() throws Exception {
         FutureTask<Void> task = new FutureTask<>(() -> {
-            EmployeeStorageUtil.ensureStorageRoot();
+            ensureStartupStorageRoot();
             return null;
         });
         Thread worker = new Thread(task, "KGM employee storage startup check");
@@ -256,6 +258,24 @@ public final class ApplicationStartup {
             }
             throw new IllegalStateException(cause);
         }
+    }
+
+    private static void ensureStartupStorageRoot() throws IOException {
+        Path root = EmployeeStorageUtil.storageRoot();
+        if (isUncPath(root) && !WindowsNetworkShareConnector.exists(root)) {
+            WindowsNetworkShareConnector.ConnectionResult reconnect = WindowsNetworkShareConnector.reconnectStored(root.toString());
+            if (!reconnect.connected()) {
+                throw new IOException(reconnect.message().isBlank()
+                        ? "Windows could not reconnect the employee storage folder."
+                        : reconnect.message());
+            }
+        }
+        EmployeeStorageUtil.ensureStorageRoot();
+    }
+
+    private static boolean isUncPath(Path path) {
+        String value = path == null ? "" : path.toString();
+        return value.startsWith("\\\\") || value.startsWith("//");
     }
 
     private static void showEmployeeStorageConnectionFailure() {
