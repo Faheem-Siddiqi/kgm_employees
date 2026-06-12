@@ -64,8 +64,8 @@ public final class ApplicationStartup {
 
         LoadingOverlay.Handle loader = LoadingOverlay.show(
                 parent,
-                "Login Successful",
-                phaseMessage(currentPhase())
+                "Checking database",
+                loginWaitMessage(currentPhase())
         );
         loader.setProgress(phaseProgress(currentPhase()));
         synchronized (LOCK) {
@@ -314,7 +314,7 @@ public final class ApplicationStartup {
             cancelDelayedNotice();
             delayedNoticeTimer = new Timer(STARTUP_NOTICE_DELAY_MS, event -> {
                 synchronized (LOCK) {
-                    if (ready || startupWorker == null || startupWorker.isDone()) {
+                    if (ready || startupWorker == null || startupWorker.isDone() || readyWaiters.isEmpty()) {
                         return;
                     }
                     if (startupPhase != StartupPhase.CONNECTING_DATABASE) {
@@ -388,7 +388,7 @@ public final class ApplicationStartup {
     }
 
     private static void updateReadyWaitersForPhase(StartupPhase phase) {
-        updateReadyWaiters(phaseMessage(phase), phaseProgress(phase));
+        updateReadyWaiters(loginWaitMessage(phase), phaseProgress(phase));
     }
 
     private static void updateReadyWaiters(String message, int progress) {
@@ -408,6 +408,16 @@ public final class ApplicationStartup {
             case LOADING_METADATA -> "Loading field settings and document configuration... 90%";
             case READY -> "Application is ready... 100%";
             case IDLE -> "Preparing application in the background. This may take a moment after login... 10%";
+        };
+    }
+
+    private static String loginWaitMessage(StartupPhase phase) {
+        return switch (phase) {
+            case PREPARING_STORAGE -> "Checking employee storage before opening the dashboard... 20%";
+            case CONNECTING_DATABASE -> "Checking MySQL database before opening the dashboard... 60%";
+            case LOADING_METADATA -> "Loading field settings before opening the dashboard... 90%";
+            case READY -> "Application is ready... 100%";
+            case IDLE -> "Checking application setup before opening the dashboard... 10%";
         };
     }
 
