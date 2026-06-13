@@ -360,6 +360,9 @@ public class HomeView extends JFrame {
         private final JLabel employeeLabel = new JLabel("Employee Code: -");
         private final JLabel documentLabel = new JLabel("Document: -");
         private final JLabel stopNoticeLabel = new JLabel(" ");
+        // KPI meanings: Uploaded = saved to employee storage/DB, Skipped = already present or left unchanged,
+        // Failed = upload/preparation/database error, Duplicate = another file already owns the same target,
+        // Discarded = file did not match one clear document label.
         private final JLabel countLabel = new JLabel("Uploaded 0 | Skipped 0 | Failed 0 | Duplicate 0 | Discarded 0");
         private final JLabel statusLabel = new JLabel(UniversalDialogHelper.htmlWrap("Waiting to start..."));
         private final JProgressBar progressBar = new JProgressBar(0, 100);

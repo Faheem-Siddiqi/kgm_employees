@@ -573,15 +573,7 @@ public final class EmployeeStorageConnectionDialog {
         }
 
         private void closeDialog() {
-            if (connected) {
-                dialog.dispose();
-                return;
-            }
-            if (busy) {
-                showError("KGM is still checking the shared folder. Please wait for this attempt to finish, then use Retry or Connect.");
-                return;
-            }
-            showError("Employee storage is required before the app can continue. Fix the details, then choose Connect. If Windows was already connected, choose Retry.");
+            dialog.dispose();
         }
 
         private void prefillFromConfiguredPath() {
