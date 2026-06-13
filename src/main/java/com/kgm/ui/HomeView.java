@@ -18,6 +18,7 @@ import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.panel.KPIRowsPanel;
 import com.kgm.ui.styling.DialogHelper;
+import com.kgm.ui.styling.ButtonStateHelper;
 import com.kgm.ui.styling.HomeViewHelper;
 import com.kgm.ui.styling.UniversalDialogHelper;
 
@@ -364,7 +365,7 @@ public class HomeView extends JFrame {
         private final JProgressBar progressBar = new JProgressBar(0, 100);
         private final JButton startButton = UniversalDialogHelper.primaryButton("Start Upload", UniversalDialogHelper.PRIMARY);
         private final JButton cancelButton = UniversalDialogHelper.secondaryButton("Cancel");
-        private final JButton stopButton = UniversalDialogHelper.secondaryButton("Stop");
+        private final JButton stopButton = UniversalDialogHelper.primaryButton("Stop", UniversalDialogHelper.ERROR_ACCENT);
         private SwingWorker<BulkFolderDocumentImportService.ImportResult, Void> worker;
         private volatile boolean running;
         private volatile boolean stopRequested;
@@ -571,6 +572,12 @@ public class HomeView extends JFrame {
                     UniversalDialogHelper.roundedBorder(UniversalDialogHelper.ERROR_ACCENT, 6, 1),
                     BorderFactory.createEmptyBorder(8, 14, 8, 14)
             ));
+            ButtonStateHelper.setHoverBackground(
+                    stopButton,
+                    UniversalDialogHelper.ERROR_ACCENT,
+                    UniversalDialogHelper.ERROR_ACCENT
+            );
+            ButtonStateHelper.setDisabledColors(stopButton, UniversalDialogHelper.ERROR_ACCENT, Color.WHITE);
         }
 
         private void styleRangeField(JTextField field) {
@@ -699,8 +706,9 @@ public class HomeView extends JFrame {
                 return;
             }
             stopRequested = true;
-            stopButton.setEnabled(false);
             stopButton.setText("Stopping...");
+            stopButton.setPreferredSize(new Dimension(112, 36));
+            stopButton.setEnabled(false);
             stopNoticeLabel.setText("Stopping safely after the current employee finishes.");
             showInlineStatus("The upload will stop after KGM finishes the employee currently in progress.");
         }

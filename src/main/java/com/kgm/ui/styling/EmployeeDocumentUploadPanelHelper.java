@@ -236,7 +236,9 @@ public final class EmployeeDocumentUploadPanelHelper {
         frame.setResizable(true);
         frame.setSize(new Dimension(width, height));
         frame.setMinimumSize(new Dimension(Math.min(520, width), Math.min(360, height)));
-        frame.setLocationRelativeTo(relativeTo);
+        frame.setLocationByPlatform(false);
+        Window owner = relativeTo == null ? null : SwingUtilities.getWindowAncestor(relativeTo);
+        frame.setLocationRelativeTo(owner == null ? relativeTo : owner);
     }
 
     private static JLabel createTextDivider() {

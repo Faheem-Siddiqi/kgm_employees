@@ -13,6 +13,8 @@ public final class ButtonStateHelper {
     private static final String ROUND_RADIUS = "kgm.buttonState.roundRadius";
     private static final String HOVER_BACKGROUND = "kgm.buttonState.hoverBackground";
     private static final String PRESSED_BACKGROUND = "kgm.buttonState.pressedBackground";
+    private static final String DISABLED_BACKGROUND = "kgm.buttonState.disabledBackground";
+    private static final String DISABLED_FOREGROUND = "kgm.buttonState.disabledForeground";
     private static final String PAINT_ROUNDED_BACKGROUND = "kgm.buttonState.paintRoundedBackground";
     private static final Color FILLED_BUTTON_TEXT = Color.WHITE;
     private static final Color PLAIN_BUTTON_TEXT = new Color(99, 115, 129);
@@ -60,6 +62,15 @@ public final class ButtonStateHelper {
         button.repaint();
     }
 
+    public static void setDisabledColors(AbstractButton button, Color background, Color foreground) {
+        if (button == null) {
+            return;
+        }
+        button.putClientProperty(DISABLED_BACKGROUND, background);
+        button.putClientProperty(DISABLED_FOREGROUND, foreground);
+        applyState(button);
+    }
+
     public static void setEnabled(AbstractButton button, boolean enabled) {
         install(button);
         button.setEnabled(enabled);
@@ -86,10 +97,10 @@ public final class ButtonStateHelper {
 
         button.setForeground(button.isEnabled()
                 ? textColorFor(button, background, foreground)
-                : disabledTextColorFor(filled));
+                : colorProperty(button, DISABLED_FOREGROUND, disabledTextColorFor(filled)));
         button.setBackground(button.isEnabled()
                 ? background
-                : disabledBackgroundFor(background, filled));
+                : colorProperty(button, DISABLED_BACKGROUND, disabledBackgroundFor(background, filled)));
         button.setCursor(button.isEnabled()
                 ? cursor
                 : Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));

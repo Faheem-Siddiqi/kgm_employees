@@ -176,13 +176,16 @@ public Insets getBorderInsets(Component c) {
             if (image == null) {
                 drawPlaceholder(g2, width, height);
             } else {
-                drawCoverImage(g2, width, height);
+                drawContainedImage(g2, width, height);
             }
             g2.dispose();
         }
 
-        private void drawCoverImage(Graphics2D g2, int width, int height) {
-            double scale = Math.max(width / (double) image.getWidth(), height / (double) image.getHeight());
+        private void drawContainedImage(Graphics2D g2, int width, int height) {
+            int inset = 8;
+            int availableWidth = Math.max(1, width - inset * 2);
+            int availableHeight = Math.max(1, height - inset * 2);
+            double scale = Math.min(availableWidth / (double) image.getWidth(), availableHeight / (double) image.getHeight());
             int drawWidth = Math.max(1, (int) Math.round(image.getWidth() * scale));
             int drawHeight = Math.max(1, (int) Math.round(image.getHeight() * scale));
             int x = (width - drawWidth) / 2;
