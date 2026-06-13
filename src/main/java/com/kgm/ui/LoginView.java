@@ -14,6 +14,7 @@ public class LoginView extends JFrame {
 
     public LoginView() {
         LoginViewHelper.applyFrame(this);
+        ApplicationStartup.startSilently();
 
         JPanel root = LoginViewHelper.createRootPanel();
         add(root, BorderLayout.CENTER);
@@ -56,6 +57,7 @@ public class LoginView extends JFrame {
             String pass = new String(passField.getPassword());
             if (AuthService.login(user, pass)) {
                 loginBtn.setEnabled(false);
+                loginBtn.setText("Opening...");
                 ApplicationStartup.prepareThen(
                         this,
                         () -> {
@@ -64,7 +66,10 @@ public class LoginView extends JFrame {
                             SessionWatcher.closeAllWindows();
                             new HomeView();
                         },
-                        () -> loginBtn.setEnabled(true)
+                        () -> {
+                            loginBtn.setText("Sign In");
+                            loginBtn.setEnabled(true);
+                        }
                 );
             } else {
                 DialogHelper.error(this, "Login Failed", "Invalid username or password.");
@@ -74,4 +79,3 @@ public class LoginView extends JFrame {
         return outer;
     }
 }
-
