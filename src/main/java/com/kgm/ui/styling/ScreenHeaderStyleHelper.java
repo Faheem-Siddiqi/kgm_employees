@@ -33,7 +33,7 @@ public final class ScreenHeaderStyleHelper {
     ) {
         JPanel header = new JPanel(new GridBagLayout());
         header.setBackground(PAGE_BACKGROUND);
-        header.setBorder(new EmptyBorder(25, 28, 18, 28));
+        header.setBorder(new EmptyBorder(25, 28, 8, 28));
 
         JPanel titleBlock = createTitleBlock(titleText, subtitleText);
         titleBlock.setMinimumSize(new Dimension(0, titleBlock.getPreferredSize().height));

@@ -1,9 +1,7 @@
 package com.kgm.ui.styling;
 
 import javax.swing.*;
-import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
-import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
@@ -14,9 +12,11 @@ public final class EmployeeRegistrationViewHelper {
     public static final Color TEXT_SECONDARY = new Color(99, 115, 129);
     public static final Color BORDER = new Color(220, 226, 232);
     private static final Color PAGE_BACKGROUND = Color.WHITE;
-    private static final Color LINK_BLUE = new Color(0, 102, 204);
-    private static final Color BUTTON_SECONDARY_BG = new Color(245, 245, 245);
-    private static final Color BUTTON_SECONDARY_TEXT = new Color(80, 80, 80);
+    private static final Color PRIMARY_HOVER = new Color(29, 78, 216);
+    private static final Color PRIMARY_PRESSED = new Color(30, 64, 175);
+    private static final Color SECONDARY_BG = Color.WHITE;
+    private static final Color SECONDARY_HOVER = new Color(248, 250, 252);
+    private static final Color SECONDARY_PRESSED = new Color(241, 245, 249);
     private static final int TAB_CONTENT_INSET = 28;
 
     private EmployeeRegistrationViewHelper() {
@@ -42,7 +42,7 @@ public final class EmployeeRegistrationViewHelper {
 
     public static JPanel createCenterWrapper() {
         JPanel wrapper = new PageContentPanel();
-        wrapper.setBorder(new EmptyBorder(0, 20, 10, 20));
+        wrapper.setBorder(new EmptyBorder(0, 0, 10, 0));
         wrapper.setOpaque(true);
         wrapper.setBackground(PAGE_BACKGROUND);
         return wrapper;
@@ -67,7 +67,7 @@ public final class EmployeeRegistrationViewHelper {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.gridx = 0;
         gbc.gridy = y;
-        gbc.insets = new Insets(0, 0, 12, 0);
+        gbc.insets = new Insets(0, 0, 0, 0);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.NORTH;
         gbc.weightx = 1.0;
@@ -114,32 +114,38 @@ public final class EmployeeRegistrationViewHelper {
     }
 
     public static void stylePrimaryButton(JButton button) {
-        button.setPreferredSize(new Dimension(110, 34));
-        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        Dimension size = new Dimension(110, 36);
+        button.setPreferredSize(size);
+        button.setMinimumSize(size);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         button.setForeground(Color.WHITE);
         button.setBackground(PRIMARY);
-        button.setOpaque(true);
+        button.setOpaque(false);
         button.setBorderPainted(false);
         button.setBorder(new EmptyBorder(8, 16, 8, 16));
-        ButtonStateHelper.install(button);
+        ButtonStateHelper.installRounded(button, 8);
+        ButtonStateHelper.setHoverBackground(button, PRIMARY_HOVER, PRIMARY_PRESSED);
     }
 
     public static void styleSecondaryButton(JButton button) {
-        button.setPreferredSize(new Dimension(110, 34));
-        button.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        Dimension size = new Dimension(110, 36);
+        button.setPreferredSize(size);
+        button.setMinimumSize(size);
+        button.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
         button.setFocusPainted(false);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setForeground(Color.WHITE);
-        button.setBackground(BUTTON_SECONDARY_BG);
-        button.setOpaque(true);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setForeground(new Color(51, 65, 85));
+        button.setBackground(SECONDARY_BG);
+        button.setOpaque(false);
         button.setBorderPainted(true);
-        button.setBorder(new CompoundBorder(
-                new LineBorder(new Color(170, 170, 170)),
-                new EmptyBorder(7, 16, 7, 16)
+        button.setBorder(BorderFactory.createCompoundBorder(
+                UniversalDialogHelper.roundedBorder(new Color(203, 213, 225), 8, 1),
+                new EmptyBorder(8, 16, 8, 16)
         ));
-        ButtonStateHelper.install(button);
+        ButtonStateHelper.installRounded(button, 8);
+        ButtonStateHelper.setHoverBackground(button, SECONDARY_HOVER, SECONDARY_PRESSED);
     }
 
     public static void styleFooterButton(JButton button) {

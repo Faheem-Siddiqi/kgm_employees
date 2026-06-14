@@ -16,7 +16,7 @@ public final class AppTabsHelper {
     public static void styleTabs(JTabbedPane tabs) {
         styleTabs(
                 tabs,
-                new Insets(6, DEFAULT_TAB_CONTENT_INSET, 12, DEFAULT_TAB_CONTENT_INSET),
+                new Insets(0, DEFAULT_TAB_CONTENT_INSET, 12, DEFAULT_TAB_CONTENT_INSET),
                 new Insets(8, 0, 0, 0)
         );
     }

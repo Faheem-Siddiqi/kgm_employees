@@ -428,8 +428,8 @@ public class HomeView extends JFrame {
             grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, 116));
             styleRangeField(startCodeField);
             styleRangeField(endCodeField);
-            addRangeRow(grid, 0, "Start Code", startCodeField, "Example: 1");
-            addRangeRow(grid, 1, "End Code", endCodeField, "Example: 50");
+            addRangeRow(grid, 0, "Start Code", startCodeField, "");
+            addRangeRow(grid, 1, "End Code", endCodeField, "");
             body.add(grid);
             body.add(Box.createVerticalStrut(16));
             body.add(bulkUploadSettingsBox());
@@ -446,6 +446,7 @@ public class HomeView extends JFrame {
 
         private JPanel rangeFooter() {
             JPanel footer = UniversalDialogHelper.createFooter();
+            footer.setBorder(BorderFactory.createEmptyBorder(16, 0, 0, 0));
             cancelButton.addActionListener(event -> requestClose());
             startButton.addActionListener(event -> startUpload());
             footer.add(cancelButton);

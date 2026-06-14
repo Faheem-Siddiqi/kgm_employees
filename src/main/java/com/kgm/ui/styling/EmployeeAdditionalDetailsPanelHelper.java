@@ -16,23 +16,25 @@ public final class EmployeeAdditionalDetailsPanelHelper {
     private static final int INPUT_HEIGHT = 34;
     private static final Color PAGE_BACKGROUND = Color.WHITE;
     private static final Color SECTION_BORDER = new Color(226, 232, 240);
+    private static final Color CONTROL_BORDER = new Color(203, 213, 225);
+    private static final Color CONTROL_BACKGROUND = Color.WHITE;
     private static final Color HEADER_TEXT = new Color(2, 8, 23);
-    private static final Color TEXT_MUTED = new Color(100, 116, 139);
-    private static final Color CHIP_BG = new Color(37, 99, 235);
-    private static final Color CHIP_BG_HOVER = new Color(29, 78, 216);
-    private static final Color CHIP_BG_ACTIVE = new Color(30, 64, 175);
-    private static final Color CHIP_TEXT = Color.WHITE;
+    private static final Color TEXT_MUTED = new Color(71, 85, 105);
+    private static final Color CHIP_BG = Color.WHITE;
+    private static final Color CHIP_BG_HOVER = new Color(248, 250, 252);
+    private static final Color CHIP_BG_ACTIVE = new Color(37, 99, 235);
+    private static final Color CHIP_TEXT = new Color(51, 65, 85);
     private static final Color CHIP_TEXT_ACTIVE = Color.WHITE;
-    private static final Color CHIP_BORDER = new Color(37, 99, 235);
-    private static final Color CHIP_BORDER_ACTIVE = new Color(30, 64, 175);
+    private static final Color CHIP_BORDER = new Color(203, 213, 225);
+    private static final Color CHIP_BORDER_ACTIVE = new Color(37, 99, 235);
     private static final String CHIP_ACTIVE_KEY = "kgm.breadcrumb.active";
     private static final String CHIP_BASE_BG_KEY = "kgm.chip.baseBg";
     private static final String CHIP_HOVER_BG_KEY = "kgm.chip.hoverBg";
     private static final String CHIP_BORDER_KEY = "kgm.chip.border";
-    private static final int CHIP_RADIUS = 2;
-    private static final int CHIP_HEIGHT = 28;
+    private static final int CHIP_RADIUS = 8;
+    private static final int CHIP_HEIGHT = 34;
     private static final int CHIP_MIN_WIDTH = 56;
-    private static final int CHIP_HORIZONTAL_PADDING = 12;
+    private static final int CHIP_HORIZONTAL_PADDING = 14;
 
     private EmployeeAdditionalDetailsPanelHelper() {
     }
@@ -57,8 +59,8 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
         root.setBackground(PAGE_BACKGROUND);
         root.setBorder(new CompoundBorder(
-                new RoundedBorder(8),
-                new EmptyBorder(16, 16, 18, 16)
+                new RoundedBorder(10),
+                new EmptyBorder(18, 18, 20, 18)
         ));
         return root;
     }
@@ -91,11 +93,11 @@ public final class EmployeeAdditionalDetailsPanelHelper {
     }
 
     public static JPanel createBreadcrumbPanel() {
-        JPanel breadcrumb = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        JPanel breadcrumb = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         breadcrumb.setBackground(PAGE_BACKGROUND);
         breadcrumb.setAlignmentX(Component.LEFT_ALIGNMENT);
-        breadcrumb.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
-        breadcrumb.setBorder(new EmptyBorder(0, 0, 8, 0));
+        breadcrumb.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
+        breadcrumb.setBorder(new EmptyBorder(2, 0, 16, 0));
         return breadcrumb;
     }
 
@@ -108,8 +110,8 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
         HomeStatsChartHelper.styleHorizontalScrollBar(scrollPane.getHorizontalScrollBar());
-        scrollPane.setPreferredSize(new Dimension(1, 56));
-        scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
+        scrollPane.setPreferredSize(new Dimension(1, 72));
+        scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
         scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
         return scrollPane;
     }
@@ -128,12 +130,13 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         header.setOpaque(true);
         header.setBackground(PAGE_BACKGROUND);
         header.setAlignmentX(Component.LEFT_ALIGNMENT);
-        header.setMaximumSize(new Dimension(Integer.MAX_VALUE, 74));
+        header.setBorder(new EmptyBorder(0, 0, 6, 0));
+        header.setMaximumSize(new Dimension(Integer.MAX_VALUE, 94));
 
         statusLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         searchPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         header.add(statusLabel);
-        header.add(Box.createVerticalStrut(12));
+        header.add(Box.createVerticalStrut(10));
         header.add(searchPanel);
         return header;
     }
@@ -142,15 +145,15 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         row.setOpaque(false);
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
 
         JPanel searchBox = new JPanel(new BorderLayout(6, 0));
-        searchBox.setBackground(PAGE_BACKGROUND);
-        searchBox.setPreferredSize(new Dimension(360, 36));
-        searchBox.setMinimumSize(new Dimension(260, 36));
+        searchBox.setBackground(CONTROL_BACKGROUND);
+        searchBox.setPreferredSize(new Dimension(392, 40));
+        searchBox.setMinimumSize(new Dimension(280, 40));
         searchBox.setBorder(new CompoundBorder(
-                new RoundedBorder(8),
-                new EmptyBorder(0, 10, 0, 4)
+                new RoundedBorder(8, CONTROL_BORDER),
+                new EmptyBorder(0, 12, 0, 6)
         ));
         searchBox.add(searchField, BorderLayout.CENTER);
         searchBox.add(clearButton, BorderLayout.EAST);
@@ -187,7 +190,7 @@ public final class EmployeeAdditionalDetailsPanelHelper {
         link.setOpaque(false);
         link.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));
         link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        link.setBorder(new EmptyBorder(5, CHIP_HORIZONTAL_PADDING, 5, CHIP_HORIZONTAL_PADDING));
+        link.setBorder(new EmptyBorder(7, CHIP_HORIZONTAL_PADDING, 7, CHIP_HORIZONTAL_PADDING));
         link.setMargin(new Insets(0, 0, 0, 0));
         link.setHorizontalAlignment(SwingConstants.CENTER);
         link.setVerticalAlignment(SwingConstants.CENTER);
@@ -226,7 +229,7 @@ public final class EmployeeAdditionalDetailsPanelHelper {
             setChipVisual(button, CHIP_BG, CHIP_TEXT, CHIP_BORDER);
         }
         button.setFont(new Font("Segoe UI Semibold", active ? Font.BOLD : Font.PLAIN, 12));
-        button.setBorder(new EmptyBorder(5, CHIP_HORIZONTAL_PADDING, 5, CHIP_HORIZONTAL_PADDING));
+        button.setBorder(new EmptyBorder(7, CHIP_HORIZONTAL_PADDING, 7, CHIP_HORIZONTAL_PADDING));
         refreshChipSize(button);
         button.repaint();
     }
@@ -388,15 +391,22 @@ public final class EmployeeAdditionalDetailsPanelHelper {
 
     private static class RoundedBorder extends AbstractBorder {
         private final int radius;
+        private final Color color;
 
         RoundedBorder(int radius) {
             this.radius = radius;
+            this.color = SECTION_BORDER;
+        }
+
+        RoundedBorder(int radius, Color color) {
+            this.radius = radius;
+            this.color = color == null ? SECTION_BORDER : color;
         }
 
         public void paintBorder(Component component, Graphics g, int x, int y, int width, int height) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(SECTION_BORDER);
+            g2.setColor(color);
             g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
             g2.dispose();
         }

@@ -37,7 +37,7 @@ public class EmployeeRegistrationView extends JFrame {
         };
 
         JPanel topContainer = EmployeeRegistrationViewHelper.createTopContainer();
-        topContainer.add(new HeaderPanel("Employee Registration"), BorderLayout.NORTH);
+        topContainer.add(new HeaderPanel("Register Ex-Employee"), BorderLayout.NORTH);
         add(topContainer, BorderLayout.NORTH);
 
         centerWrapper = EmployeeRegistrationViewHelper.createCenterWrapper();

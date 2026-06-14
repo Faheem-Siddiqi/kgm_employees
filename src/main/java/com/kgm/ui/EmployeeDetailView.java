@@ -196,7 +196,7 @@ public class EmployeeDetailView extends JFrame {
     private JPanel createTabLoadingPanel(String title, String message) {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBackground(Color.WHITE);
-        panel.setBorder(BorderFactory.createEmptyBorder(42, 24, 52, 24));
+        panel.setBorder(BorderFactory.createEmptyBorder(42, 28, 52, 28));
 
         JPanel box = new JPanel();
         box.setOpaque(false);
@@ -222,7 +222,7 @@ public class EmployeeDetailView extends JFrame {
     private JPanel createTabErrorPanel(String title, String message, Runnable retryAction) {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBackground(Color.WHITE);
-        panel.setBorder(BorderFactory.createEmptyBorder(46, 24, 56, 24));
+        panel.setBorder(BorderFactory.createEmptyBorder(46, 28, 56, 28));
 
         JPanel box = new JPanel();
         box.setOpaque(false);

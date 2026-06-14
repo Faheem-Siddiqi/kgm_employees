@@ -89,8 +89,8 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
         if (!headings.isEmpty()) {
             sectionNav = EmployeeAdditionalDetailsPanelHelper.createBreadcrumbPanel();
             sectionNavScroller = EmployeeAdditionalDetailsPanelHelper.createBreadcrumbScroller(sectionNav);
-            sectionNavTopGap = Box.createVerticalStrut(12);
-            sectionNavGap = Box.createVerticalStrut(14);
+            sectionNavTopGap = Box.createVerticalStrut(16);
+            sectionNavGap = Box.createVerticalStrut(20);
             root.add(sectionNavTopGap);
             root.add(sectionNavScroller);
             root.add(sectionNavGap);
@@ -113,6 +113,7 @@ public class EmployeeAdditionalDetailsPanel extends JPanel {
             rebuildVisibleSections("");
             root.add(EmployeeAdditionalDetailsPanelHelper.createReturnToTopPanel(() -> scrollToComponent(topAnchor)));
             installBreadcrumbLinks(sectionNav, headings, sectionRefs);
+            filterToMissingFieldsOnly();
         }
 
         installResponsiveLayoutRefresh(root);
