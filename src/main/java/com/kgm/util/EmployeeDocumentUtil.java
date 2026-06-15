@@ -92,6 +92,10 @@ public final class EmployeeDocumentUtil {
         }
     }
 
+    public static List<DocumentType> builtInDocumentTypes() {
+        return DOCUMENT_TYPES;
+    }
+
     public static void refreshDocumentTypes() {
         synchronized (EmployeeDocumentUtil.class) {
             cachedDocumentTypes = null;

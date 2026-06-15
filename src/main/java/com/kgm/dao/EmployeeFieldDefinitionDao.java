@@ -392,8 +392,18 @@ public class EmployeeFieldDefinitionDao {
     }
 
     public List<EmployeeFieldDefinition> listFields() {
+        return listFields(true);
+    }
+
+    public List<EmployeeFieldDefinition> listPreparedFields() {
+        return listFields(false);
+    }
+
+    private List<EmployeeFieldDefinition> listFields(boolean syncWithDatabase) {
         try {
-            syncMetadataWithDatabase();
+            if (syncWithDatabase) {
+                syncMetadataWithDatabase();
+            }
             List<EmployeeFieldDefinition> dbDefinitions = new ArrayList<>(metadataByColumn().values());
             String dbChecksum = EmployeeFieldMetadataStore.metadataChecksum(dbDefinitions);
             repairMetadataBackupIfNeeded(dbDefinitions, dbChecksum);

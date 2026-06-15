@@ -12,7 +12,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class DatabaseInitializer {
     private static volatile boolean initialized;
@@ -352,15 +355,17 @@ public class DatabaseInitializer {
             boolean exists = tableExists(conn);
             stmt.execute(EMPLOYEES_TABLE);
             migrateCurrentAddressColumn(conn);
-            ensureCoreColumns(conn);
-            ensureDocumentColumns(conn);
+            Map<String, Integer> employeeColumns = employeeColumns(conn);
+            ensureCoreColumns(conn, employeeColumns);
+            ensureDocumentColumns(conn, employeeColumns);
             migrateLegacyDocumentColumns(conn);
             EmployeeFieldDefinitionDao fieldDefinitionDao = new EmployeeFieldDefinitionDao(conn);
             fieldDefinitionDao.ensureMetadata();
             fieldDefinitionDao.syncMetadataWithDatabase();
             EmployeeDocumentUtil.refreshDocumentTypes();
-            ensureSearchIndexes(conn);
-            ensureReportingIndexes(conn);
+            Set<String> employeeIndexes = employeeIndexes(conn);
+            ensureSearchIndexes(conn, employeeIndexes);
+            ensureReportingIndexes(conn, employeeColumns, employeeIndexes);
 
             System.out.println(exists ? "=> MySQL schema already exists." : "=> MySQL schema created.");
             initialized = true;
@@ -420,23 +425,24 @@ public class DatabaseInitializer {
         }
     }
 
-    private static void ensureDocumentColumns(Connection conn) throws SQLException {
-        for (EmployeeDocumentUtil.DocumentType documentType : EmployeeDocumentUtil.documentTypes()) {
+    private static void ensureDocumentColumns(Connection conn, Map<String, Integer> columns) throws SQLException {
+        for (EmployeeDocumentUtil.DocumentType documentType : EmployeeDocumentUtil.builtInDocumentTypes()) {
             String column = documentType.employeeFieldName();
-            if (!columnExists(conn, column)) {
+            if (!columns.containsKey(column.toUpperCase())) {
                 try (Statement stmt = conn.createStatement()) {
                     stmt.execute("ALTER TABLE employees ADD COLUMN " + quoteIdentifier(column) + " TEXT");
                 }
+                columns.put(column.toUpperCase(), columns.size() + 1);
             }
         }
     }
 
-    private static void ensureCoreColumns(Connection conn) throws SQLException {
+    private static void ensureCoreColumns(Connection conn, Map<String, Integer> columns) throws SQLException {
         for (String column : STANDARD_EMPLOYEE_TEXT_COLUMNS) {
-            ensureColumn(conn, column);
+            ensureColumn(conn, columns, column);
         }
         for (String column : EmployeeAdditionalFieldDefaults.columnNames()) {
-            ensureColumn(conn, column);
+            ensureColumn(conn, columns, column);
         }
     }
 
@@ -481,13 +487,15 @@ public class DatabaseInitializer {
         }
     }
 
-    private static void ensureColumn(Connection conn, String column) throws SQLException {
-        if (columnExists(conn, column)) {
+    private static void ensureColumn(Connection conn, Map<String, Integer> columns, String column) throws SQLException {
+        String key = column.toUpperCase();
+        if (columns.containsKey(key)) {
             return;
         }
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("ALTER TABLE employees ADD COLUMN " + quoteIdentifier(column) + " TEXT");
         }
+        columns.put(key, columns.size() + 1);
     }
 
     private static void migrateLegacyDocumentColumns(Connection conn) throws SQLException {
@@ -507,32 +515,55 @@ public class DatabaseInitializer {
         }
     }
 
-    private static void ensureSearchIndexes(Connection conn) throws SQLException {
-        if (indexExists(conn, "uk_employee_code") || indexExists(conn, "idx_employee_code")) {
+    private static void ensureSearchIndexes(Connection conn, Set<String> indexes) throws SQLException {
+        if (containsIgnoreCase(indexes, "uk_employee_code") || containsIgnoreCase(indexes, "idx_employee_code")) {
             return;
         }
 
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("CREATE INDEX idx_employee_code ON employees (EMPLOYEE_CODE)");
         }
+        indexes.add("idx_employee_code");
     }
 
-    private static void ensureReportingIndexes(Connection conn) throws SQLException {
-        ensureTextPrefixIndex(conn, "idx_employees_department", "DEPARTMENT");
-        ensureTextPrefixIndex(conn, "idx_employees_section", "SECTION");
-        ensureTextPrefixIndex(conn, "idx_employees_grade", "GRADE");
-        ensureTextPrefixIndex(conn, "idx_employees_designation", "DESIGNATION");
-        ensureTextPrefixIndex(conn, "idx_employees_resign_reason", "RESIGN_REASON");
+    private static void ensureReportingIndexes(
+            Connection conn,
+            Map<String, Integer> columns,
+            Set<String> indexes
+    ) throws SQLException {
+        ensureTextPrefixIndex(conn, columns, indexes, "idx_employees_department", "DEPARTMENT");
+        ensureTextPrefixIndex(conn, columns, indexes, "idx_employees_section", "SECTION");
+        ensureTextPrefixIndex(conn, columns, indexes, "idx_employees_grade", "GRADE");
+        ensureTextPrefixIndex(conn, columns, indexes, "idx_employees_designation", "DESIGNATION");
+        ensureTextPrefixIndex(conn, columns, indexes, "idx_employees_resign_reason", "RESIGN_REASON");
     }
 
-    private static void ensureTextPrefixIndex(Connection conn, String indexName, String columnName) throws SQLException {
-        if (indexExists(conn, indexName) || !columnExists(conn, columnName)) {
+    private static void ensureTextPrefixIndex(
+            Connection conn,
+            Map<String, Integer> columns,
+            Set<String> indexes,
+            String indexName,
+            String columnName
+    ) throws SQLException {
+        if (containsIgnoreCase(indexes, indexName) || !columns.containsKey(columnName.toUpperCase())) {
             return;
         }
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("CREATE INDEX " + quoteIdentifier(indexName)
                     + " ON employees (" + quoteIdentifier(columnName) + "(120))");
         }
+        indexes.add(indexName);
+    }
+
+    private static Map<String, Integer> employeeColumns(Connection conn) throws SQLException {
+        Map<String, Integer> columns = new LinkedHashMap<>();
+        DatabaseMetaData metaData = conn.getMetaData();
+        try (ResultSet rs = metaData.getColumns(conn.getCatalog(), null, "employees", null)) {
+            while (rs.next()) {
+                columns.put(rs.getString("COLUMN_NAME").toUpperCase(), rs.getInt("ORDINAL_POSITION"));
+            }
+        }
+        return columns;
     }
 
     private static boolean columnExists(Connection conn, String columnName) throws SQLException {
@@ -553,12 +584,27 @@ public class DatabaseInitializer {
     }
 
     private static boolean indexExists(Connection conn, String indexName) throws SQLException {
+        return containsIgnoreCase(employeeIndexes(conn), indexName);
+    }
+
+    private static Set<String> employeeIndexes(Connection conn) throws SQLException {
+        Set<String> indexes = new LinkedHashSet<>();
         DatabaseMetaData metaData = conn.getMetaData();
         try (ResultSet rs = metaData.getIndexInfo(conn.getCatalog(), null, "employees", false, false)) {
             while (rs.next()) {
-                if (indexName.equalsIgnoreCase(rs.getString("INDEX_NAME"))) {
-                    return true;
+                String indexName = rs.getString("INDEX_NAME");
+                if (indexName != null && !indexName.isBlank()) {
+                    indexes.add(indexName);
                 }
+            }
+        }
+        return indexes;
+    }
+
+    private static boolean containsIgnoreCase(Set<String> values, String value) {
+        for (String existing : values) {
+            if (existing.equalsIgnoreCase(value)) {
+                return true;
             }
         }
         return false;

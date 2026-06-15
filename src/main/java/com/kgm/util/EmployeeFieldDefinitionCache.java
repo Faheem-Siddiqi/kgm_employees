@@ -20,15 +20,23 @@ public final class EmployeeFieldDefinitionCache {
         }
         synchronized (EmployeeFieldDefinitionCache.class) {
             if (cachedFields == null) {
-                cachedFields = loadFromDatabase();
+                cachedFields = loadFromDatabase(true);
             }
             return cachedFields;
         }
     }
 
     public static List<EmployeeFieldDefinition> refreshFromDatabase() {
+        return refreshFromDatabase(true);
+    }
+
+    public static List<EmployeeFieldDefinition> refreshPreparedMetadata() {
+        return refreshFromDatabase(false);
+    }
+
+    private static List<EmployeeFieldDefinition> refreshFromDatabase(boolean syncWithDatabase) {
         synchronized (EmployeeFieldDefinitionCache.class) {
-            cachedFields = loadFromDatabase();
+            cachedFields = loadFromDatabase(syncWithDatabase);
             EmployeeDocumentUtil.refreshDocumentTypes();
             return cachedFields;
         }
@@ -66,8 +74,9 @@ public final class EmployeeFieldDefinitionCache {
         return List.copyOf(definitions);
     }
 
-    private static List<EmployeeFieldDefinition> loadFromDatabase() {
-        return List.copyOf(new EmployeeFieldDefinitionDao().listFields());
+    private static List<EmployeeFieldDefinition> loadFromDatabase(boolean syncWithDatabase) {
+        EmployeeFieldDefinitionDao dao = new EmployeeFieldDefinitionDao();
+        return List.copyOf(syncWithDatabase ? dao.listFields() : dao.listPreparedFields());
     }
 
     private static Comparator<EmployeeFieldDefinition> fieldOrder() {

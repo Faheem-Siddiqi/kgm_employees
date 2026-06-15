@@ -132,7 +132,7 @@ public final class ApplicationStartup {
         setStartupPhase(StartupPhase.CONNECTING_DATABASE);
         DatabaseInitializer.init();
         setStartupPhase(StartupPhase.LOADING_METADATA);
-        EmployeeFieldDefinitionCache.refreshFromDatabase();
+        EmployeeFieldDefinitionCache.refreshPreparedMetadata();
         EmployeeDocumentUtil.documentTypes();
         EmployeeDocumentUtil.requiredDocumentFlags();
     }
