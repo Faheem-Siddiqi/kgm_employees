@@ -3,13 +3,13 @@ package com.kgm.ui;
 import com.kgm.config.AppConfig;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.dao.EmployeeRecordDao;
-import com.kgm.database.DatabaseInitializer;
 import com.kgm.model.Employee;
 import com.kgm.service.BulkFolderDocumentImportService;
 import com.kgm.service.ExcelExportService;
 import com.kgm.service.ExcelImportService;
 import com.kgm.service.ExcelSampleGenerator;
 import com.kgm.ui.component.FileUploadCard;
+import com.kgm.ui.component.EmployeeStorageStatusBanner;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.dialog.UniversalDialog;
 import com.kgm.ui.panel.ChartsPanel;
@@ -21,6 +21,7 @@ import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.ButtonStateHelper;
 import com.kgm.ui.styling.HomeViewHelper;
 import com.kgm.ui.styling.UniversalDialogHelper;
+import com.kgm.util.ApplicationStartup;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -39,6 +40,7 @@ public class HomeView extends JFrame {
     private final ExcelExportService excelExportService = new ExcelExportService();
     private EmployeeTablePanel tablePanel;
     private KPIRowsPanel kpiPanel;
+    private EmployeeStorageStatusBanner storageStatusBanner;
     private ChartsPanel chartsPanel;
     private JScrollPane mainScrollPane;
     private JMenuItem excelBtn;
@@ -47,6 +49,7 @@ public class HomeView extends JFrame {
     private boolean bulkDocumentActionRunning;
     private boolean homeDataLoading;
     private boolean dashboardStatsLoading;
+    private boolean homeStartupWaitPending;
     private int homeLoadToken;
     private int dashboardStatsLoadToken;
     private SwingWorker<HomeTableData, String> homeDataWorker;
@@ -57,6 +60,7 @@ public class HomeView extends JFrame {
 
         tablePanel = new EmployeeTablePanel(null);
         kpiPanel = new KPIRowsPanel(null);
+        storageStatusBanner = new EmployeeStorageStatusBanner(this);
         chartsPanel = new ChartsPanel(null);
 
         // Wire "Show in Table" from chart cards to the table filtering
@@ -166,17 +170,21 @@ public class HomeView extends JFrame {
         });
         HomeViewHelper.addCommandActions(commandBar, addBtn, refreshBtn, servicesBtn);
 
-        // Build layout: Header > KPIs > Command Bar > Table > Charts
+        JPanel stickyTop = new JPanel();
+        stickyTop.setLayout(new BoxLayout(stickyTop, BoxLayout.Y_AXIS));
+        stickyTop.setOpaque(false);
+        stickyTop.add(top);
+        stickyTop.add(EmployeeStorageStatusBanner.stickyRow(storageStatusBanner, 0));
+        add(stickyTop, BorderLayout.NORTH);
+
+        // Build scroll layout: KPIs > Command Bar > Table > Charts
         JPanel mainContent = new JPanel();
         mainContent.setLayout(new BoxLayout(mainContent, BoxLayout.Y_AXIS));
         mainContent.setOpaque(false);
-        
-        mainContent.add(top);
-        
-        // Wrap KPI panel with left/right margins (28px) to match filter
+
         JPanel kpiWrapper = new JPanel(new BorderLayout());
         kpiWrapper.setOpaque(false);
-        kpiWrapper.setBorder(BorderFactory.createEmptyBorder(24, 28, 0, 28));
+        kpiWrapper.setBorder(BorderFactory.createEmptyBorder(12, 28, 0, 28));
         kpiWrapper.add(kpiPanel, BorderLayout.CENTER);
         mainContent.add(kpiWrapper);
         
@@ -201,10 +209,19 @@ public class HomeView extends JFrame {
         add(new FooterPanel(), BorderLayout.SOUTH);
 
         setVisible(true);
-        SwingUtilities.invokeLater(() -> loadHomeDataAsync(
+        SwingUtilities.invokeLater(() -> loadHomeDataWhenReady(
                 "Loading Dashboard",
                 "Preparing employee table and analytics..."
         ));
+    }
+
+    @Override
+    public void dispose() {
+        if (storageStatusBanner != null) {
+            storageStatusBanner.dispose();
+            storageStatusBanner = null;
+        }
+        super.dispose();
     }
 
     /**
@@ -1352,10 +1369,52 @@ public class HomeView extends JFrame {
     }
 
     private void reloadHomeData() {
-        loadHomeDataAsync("Refreshing Dashboard", "Loading latest employee table and analytics...");
+        loadHomeDataWhenReady("Refreshing Dashboard", "Loading latest employee table and analytics...");
+    }
+
+    private void loadHomeDataWhenReady(String title, String message) {
+        if (ApplicationStartup.isReady()) {
+            loadHomeDataAsync(title, message);
+            return;
+        }
+        if (homeStartupWaitPending) {
+            return;
+        }
+        homeStartupWaitPending = true;
+        tablePanel.showLoading("Initializing database and field settings before dashboard queries...");
+        chartsPanel.setStats(null);
+        if (refreshBtn != null) {
+            refreshBtn.setText("Loading...");
+            HomeViewHelper.styleRefreshButton(refreshBtn);
+            refreshBtn.setEnabled(true);
+        }
+        ApplicationStartup.prepareThen(
+                this,
+                () -> {
+                    homeStartupWaitPending = false;
+                    if (isDisplayable()) {
+                        loadHomeDataAsync(title, message);
+                    }
+                },
+                () -> {
+                    homeStartupWaitPending = false;
+                    if (isDisplayable()) {
+                        tablePanel.showLoadFailed("Database initialization did not complete. Dashboard queries were not run.");
+                        if (refreshBtn != null) {
+                            refreshBtn.setText("Refresh");
+                            HomeViewHelper.styleRefreshButton(refreshBtn);
+                            refreshBtn.setEnabled(true);
+                        }
+                    }
+                }
+        );
     }
 
     private void loadHomeDataAsync(String title, String message) {
+        if (!ApplicationStartup.isReady()) {
+            loadHomeDataWhenReady(title, message);
+            return;
+        }
         if (homeDataWorker != null && !homeDataWorker.isDone()) {
             homeDataWorker.cancel(true);
         }
@@ -1375,8 +1434,6 @@ public class HomeView extends JFrame {
         SwingWorker<HomeTableData, String> worker = new SwingWorker<>() {
             @Override
             protected HomeTableData doInBackground() {
-                publish("Preparing database and field settings...");
-                DatabaseInitializer.init();
                 publish("Loading employee table...");
                 try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
                     java.util.List<Employee> employees = dao.getEmployeeSummaries();
@@ -1472,6 +1529,26 @@ public class HomeView extends JFrame {
     }
 
     private void loadDashboardStatsAsync() {
+        if (!ApplicationStartup.isReady()) {
+            ApplicationStartup.prepareThen(
+                    this,
+                    () -> {
+                        if (isDisplayable()) {
+                            loadDashboardStatsAsync();
+                        }
+                    },
+                    () -> {
+                        if (isDisplayable()) {
+                            DialogHelper.error(
+                                    HomeView.this,
+                                    "Dashboard Analytics Skipped",
+                                    "Database initialization did not complete, so dashboard analytics were not run."
+                            );
+                        }
+                    }
+            );
+            return;
+        }
         if (dashboardStatsWorker != null && !dashboardStatsWorker.isDone()) {
             dashboardStatsWorker.cancel(true);
         }

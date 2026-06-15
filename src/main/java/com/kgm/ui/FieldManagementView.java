@@ -3,6 +3,7 @@ package com.kgm.ui;
 import com.kgm.dao.EmployeeFieldDefinitionDao;
 import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.config.AppConfig;
+import com.kgm.ui.component.EmployeeStorageStatusBanner;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.HeaderPanel;
@@ -13,7 +14,6 @@ import com.kgm.ui.styling.ButtonStateHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
 import com.kgm.util.EmployeeFieldDefinitionCache;
-import com.kgm.util.EmployeeFieldMetadataStore;
 
 import javax.swing.*;
 import javax.swing.border.AbstractBorder;
@@ -87,6 +87,7 @@ public class FieldManagementView extends JFrame {
     private UniversalTablePanel fieldTable;
     private UniversalTablePanel categoryTable;
     private UniversalTablePanel requiredTable;
+    private EmployeeStorageStatusBanner storageStatusBanner;
     private JTextField searchField;
     private JTextField requiredSearchField;
     private JComboBox<String> originFilter;
@@ -102,6 +103,8 @@ public class FieldManagementView extends JFrame {
         JPanel top = new JPanel(new BorderLayout());
         top.setBackground(Color.WHITE);
         top.add(new HeaderPanel("Field Management"), BorderLayout.NORTH);
+        storageStatusBanner = new EmployeeStorageStatusBanner(this);
+        top.add(EmployeeStorageStatusBanner.stickyRow(storageStatusBanner), BorderLayout.SOUTH);
         add(top, BorderLayout.NORTH);
 
         JPanel centerWrapper = EmployeeRegistrationViewHelper.createCenterWrapper();
@@ -122,6 +125,15 @@ public class FieldManagementView extends JFrame {
 
         loadData();
         setVisible(true);
+    }
+
+    @Override
+    public void dispose() {
+        if (storageStatusBanner != null) {
+            storageStatusBanner.dispose();
+            storageStatusBanner = null;
+        }
+        super.dispose();
     }
 
     private JPanel createTitleRow() {
@@ -1473,20 +1485,35 @@ public class FieldManagementView extends JFrame {
             String errorTitle
     ) {
         LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Updating Field Metadata", message);
-        SwingWorker<MetadataOperationResult<T>, Void> worker = new SwingWorker<>() {
+        SwingWorker<MetadataOperationResult<T>, MetadataProgress> worker = new SwingWorker<>() {
             @Override
             protected MetadataOperationResult<T> doInBackground() {
-                T value = null;
-                RuntimeException failure = null;
+                publish(new MetadataProgress("Validating field metadata request...", 12));
                 try {
-                    value = operation.get();
+                    publish(new MetadataProgress(message, 30));
+                    T value = operation.get();
+                    publish(new MetadataProgress("Syncing metadata table with employee schema...", 55));
+                    EmployeeFieldDefinitionCache.invalidate();
+                    publish(new MetadataProgress("Reloading from MySQL and writing verified cache snapshots...", 78));
+                    List<EmployeeFieldDefinition> refreshed = EmployeeFieldDefinitionCache.refreshFromDatabase();
+                    publish(new MetadataProgress("Refreshing Field Management views...", 100));
+                    return new MetadataOperationResult<>(value, refreshed, null);
                 } catch (RuntimeException exception) {
-                    failure = exception;
+                    publish(new MetadataProgress("Reloading metadata from MySQL after the failed change...", 70));
+                    EmployeeFieldDefinitionCache.invalidate();
+                    List<EmployeeFieldDefinition> refreshed = EmployeeFieldDefinitionCache.refreshFromDatabase();
+                    return new MetadataOperationResult<>(null, refreshed, exception);
                 }
-                EmployeeFieldDefinitionCache.invalidate();
-                EmployeeFieldMetadataStore.clearCache();
-                List<EmployeeFieldDefinition> refreshed = EmployeeFieldDefinitionCache.refreshFromDatabase();
-                return new MetadataOperationResult<>(value, refreshed, failure);
+            }
+
+            @Override
+            protected void process(List<MetadataProgress> chunks) {
+                if (chunks.isEmpty()) {
+                    return;
+                }
+                MetadataProgress progress = chunks.get(chunks.size() - 1);
+                loader.setMessage(progress.message());
+                loader.setProgress(progress.percent());
             }
 
             @Override
@@ -1514,6 +1541,9 @@ public class FieldManagementView extends JFrame {
             List<EmployeeFieldDefinition> definitions,
             RuntimeException failure
     ) {
+    }
+
+    private record MetadataProgress(String message, int percent) {
     }
 
     private record FieldFormData(

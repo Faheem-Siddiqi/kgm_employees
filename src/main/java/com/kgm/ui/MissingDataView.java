@@ -1,6 +1,7 @@
 package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRecordDao;
+import com.kgm.ui.component.EmployeeStorageStatusBanner;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.FooterPanel;
 import com.kgm.ui.panel.GenericRecordTablePanel;
@@ -66,6 +67,7 @@ public class MissingDataView extends JFrame {
     private JButton clearSearchButton;
     private JLabel filterStatusLabel;
     private JTabbedPane missingTypeTabs;
+    private EmployeeStorageStatusBanner storageStatusBanner;
     private MissingDataType activeMissingType = MissingDataType.FIELDS;
     private SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> loadWorker;
 
@@ -80,6 +82,7 @@ public class MissingDataView extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
+        storageStatusBanner = new EmployeeStorageStatusBanner(this);
 
         add(createHeader(), BorderLayout.NORTH);
         add(createMainContent(), BorderLayout.CENTER);
@@ -93,10 +96,20 @@ public class MissingDataView extends JFrame {
         SwingUtilities.invokeLater(this::reloadAsync);
     }
 
+    @Override
+    public void dispose() {
+        if (storageStatusBanner != null) {
+            storageStatusBanner.dispose();
+            storageStatusBanner = null;
+        }
+        super.dispose();
+    }
+
     private JPanel createHeader() {
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(Color.WHITE);
         header.add(new HeaderPanel("Missing Required Data"), BorderLayout.NORTH);
+        header.add(EmployeeStorageStatusBanner.stickyRow(storageStatusBanner), BorderLayout.SOUTH);
         return header;
     }
 

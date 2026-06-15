@@ -34,7 +34,7 @@ public class HomeStatsKPIPanel extends JPanel {
         this.repo = repo;
         setLayout(new BorderLayout(0, 14));
         setBackground(BACKGROUND);
-        setBorder(new EmptyBorder(16, 0, 8, 0));
+        setBorder(new EmptyBorder(0, 0, 8, 0));
 
         // Header
         JPanel header = new JPanel(new BorderLayout());

@@ -182,9 +182,7 @@ public final class EmployeeStorageConnectionDialog {
             title.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
             title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-            JButton closeButton = closeButton();
             titleRow.add(title, BorderLayout.CENTER);
-            titleRow.add(closeButton, BorderLayout.EAST);
 
             JTextArea message = readOnlyText("""
                     KGM cannot reach the shared employee storage folder right now. Connect it here so employee photos and documents can load and save normally.
@@ -638,24 +636,6 @@ public final class EmployeeStorageConnectionDialog {
                     UniversalDialogHelper.roundedBorder(UniversalDialogHelper.CARD_BORDER, 8, 1),
                     new EmptyBorder(8, 14, 8, 14)
             ));
-            return button;
-        }
-
-        private JButton closeButton() {
-            JButton button = new JButton("X");
-            button.setPreferredSize(new Dimension(32, 32));
-            button.setMaximumSize(new Dimension(32, 32));
-            button.setToolTipText("Close dialog");
-            button.setBackground(UniversalDialogHelper.BACKGROUND);
-            button.setForeground(UniversalDialogHelper.MUTED_TEXT);
-            button.setFocusPainted(false);
-            button.setBorder(BorderFactory.createCompoundBorder(
-                    UniversalDialogHelper.roundedBorder(UniversalDialogHelper.CARD_BORDER, 8, 1),
-                    new EmptyBorder(4, 10, 5, 10)
-            ));
-            button.setFont(new Font(UniversalDialogHelper.FONT_FAMILY, Font.BOLD, 12));
-            button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            button.addActionListener(event -> closeDialog());
             return button;
         }
 

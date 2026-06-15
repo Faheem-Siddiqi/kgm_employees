@@ -4,6 +4,7 @@ import com.kgm.config.DatabaseConnection;
 import com.kgm.dao.EmployeeRegistrationDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.ui.component.EmployeeStorageStatusBanner;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.EmployeeDocumentUploadPanel;
 import com.kgm.ui.panel.FooterPanel;
@@ -24,6 +25,7 @@ import java.util.List;
 public class EmployeeRegistrationView extends JFrame {
     private EmployeeRegistrationFormPanel formPanel;
     private EmployeeDocumentUploadPanel documentPanel;
+    private EmployeeStorageStatusBanner storageStatusBanner;
     private JPanel centerWrapper;
     private JScrollPane pageScroll;
     private Runnable onBack;
@@ -38,6 +40,8 @@ public class EmployeeRegistrationView extends JFrame {
 
         JPanel topContainer = EmployeeRegistrationViewHelper.createTopContainer();
         topContainer.add(new HeaderPanel("Register Ex-Employee"), BorderLayout.NORTH);
+        storageStatusBanner = new EmployeeStorageStatusBanner(this);
+        topContainer.add(EmployeeStorageStatusBanner.stickyRow(storageStatusBanner), BorderLayout.SOUTH);
         add(topContainer, BorderLayout.NORTH);
 
         centerWrapper = EmployeeRegistrationViewHelper.createCenterWrapper();
@@ -204,6 +208,15 @@ public class EmployeeRegistrationView extends JFrame {
         centerWrapper.revalidate();
         centerWrapper.repaint();
         pageScroll.getVerticalScrollBar().setValue(0);
+    }
+
+    @Override
+    public void dispose() {
+        if (storageStatusBanner != null) {
+            storageStatusBanner.dispose();
+            storageStatusBanner = null;
+        }
+        super.dispose();
     }
 
     private void saveEmployeeRecord(

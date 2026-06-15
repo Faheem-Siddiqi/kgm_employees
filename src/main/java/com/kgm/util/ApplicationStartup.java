@@ -3,27 +3,20 @@ package com.kgm.util;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.database.DatabaseInitializer;
 import com.kgm.ui.DatabaseConnectionStatusView;
-import com.kgm.ui.EmployeeStorageConnectionDialog;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.styling.DialogHelper;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 public final class ApplicationStartup {
     private static final int STARTUP_NOTICE_DELAY_MS = 850;
     private static final int POST_LOGIN_OVERLAY_DELAY_MS = 2_500;
     private static final int AUTO_RETRY_DELAY_MS = 4_000;
-    private static final int STORAGE_CHECK_TIMEOUT_SECONDS = 4;
     private static final int LONG_WAIT_NOTICE_DELAY_MS = 12_000;
     private static final Object LOCK = new Object();
     private static final List<ReadyWaiter> readyWaiters = new ArrayList<>();
@@ -40,6 +33,12 @@ public final class ApplicationStartup {
     public static void startSilently() {
         DatabaseConnection.setConnectionFailureListener(ApplicationStartup::showConnectionFailure);
         ensureStarted();
+    }
+
+    public static boolean isReady() {
+        synchronized (LOCK) {
+            return ready;
+        }
     }
 
     public static void initializeBlocking() {
@@ -121,8 +120,6 @@ public final class ApplicationStartup {
                                 "Database and field settings could not be prepared.",
                                 failure
                         ));
-                    } else if (EmployeeStorageUtil.isLikelyStorageAccessFailure(failure)) {
-                        showEmployeeStorageConnectionFailure();
                     } else {
                         showStartupFailure(failure);
                     }
@@ -132,12 +129,6 @@ public final class ApplicationStartup {
     }
 
     private static void performStartupWork() {
-        setStartupPhase(StartupPhase.PREPARING_STORAGE);
-        try {
-            ensureStorageRootWithTimeout();
-        } catch (Exception exception) {
-            throw new IllegalStateException("Employee storage folder could not be prepared: " + exception.getMessage(), exception);
-        }
         setStartupPhase(StartupPhase.CONNECTING_DATABASE);
         DatabaseInitializer.init();
         setStartupPhase(StartupPhase.LOADING_METADATA);
@@ -229,87 +220,6 @@ public final class ApplicationStartup {
             for (ReadyWaiter waiter : waiters) {
                 waiter.closeLoader();
                 DialogHelper.error(waiter.parent(), "Startup Failed", message);
-                runOnEdt(waiter.onFailure());
-            }
-        });
-    }
-
-    private static void ensureStorageRootWithTimeout() throws Exception {
-        FutureTask<Void> task = new FutureTask<>(() -> {
-            ensureStartupStorageRoot();
-            return null;
-        });
-        Thread worker = new Thread(task, "KGM employee storage startup check");
-        worker.setDaemon(true);
-        worker.start();
-        try {
-            task.get(STORAGE_CHECK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        } catch (TimeoutException exception) {
-            task.cancel(true);
-            throw new IllegalStateException(
-                    "Employee storage folder check timed out after " + STORAGE_CHECK_TIMEOUT_SECONDS
-                            + " seconds. The LAN share may be disconnected or slow.",
-                    exception
-            );
-        } catch (ExecutionException exception) {
-            Throwable cause = rootCause(exception);
-            if (cause instanceof Exception checked) {
-                throw checked;
-            }
-            throw new IllegalStateException(cause);
-        }
-    }
-
-    private static void ensureStartupStorageRoot() throws IOException {
-        Path root = EmployeeStorageUtil.storageRoot();
-        if (isUncPath(root) && !WindowsNetworkShareConnector.exists(root)) {
-            WindowsNetworkShareConnector.ConnectionResult reconnect = WindowsNetworkShareConnector.reconnectStored(root.toString());
-            if (!reconnect.connected()) {
-                throw new IOException(reconnect.message().isBlank()
-                        ? "Windows could not reconnect the employee storage folder."
-                        : reconnect.message());
-            }
-        }
-        EmployeeStorageUtil.ensureStorageRoot();
-    }
-
-    private static boolean isUncPath(Path path) {
-        String value = path == null ? "" : path.toString();
-        return value.startsWith("\\\\") || value.startsWith("//");
-    }
-
-    private static void showEmployeeStorageConnectionFailure() {
-        List<ReadyWaiter> waiters;
-        synchronized (LOCK) {
-            ready = false;
-            waiters = new ArrayList<>(readyWaiters);
-            readyWaiters.clear();
-            startupPhase = StartupPhase.IDLE;
-            startupWorker = null;
-        }
-        if (waiters.isEmpty()) {
-            return;
-        }
-        runOnEdt(() -> {
-            cancelDelayedNotice();
-            stopAutoRetry();
-            if (statusView != null) {
-                statusView.closeView();
-                statusView = null;
-            }
-
-            Component parent = waiters.isEmpty() ? null : waiters.get(0).parent();
-            for (ReadyWaiter waiter : waiters) {
-                waiter.closeLoader();
-            }
-
-            boolean connected = EmployeeStorageConnectionDialog.showUntilConnected(parent);
-            if (connected) {
-                ensureStarted();
-                return;
-            }
-
-            for (ReadyWaiter waiter : waiters) {
                 runOnEdt(waiter.onFailure());
             }
         });
@@ -431,7 +341,6 @@ public final class ApplicationStartup {
 
     private static String phaseMessage(StartupPhase phase) {
         return switch (phase) {
-            case PREPARING_STORAGE -> "Windows is reconnecting the employee storage folder on the LAN. Please wait... 20%";
             case CONNECTING_DATABASE -> "Connecting to MySQL database and preparing required tables... 60%";
             case LOADING_METADATA -> "Loading field settings and document configuration... 90%";
             case READY -> "Application is ready... 100%";
@@ -441,7 +350,6 @@ public final class ApplicationStartup {
 
     private static String loginWaitMessage(StartupPhase phase) {
         return switch (phase) {
-            case PREPARING_STORAGE -> "Checking the employee storage folder before opening the dashboard. This usually finishes in a moment.";
             case CONNECTING_DATABASE -> "Preparing MySQL database, creating missing tables, and applying schema updates. If the database was dropped, this can take a little longer.";
             case LOADING_METADATA -> "Loading field settings and document configuration so the dashboard opens with the latest setup.";
             case READY -> "Application is ready. Opening the dashboard now.";
@@ -451,7 +359,6 @@ public final class ApplicationStartup {
 
     private static String overlayTitle(StartupPhase phase) {
         return switch (phase) {
-            case PREPARING_STORAGE -> "Checking Employee Storage";
             case CONNECTING_DATABASE -> "Initializing Database";
             case LOADING_METADATA -> "Preparing Dashboard";
             case READY -> "Opening Dashboard";
@@ -461,7 +368,6 @@ public final class ApplicationStartup {
 
     private static String longWaitMessage(StartupPhase phase) {
         return switch (phase) {
-            case PREPARING_STORAGE -> "Still waiting for the LAN employee storage folder. If it cannot reconnect soon, the app will ask for shared folder details.";
             case CONNECTING_DATABASE -> "Still initializing MySQL. KGM may be creating the database and required tables after a fresh or dropped database.";
             case LOADING_METADATA -> "Still loading field settings and document configuration. The dashboard will open automatically.";
             case READY -> "Application is ready. Opening the dashboard now.";
@@ -472,7 +378,6 @@ public final class ApplicationStartup {
     private static int phaseProgress(StartupPhase phase) {
         return switch (phase) {
             case IDLE -> 10;
-            case PREPARING_STORAGE -> 20;
             case CONNECTING_DATABASE -> 60;
             case LOADING_METADATA -> 90;
             case READY -> 100;
@@ -571,7 +476,6 @@ public final class ApplicationStartup {
 
     private enum StartupPhase {
         IDLE,
-        PREPARING_STORAGE,
         CONNECTING_DATABASE,
         LOADING_METADATA,
         READY

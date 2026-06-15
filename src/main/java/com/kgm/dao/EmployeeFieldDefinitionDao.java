@@ -1237,6 +1237,7 @@ public class EmployeeFieldDefinitionDao {
         boolean core = isCoreColumn(column);
         boolean document = builtIn.documentField();
         boolean internal = isInternalColumn(column);
+        ensureSeededEmployeeColumn(column, internal);
         if (!core && !document && !internal) {
             EmployeeFieldDefinition existing = existingFields.get(column);
             EmployeeFieldDefinition knownCustom = customDetailDefinition(builtIn, existing);
@@ -1264,6 +1265,15 @@ public class EmployeeFieldDefinitionDao {
         }
 
         insertMetadataReplace(systemDefinition(builtIn, existing, core, document, internal));
+    }
+
+    private void ensureSeededEmployeeColumn(String column, boolean internal) throws SQLException {
+        if (internal || !validColumnName(column) || columnExists(column)) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE employees ADD COLUMN " + quoteIdentifier(column) + " TEXT");
+        }
     }
 
     private void seedDefaultRequiredFields() throws SQLException {

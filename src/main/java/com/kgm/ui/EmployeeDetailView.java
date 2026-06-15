@@ -3,6 +3,7 @@ package com.kgm.ui;
 import com.kgm.dao.EmployeeRecordDao;
 import com.kgm.model.Employee;
 import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.ui.component.EmployeeStorageStatusBanner;
 import com.kgm.ui.component.FileUploadCard;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.component.UniversalDatePicker;
@@ -42,6 +43,7 @@ public class EmployeeDetailView extends JFrame {
     private JTabbedPane tabs;
     private JScrollPane pageScroll;
     private JPanel centerWrapper;
+    private EmployeeStorageStatusBanner storageStatusBanner;
     private EmployeeBasicDetailsPanel basicPanel;
     private EmployeeAdditionalDetailsPanel otherPanel;
     private EmployeeDocumentViewPanel documentPanel;
@@ -108,6 +110,11 @@ public class EmployeeDetailView extends JFrame {
                 },
                 onDownloadReport
         ), BorderLayout.CENTER);
+        if (storageStatusBanner != null) {
+            storageStatusBanner.dispose();
+        }
+        storageStatusBanner = new EmployeeStorageStatusBanner(this);
+        topContainer.add(EmployeeStorageStatusBanner.stickyRow(storageStatusBanner), BorderLayout.SOUTH);
         add(topContainer, BorderLayout.NORTH);
 
         centerWrapper = EmployeeDetailViewHelper.createCenterWrapper();
@@ -179,6 +186,15 @@ public class EmployeeDetailView extends JFrame {
         if (isWithData) {
             SwingUtilities.invokeLater(this::loadSelectedTab);
         }
+    }
+
+    @Override
+    public void dispose() {
+        if (storageStatusBanner != null) {
+            storageStatusBanner.dispose();
+            storageStatusBanner = null;
+        }
+        super.dispose();
     }
 
     private void resetLazyTabs() {

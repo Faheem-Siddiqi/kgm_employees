@@ -4,6 +4,7 @@ import com.kgm.service.AuthService;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.LoginViewHelper;
 import com.kgm.util.ApplicationStartup;
+import com.kgm.util.EmployeeStorageConnectionMonitor;
 import com.kgm.util.SessionManager;
 import com.kgm.util.SessionWatcher;
 
@@ -15,6 +16,7 @@ public class LoginView extends JFrame {
     public LoginView() {
         LoginViewHelper.applyFrame(this);
         ApplicationStartup.startSilently();
+        EmployeeStorageConnectionMonitor.startSilently();
 
         JPanel root = LoginViewHelper.createRootPanel();
         add(root, BorderLayout.CENTER);
@@ -58,19 +60,10 @@ public class LoginView extends JFrame {
             if (AuthService.login(user, pass)) {
                 loginBtn.setEnabled(false);
                 loginBtn.setText("Opening...");
-                ApplicationStartup.prepareThen(
-                        this,
-                        () -> {
-                            SessionManager.startSession(user);
-                            SessionWatcher.start();
-                            SessionWatcher.closeAllWindows();
-                            new HomeView();
-                        },
-                        () -> {
-                            loginBtn.setText("Sign In");
-                            loginBtn.setEnabled(true);
-                        }
-                );
+                SessionManager.startSession(user);
+                SessionWatcher.start();
+                SessionWatcher.closeAllWindows();
+                new HomeView();
             } else {
                 DialogHelper.error(this, "Login Failed", "Invalid username or password.");
             }
