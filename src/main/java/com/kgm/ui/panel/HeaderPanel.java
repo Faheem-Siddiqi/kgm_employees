@@ -1,10 +1,13 @@
 package com.kgm.ui.panel;
 
 import com.kgm.ui.LoginView;
+import com.kgm.ui.navigation.BackNavigationHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.util.SessionManager;
 import com.kgm.util.SessionWatcher;
 
+import javax.swing.event.AncestorEvent;
+import javax.swing.event.AncestorListener;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -23,6 +26,8 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.Image;
 import java.awt.Window;
 import java.net.URL;
@@ -39,24 +44,44 @@ public class HeaderPanel extends JPanel {
         setBackground(Color.WHITE);
         setBorder(new CompoundBorder(
                 new MatteBorder(0, 0, 1, 0, BORDER),
-                new EmptyBorder(10, 22, 10, 22)
+                new EmptyBorder(10, 22, 14, 22)
         ));
 
         JPanel center = createBrandBlock(title);
+        JButton backButton = BackNavigationHelper.createBackButton(title);
         JButton logoutButton = createLogoutButton();
 
-        JPanel leftSpacer = new JPanel();
-        leftSpacer.setOpaque(false);
-        leftSpacer.setPreferredSize(new Dimension(132, 40));
+        JPanel left = new JPanel(new GridBagLayout());
+        left.setOpaque(false);
+        left.setPreferredSize(new Dimension(132, 40));
+        GridBagConstraints backButtonConstraints = new GridBagConstraints();
+        backButtonConstraints.anchor = GridBagConstraints.WEST;
+        backButtonConstraints.weightx = 1;
+        left.add(backButton, backButtonConstraints);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         right.setOpaque(false);
         right.setPreferredSize(new Dimension(132, 40));
         right.add(logoutButton);
 
-        add(leftSpacer, BorderLayout.WEST);
+        add(left, BorderLayout.WEST);
         add(center, BorderLayout.CENTER);
         add(right, BorderLayout.EAST);
+
+        addAncestorListener(new AncestorListener() {
+            @Override
+            public void ancestorAdded(AncestorEvent event) {
+                BackNavigationHelper.registerWindow(HeaderPanel.this);
+            }
+
+            @Override
+            public void ancestorRemoved(AncestorEvent event) {
+            }
+
+            @Override
+            public void ancestorMoved(AncestorEvent event) {
+            }
+        });
     }
 
     private JPanel createBrandBlock(String title) {
