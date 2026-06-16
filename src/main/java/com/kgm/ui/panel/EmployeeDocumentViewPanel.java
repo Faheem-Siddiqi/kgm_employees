@@ -6,6 +6,7 @@ import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeDocumentViewPanelHelper;
 import com.kgm.ui.styling.TablePaginationHelper;
+import com.kgm.ui.styling.UniversalDialogHelper;
 import com.kgm.util.EmployeeDocumentUtil;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -15,6 +16,12 @@ import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import java.awt.*;
+import java.awt.Dialog;
+import java.awt.Window;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
@@ -36,6 +43,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
     private String[] displayFileNames;
     private boolean[] temporaryUploadFiles;
     private boolean[] lockedDocuments;
+    private boolean[] activeDocumentViews;
     private JLabel uploadedCountLabel;
     private JTextField searchField;
     private JButton clearSearchButton;
@@ -55,6 +63,7 @@ public class EmployeeDocumentViewPanel extends JPanel {
         displayFileNames = new String[EmployeeDocumentUtil.documentCount()];
         temporaryUploadFiles = new boolean[EmployeeDocumentUtil.documentCount()];
         lockedDocuments = new boolean[EmployeeDocumentUtil.documentCount()];
+        activeDocumentViews = new boolean[EmployeeDocumentUtil.documentCount()];
 
         JPanel topPanel = EmployeeDocumentViewPanelHelper.createTopPanel();
         uploadedCountLabel = EmployeeDocumentViewPanelHelper.createUploadedCountLabel(
@@ -481,6 +490,10 @@ public class EmployeeDocumentViewPanel extends JPanel {
     }
 
     private void viewFile(int documentIndex) {
+        if (activeDocumentViews[documentIndex]) {
+            return;
+        }
+
         File file = files[documentIndex];
         if (file == null && EmployeeDocumentUtil.hasStoredPath(filePaths[documentIndex])) {
             file = EmployeeDocumentUtil.resolveStoredFile(filePaths[documentIndex]);
@@ -490,23 +503,118 @@ public class EmployeeDocumentViewPanel extends JPanel {
             return;
         }
 
-        try {
-            BufferedImage img = EmployeeDocumentUtil.readJpegImage(file);
-            if (img == null) {
-                DialogHelper.error(this, "Cannot Open File", "Cannot open file.");
-                return;
+        openPreviewAsync(documentIndex, file);
+    }
+
+    private void openPreviewAsync(int documentIndex, File file) {
+        activeDocumentViews[documentIndex] = true;
+        refreshDocumentActionCell(documentIndex);
+
+        final DocumentOpenProgressDialog[] progressDialog = new DocumentOpenProgressDialog[1];
+        final Timer[] delayTimer = new Timer[1];
+        SwingWorker<BufferedImage, Void> worker = new SwingWorker<>() {
+            @Override
+            protected BufferedImage doInBackground() throws IOException {
+                return EmployeeDocumentUtil.readJpegImage(file);
             }
 
-            JFrame frame = new JFrame("Document Preview - " + file.getName());
-            JScrollPane previewScroll = new JScrollPane(new DocumentImagePreviewPanel(img));
-            previewScroll.setBorder(null);
-            previewScroll.getViewport().setBackground(Color.WHITE);
-            frame.getContentPane().add(previewScroll);
-            EmployeeDocumentViewPanelHelper.stylePreviewFrame(frame, this);
-            frame.setVisible(true);
-        } catch (Exception e) {
-            DialogHelper.error(this, "Cannot Open File", "Cannot open file.");
+            @Override
+            protected void done() {
+                if (delayTimer[0] != null) {
+                    delayTimer[0].stop();
+                }
+                if (progressDialog[0] != null) {
+                    progressDialog[0].dispose();
+                }
+
+                if (isCancelled()) {
+                    releaseActiveDocumentView(documentIndex);
+                    return;
+                }
+
+                try {
+                    BufferedImage img = get();
+                    if (img == null) {
+                        releaseActiveDocumentView(documentIndex);
+                        DialogHelper.error(EmployeeDocumentViewPanel.this, "Cannot Open File", "Cannot open file.");
+                        return;
+                    }
+                    showPreviewFrame(documentIndex, file, img);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    releaseActiveDocumentView(documentIndex);
+                    DialogHelper.warning(EmployeeDocumentViewPanel.this, "Open Stopped", "Document loading was stopped.");
+                } catch (ExecutionException exception) {
+                    releaseActiveDocumentView(documentIndex);
+                    DialogHelper.error(EmployeeDocumentViewPanel.this, "Cannot Open File", "Cannot open file.");
+                }
+            }
+        };
+
+        progressDialog[0] = new DocumentOpenProgressDialog(
+                this,
+                file.getName(),
+                () -> {
+                    worker.cancel(true);
+                    releaseActiveDocumentView(documentIndex);
+                }
+        );
+        progressDialog[0].setVisible(true);
+
+        delayTimer[0] = new Timer(2200, event -> {
+            if (worker.isDone()) {
+                return;
+            }
+            if (progressDialog[0] != null) {
+                progressDialog[0].showSlowNetworkMessage();
+            }
+        });
+        delayTimer[0].setRepeats(false);
+        delayTimer[0].start();
+        worker.execute();
+    }
+
+    private void showPreviewFrame(int documentIndex, File file, BufferedImage img) {
+        JFrame frame = new JFrame("Document Preview - " + file.getName());
+        frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        JScrollPane previewScroll = new JScrollPane(new DocumentImagePreviewPanel(img));
+        previewScroll.setBorder(null);
+        previewScroll.getViewport().setBackground(Color.WHITE);
+        frame.getContentPane().add(previewScroll);
+        frame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent event) {
+                releaseActiveDocumentView(documentIndex);
+            }
+
+            @Override
+            public void windowClosing(WindowEvent event) {
+                releaseActiveDocumentView(documentIndex);
+            }
+        });
+        EmployeeDocumentViewPanelHelper.stylePreviewFrame(frame, this);
+        frame.setVisible(true);
+    }
+
+    private void releaseActiveDocumentView(int documentIndex) {
+        if (documentIndex < 0 || documentIndex >= activeDocumentViews.length || !activeDocumentViews[documentIndex]) {
+            return;
         }
+        activeDocumentViews[documentIndex] = false;
+        refreshDocumentActionCell(documentIndex);
+    }
+
+    private void refreshDocumentActionCell(int documentIndex) {
+        int modelRow = findModelRowByDocumentIndex(documentIndex);
+        if (modelRow < 0 || table == null) {
+            return;
+        }
+        int viewRow = table.convertRowIndexToView(modelRow);
+        int viewColumn = table.convertColumnIndexToView(ACTION_COLUMN);
+        if (viewRow >= 0 && viewColumn >= 0) {
+            table.repaint(table.getCellRect(viewRow, viewColumn, false));
+        }
+        model.fireTableRowsUpdated(modelRow, modelRow);
     }
 
     public boolean hasPendingDocumentUpdates() {
@@ -664,7 +772,9 @@ public class EmployeeDocumentViewPanel extends JPanel {
             }
 
             JButton viewBtn = createLink("View");
-            EmployeeDocumentViewPanelHelper.styleViewLink(viewBtn, hasDocumentReference(documentIndex));
+            boolean canView = canViewDocument(documentIndex);
+            viewBtn.setEnabled(canView);
+            EmployeeDocumentViewPanelHelper.styleViewLink(viewBtn, canView);
             buttons.add(viewBtn);
             add(buttons, EmployeeDocumentViewPanelHelper.actionCellConstraints());
 
@@ -707,8 +817,9 @@ public class EmployeeDocumentViewPanel extends JPanel {
             }
 
             JButton viewBtn = createButton("View");
-            viewBtn.setEnabled(hasDocumentReference(documentIndex));
-            EmployeeDocumentViewPanelHelper.styleViewLink(viewBtn, hasDocumentReference(documentIndex));
+            boolean canView = canViewDocument(documentIndex);
+            viewBtn.setEnabled(canView);
+            EmployeeDocumentViewPanelHelper.styleViewLink(viewBtn, canView);
             buttons.add(viewBtn);
             panel.add(buttons, EmployeeDocumentViewPanelHelper.actionCellConstraints());
 
@@ -717,13 +828,22 @@ public class EmployeeDocumentViewPanel extends JPanel {
 
         private JButton createButton(String text) {
             JButton btn = EmployeeDocumentViewPanelHelper.createActionLink(text);
+            int actionDocumentIndex = documentIndex;
             btn.addActionListener(e -> {
                 if ("Upload".equals(text) || "Replace".equals(text)) {
-                    chooseFile(documentIndex);
+                    stopCellEditing();
+                    chooseFile(actionDocumentIndex);
                 } else if ("View".equals(text)) {
-                    viewFile(documentIndex);
+                    if (!canViewDocument(actionDocumentIndex)) {
+                        stopCellEditing();
+                        return;
+                    }
+                    btn.setEnabled(false);
+                    EmployeeDocumentViewPanelHelper.styleViewLink(btn, false);
+                    stopCellEditing();
+                    viewFile(actionDocumentIndex);
+                    return;
                 }
-                stopCellEditing();
             });
             return btn;
         }
@@ -731,6 +851,180 @@ public class EmployeeDocumentViewPanel extends JPanel {
         @Override
         public Object getCellEditorValue() {
             return "";
+        }
+    }
+
+    private boolean canViewDocument(int documentIndex) {
+        return hasDocumentReference(documentIndex) && !activeDocumentViews[documentIndex];
+    }
+
+    private static class DocumentOpenProgressDialog extends JDialog {
+        private static final int DIALOG_WIDTH = 480;
+        private JLabel titleLabel;
+        private JTextArea messageArea;
+
+        DocumentOpenProgressDialog(Component parent, String fileName, Runnable onStop) {
+            super(owner(parent), "Opening document", Dialog.ModalityType.MODELESS);
+            UniversalDialogHelper.styleDialogWindow(this);
+            setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+
+            JPanel root = new JPanel(new BorderLayout());
+            UniversalDialogHelper.styleRoot(root);
+            root.add(createHeader(), BorderLayout.NORTH);
+            root.add(createBody(fileName), BorderLayout.CENTER);
+            root.add(createFooter(onStop), BorderLayout.SOUTH);
+            setContentPane(root);
+            pack();
+            setMinimumSize(new Dimension(360, 230));
+            setResizable(false);
+            setLocationRelativeTo(owner(parent));
+        }
+
+        private JComponent createHeader() {
+            JPanel header = new JPanel(new BorderLayout());
+            header.setOpaque(true);
+            header.setBackground(UniversalDialogHelper.BACKGROUND);
+            header.setBorder(BorderFactory.createEmptyBorder(22, 24, 4, 24));
+
+            JPanel copy = new JPanel();
+            copy.setOpaque(false);
+            copy.setLayout(new BoxLayout(copy, BoxLayout.Y_AXIS));
+
+            titleLabel = new JLabel("Opening document");
+            titleLabel.setFont(UniversalDialogHelper.mediumFont(18));
+            titleLabel.setForeground(UniversalDialogHelper.TEXT_PRIMARY);
+            titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            JLabel helper = new JLabel("Please keep this window open while the preview loads.");
+            helper.setFont(UniversalDialogHelper.regularFont(13));
+            helper.setForeground(UniversalDialogHelper.MUTED_TEXT);
+            helper.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            copy.add(titleLabel);
+            copy.add(Box.createVerticalStrut(4));
+            copy.add(helper);
+
+            header.add(copy, BorderLayout.CENTER);
+            return header;
+        }
+
+        private JComponent createBody(String fileName) {
+            JPanel panel = new JPanel();
+            panel.setOpaque(true);
+            panel.setBackground(UniversalDialogHelper.BACKGROUND);
+            panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+            panel.setBorder(BorderFactory.createEmptyBorder(14, 24, 18, 24));
+
+            messageArea = new JTextArea(openingMessage(fileName));
+            messageArea.setEditable(false);
+            messageArea.setFocusable(false);
+            messageArea.setOpaque(false);
+            messageArea.setLineWrap(true);
+            messageArea.setWrapStyleWord(true);
+            messageArea.setRows(4);
+            messageArea.setFont(UniversalDialogHelper.regularFont(14));
+            messageArea.setForeground(UniversalDialogHelper.TEXT_SECONDARY);
+            messageArea.setBorder(BorderFactory.createEmptyBorder());
+            Dimension textSize = new Dimension(DIALOG_WIDTH - 48, 78);
+            messageArea.setPreferredSize(textSize);
+            messageArea.setMaximumSize(textSize);
+            messageArea.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            JProgressBar progress = new JProgressBar();
+            progress.setIndeterminate(true);
+            progress.setBorderPainted(false);
+            progress.setPreferredSize(new Dimension(DIALOG_WIDTH - 48, 14));
+            progress.setMaximumSize(new Dimension(DIALOG_WIDTH - 48, 14));
+            progress.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+            panel.add(messageArea);
+            panel.add(Box.createVerticalStrut(14));
+            panel.add(progress);
+            return panel;
+        }
+
+        private JComponent createFooter(Runnable onStop) {
+            JPanel footer = UniversalDialogHelper.createFooter();
+            JButton stop = destructiveButton("Stop");
+            stop.addActionListener(event -> {
+                stop.setText("Stopping...");
+                stop.setEnabled(false);
+                stop.setBackground(new Color(153, 27, 27));
+                stop.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                onStop.run();
+                dispose();
+            });
+            footer.add(stop);
+            getRootPane().setDefaultButton(stop);
+            return footer;
+        }
+
+        private JButton destructiveButton(String text) {
+            JButton button = new JButton(text);
+            Color normal = new Color(220, 38, 38);
+            Color hover = new Color(185, 28, 28);
+            Color pressed = new Color(153, 27, 27);
+            button.setPreferredSize(new Dimension(112, 36));
+            button.setBackground(normal);
+            button.setForeground(Color.WHITE);
+            button.setFont(UniversalDialogHelper.mediumFont(13));
+            button.setFocusPainted(false);
+            button.setBorderPainted(false);
+            button.setOpaque(true);
+            button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            button.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseEntered(MouseEvent event) {
+                    if (button.isEnabled()) {
+                        button.setBackground(hover);
+                    }
+                }
+
+                @Override
+                public void mouseExited(MouseEvent event) {
+                    if (button.isEnabled()) {
+                        button.setBackground(normal);
+                    }
+                }
+
+                @Override
+                public void mousePressed(MouseEvent event) {
+                    if (button.isEnabled()) {
+                        button.setBackground(pressed);
+                    }
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent event) {
+                    if (button.isEnabled()) {
+                        button.setBackground(button.contains(event.getPoint()) ? hover : normal);
+                    }
+                }
+            });
+            return button;
+        }
+
+        private void showSlowNetworkMessage() {
+            titleLabel.setText("Still opening document");
+            messageArea.setText(
+                    "This is taking longer than usual, usually because the shared folder or network is slow. "
+                            + "The preview will open automatically when the file is ready. Press Stop to cancel this attempt."
+            );
+            revalidate();
+            repaint();
+        }
+
+        private static String openingMessage(String fileName) {
+            String cleanName = fileName == null || fileName.isBlank() ? "the selected document" : fileName;
+            return "Loading " + cleanName
+                    + ". The preview will open automatically when the file is ready. Press Stop to cancel this attempt.";
+        }
+
+        private static Window owner(Component parent) {
+            if (parent instanceof Window window) {
+                return window;
+            }
+            return parent == null ? null : SwingUtilities.getWindowAncestor(parent);
         }
     }
 

@@ -288,7 +288,7 @@ public class EmployeeDetailView extends JFrame {
         }
         basicTabLoading = true;
         tabs.setComponentAt(BASIC_TAB_INDEX, createTabLoadingPanel("Basic details", "Fetching Basic fields from the database."));
-        LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Loading Basic Details", "Fetching only Basic tab fields...");
+        LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Loading Basic Details", "Fetching basic tab fields...");
 
         SwingWorker<Employee, Void> worker = new SwingWorker<>() {
             @Override
