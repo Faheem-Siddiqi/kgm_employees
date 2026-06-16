@@ -743,21 +743,25 @@ public class HomeStatsChartsPanel extends JPanel {
         } else if ("Documents".equals(selectedMissingGroup)) {
             missingTitle.setText("Missing Documents");
             missingDocsChart.setItems(missingRequirementItems(stats.missingRequiredDocuments(), HomeStatsChartHelper.RED, "employees missing"));
-            missingDocsChart.setClickHandler(item -> openMissingDataView(selectedMissingGroup));
+            missingDocsChart.setClickHandler(item -> openMissingDataView(selectedMissingGroup, item.label()));
         } else {
             missingTitle.setText("Missing Required Fields");
             missingDocsChart.setItems(missingRequirementItems(stats.missingRequiredFields(), HomeStatsChartHelper.PURPLE, "employees missing"));
-            missingDocsChart.setClickHandler(item -> openMissingDataView(selectedMissingGroup));
+            missingDocsChart.setClickHandler(item -> openMissingDataView(selectedMissingGroup, item.label()));
         }
         missingBack.setVisible(selectedMissingGroup != null);
     }
 
     private void openMissingDataView(String missingGroup) {
+        openMissingDataView(missingGroup, null);
+    }
+
+    private void openMissingDataView(String missingGroup, String initialMissingItem) {
         Window window = SwingUtilities.getWindowAncestor(this);
         if (window != null) {
             window.dispose();
         }
-        new MissingDataView("Documents".equals(missingGroup));
+        new MissingDataView("Documents".equals(missingGroup), initialMissingItem);
     }
 
     private JPanel chartCard(String title, JComponent chart) {

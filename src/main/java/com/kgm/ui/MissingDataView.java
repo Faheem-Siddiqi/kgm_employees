@@ -1,6 +1,7 @@
 package com.kgm.ui;
 
 import com.kgm.dao.EmployeeRecordDao;
+import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.EmployeeStorageStatusBanner;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.FooterPanel;
@@ -11,14 +12,20 @@ import com.kgm.ui.styling.AppTabsHelper;
 import com.kgm.ui.styling.HomeViewHelper;
 import com.kgm.ui.styling.ScreenHeaderStyleHelper;
 import com.kgm.util.DateDisplayFormatter;
+import com.kgm.util.EmployeeFieldDefinitionCache;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.border.AbstractBorder;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
@@ -26,6 +33,14 @@ public class MissingDataView extends JFrame {
     private static final int EMPLOYEE_CODE_COLUMN = 0;
     private static final int MISSING_COLUMN = 2;
     private static final int ACTION_COLUMN = 9;
+    private static final Color CONTROL_BORDER = new Color(209, 213, 219);
+    private static final Color CONTROL_TEXT = new Color(35, 43, 54);
+    private static final Color CONTROL_MUTED = new Color(99, 115, 129);
+    private static final Color CONTROL_HOVER = new Color(248, 250, 252);
+    private static final Color CONTROL_SELECTED = new Color(241, 245, 249);
+    private static final Color CONTROL_PRIMARY = new Color(37, 99, 235);
+    private static final int SEARCH_RADIUS = 3;
+    private static final int DROPDOWN_RADIUS = 8;
 
     private static final String[] COLUMNS = {
             "Employee ID",
@@ -65,10 +80,18 @@ public class MissingDataView extends JFrame {
     private final List<EmployeeRecordDao.MissingEmployeeRow> allRows = new ArrayList<>();
     private JTextField employeeCodeSearchField;
     private JButton clearSearchButton;
+    private JButton missingItemFilterButton;
     private JLabel filterStatusLabel;
     private JTabbedPane missingTypeTabs;
     private EmployeeStorageStatusBanner storageStatusBanner;
     private MissingDataType activeMissingType = MissingDataType.FIELDS;
+    private final Set<String> selectedMissingItems = new LinkedHashSet<>();
+    private final Map<EmployeeRecordDao.MissingEmployeeRow, Set<String>> missingFieldLabelsByRow =
+            new IdentityHashMap<>();
+    private final Map<EmployeeRecordDao.MissingEmployeeRow, Set<String>> missingDocumentLabelsByRow =
+            new IdentityHashMap<>();
+    private List<String> availableMissingItems = new ArrayList<>();
+    private String pendingInitialMissingItem;
     private SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> loadWorker;
 
     public MissingDataView() {
@@ -76,7 +99,12 @@ public class MissingDataView extends JFrame {
     }
 
     public MissingDataView(boolean showDocumentsTab) {
+        this(showDocumentsTab, null);
+    }
+
+    public MissingDataView(boolean showDocumentsTab, String initialMissingItem) {
         activeMissingType = showDocumentsTab ? MissingDataType.DOCUMENTS : MissingDataType.FIELDS;
+        pendingInitialMissingItem = cleanInitialMissingItem(initialMissingItem);
         setTitle("Missing Required Data");
         AppWindowStateHelper.lockFullSize(this);
         setLocationRelativeTo(null);
@@ -179,6 +207,9 @@ public class MissingDataView extends JFrame {
                     : MissingDataType.FIELDS;
             if (activeMissingType != nextType) {
                 activeMissingType = nextType;
+                selectedMissingItems.clear();
+                rebuildAvailableMissingItems();
+                updateMissingItemFilterButton();
                 applyEmployeeCodeFilter();
             }
         });
@@ -205,7 +236,7 @@ public class MissingDataView extends JFrame {
     }
 
     private JPanel createSearchRow() {
-        JPanel row = new JPanel(new BorderLayout(14, 0));
+        JPanel row = new JPanel(new BorderLayout(0, 8));
         row.setBackground(Color.WHITE);
         row.setBorder(BorderFactory.createEmptyBorder(0, 0, 18, 0));
 
@@ -213,14 +244,14 @@ public class MissingDataView extends JFrame {
         searchBox.setBackground(Color.WHITE);
         searchBox.setPreferredSize(new Dimension(430, 36));
         searchBox.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                new RoundedLineBorder(new Color(200, 200, 200), SEARCH_RADIUS),
                 BorderFactory.createEmptyBorder(0, 10, 0, 4)
         ));
 
         employeeCodeSearchField = HomeViewHelper.createSearchField("Search Employee ID");
         employeeCodeSearchField.setBorder(null);
         employeeCodeSearchField.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        employeeCodeSearchField.setForeground(new Color(35, 43, 54));
+        employeeCodeSearchField.setForeground(CONTROL_TEXT);
         employeeCodeSearchField.setBackground(Color.WHITE);
         employeeCodeSearchField.addActionListener(event -> applyEmployeeCodeFilter());
 
@@ -262,13 +293,145 @@ public class MissingDataView extends JFrame {
         controlsWrapper.setOpaque(false);
         controlsWrapper.add(controls);
 
+        missingItemFilterButton = new JButton("Missing fields");
+        styleMissingItemFilterButton();
+        missingItemFilterButton.addActionListener(event -> showMissingItemFilterMenu());
+
+        JPanel filterWrapper = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        filterWrapper.setOpaque(false);
+        filterWrapper.add(missingItemFilterButton);
+
+        JPanel topRow = new JPanel(new BorderLayout(14, 0));
+        topRow.setOpaque(false);
+        topRow.add(controlsWrapper, BorderLayout.WEST);
+        topRow.add(filterWrapper, BorderLayout.EAST);
+
         filterStatusLabel = new JLabel(" ");
         filterStatusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        filterStatusLabel.setForeground(new Color(99, 115, 129));
+        filterStatusLabel.setForeground(CONTROL_MUTED);
+        filterStatusLabel.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 0));
 
-        row.add(controlsWrapper, BorderLayout.WEST);
+        row.add(topRow, BorderLayout.NORTH);
         row.add(filterStatusLabel, BorderLayout.CENTER);
         return row;
+    }
+
+    private void styleMissingItemFilterButton() {
+        if (missingItemFilterButton == null) {
+            return;
+        }
+        missingItemFilterButton.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+        missingItemFilterButton.setForeground(CONTROL_TEXT);
+        missingItemFilterButton.setBackground(Color.WHITE);
+        missingItemFilterButton.setFocusPainted(false);
+        missingItemFilterButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        missingItemFilterButton.setPreferredSize(new Dimension(240, 36));
+        missingItemFilterButton.setHorizontalAlignment(SwingConstants.LEFT);
+        missingItemFilterButton.setIcon(new ChevronDownIcon());
+        missingItemFilterButton.setHorizontalTextPosition(SwingConstants.LEFT);
+        missingItemFilterButton.setIconTextGap(10);
+        missingItemFilterButton.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedLineBorder(CONTROL_BORDER, SEARCH_RADIUS),
+                BorderFactory.createEmptyBorder(0, 12, 0, 12)
+        ));
+    }
+
+    private void showMissingItemFilterMenu() {
+        if (missingItemFilterButton == null || !missingItemFilterButton.isEnabled()) {
+            return;
+        }
+
+        JPopupMenu menu = new JPopupMenu();
+        menu.setBorder(new RoundedLineBorder(CONTROL_BORDER, DROPDOWN_RADIUS));
+        menu.setLayout(new BorderLayout());
+        menu.setBackground(Color.WHITE);
+
+        if (availableMissingItems.isEmpty()) {
+            JMenuItem empty = new JMenuItem("No missing " + activeMissingType.plural);
+            empty.setEnabled(false);
+            menu.add(empty, BorderLayout.CENTER);
+        } else {
+            JPanel content = new JPanel(new BorderLayout(0, 8));
+            content.setBackground(Color.WHITE);
+            content.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+            JTextField search = HomeViewHelper.createSearchField(" Search missing " + activeMissingType.plural);
+            search.setBorder(BorderFactory.createCompoundBorder(
+                    new RoundedLineBorder(CONTROL_BORDER, SEARCH_RADIUS),
+                    BorderFactory.createEmptyBorder(0, 10, 0, 10)
+            ));
+            search.setPreferredSize(new Dimension(300, 34));
+            search.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+
+            JPanel optionList = new JPanel();
+            optionList.setLayout(new BoxLayout(optionList, BoxLayout.Y_AXIS));
+            optionList.setBackground(Color.WHITE);
+
+            JScrollPane optionsScroll = new JScrollPane(optionList);
+            optionsScroll.setBorder(BorderFactory.createEmptyBorder());
+            optionsScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            optionsScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+            optionsScroll.getVerticalScrollBar().setUnitIncrement(14);
+            optionsScroll.setPreferredSize(new Dimension(320, 240));
+            optionsScroll.getViewport().setBackground(Color.WHITE);
+
+            JButton clear = new JButton("Clear selection");
+            HomeViewHelper.styleClearButton(clear);
+            clear.addActionListener(event -> {
+                selectedMissingItems.clear();
+                updateMissingItemFilterButton();
+                applyEmployeeCodeFilter();
+                rebuildMissingItemOptions(optionList, search.getText());
+            });
+
+            search.getDocument().addDocumentListener(new DocumentListener() {
+                public void insertUpdate(DocumentEvent event) {
+                    rebuildMissingItemOptions(optionList, search.getText());
+                }
+
+                public void removeUpdate(DocumentEvent event) {
+                    rebuildMissingItemOptions(optionList, search.getText());
+                }
+
+                public void changedUpdate(DocumentEvent event) {
+                    rebuildMissingItemOptions(optionList, search.getText());
+                }
+            });
+
+            JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+            footer.setOpaque(false);
+            footer.add(clear);
+
+            content.add(search, BorderLayout.NORTH);
+            content.add(optionsScroll, BorderLayout.CENTER);
+            content.add(footer, BorderLayout.SOUTH);
+            menu.add(content, BorderLayout.CENTER);
+            rebuildMissingItemOptions(optionList, "");
+        }
+
+        menu.show(missingItemFilterButton, 0, missingItemFilterButton.getHeight() + 4);
+    }
+
+    private void rebuildMissingItemOptions(JPanel optionList, String query) {
+        optionList.removeAll();
+        String normalizedQuery = normalized(query);
+        int matches = 0;
+        for (String itemLabel : availableMissingItems) {
+            if (!normalizedQuery.isBlank() && !normalized(itemLabel).contains(normalizedQuery)) {
+                continue;
+            }
+            optionList.add(new DropdownCheckRow(itemLabel));
+            matches++;
+        }
+        if (matches == 0) {
+            JLabel empty = new JLabel("No " + activeMissingType.plural + " found");
+            empty.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            empty.setForeground(CONTROL_MUTED);
+            empty.setBorder(BorderFactory.createEmptyBorder(8, 2, 8, 2));
+            optionList.add(empty);
+        }
+        optionList.revalidate();
+        optionList.repaint();
     }
 
     private JPanel createTableSection() {
@@ -309,6 +472,11 @@ public class MissingDataView extends JFrame {
 
         tablePanel.clearRows();
         updateSearchStatus(0, 0, "");
+        selectedMissingItems.clear();
+        missingFieldLabelsByRow.clear();
+        missingDocumentLabelsByRow.clear();
+        availableMissingItems = new ArrayList<>();
+        updateMissingItemFilterButton();
         refreshTable();
     }
 
@@ -342,6 +510,7 @@ public class MissingDataView extends JFrame {
                 try {
                     allRows.clear();
                     allRows.addAll(get());
+                    rebuildAvailableMissingItems();
                     applyEmployeeCodeFilter();
                     refreshTable();
                 } catch (CancellationException ignored) {
@@ -371,6 +540,11 @@ public class MissingDataView extends JFrame {
 
         tablePanel.clearRows();
         updateSearchStatus(0, 0, "");
+        selectedMissingItems.clear();
+        missingFieldLabelsByRow.clear();
+        missingDocumentLabelsByRow.clear();
+        availableMissingItems = new ArrayList<>();
+        updateMissingItemFilterButton();
         refreshTable();
     }
 
@@ -386,6 +560,9 @@ public class MissingDataView extends JFrame {
         int totalRowsForType = 0;
         for (EmployeeRecordDao.MissingEmployeeRow row : allRows) {
             if (!matchesActiveMissingType(row)) {
+                continue;
+            }
+            if (!matchesSelectedMissingItems(row)) {
                 continue;
             }
             totalRowsForType++;
@@ -409,6 +586,145 @@ public class MissingDataView extends JFrame {
                 : row.hasMissingFields();
     }
 
+    private boolean matchesSelectedMissingItems(EmployeeRecordDao.MissingEmployeeRow row) {
+        if (selectedMissingItems.isEmpty()) {
+            return true;
+        }
+
+        Set<String> rowItems = activeMissingType == MissingDataType.DOCUMENTS
+                ? missingDocumentLabelsByRow.getOrDefault(row, Set.of())
+                : missingFieldLabelsByRow.getOrDefault(row, Set.of());
+        for (String selected : selectedMissingItems) {
+            String normalizedSelected = normalized(selected);
+            for (String rowItem : rowItems) {
+                if (normalized(rowItem).equals(normalizedSelected)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void applyPendingInitialSelection() {
+        if (pendingInitialMissingItem == null || pendingInitialMissingItem.isBlank()) {
+            return;
+        }
+
+        String initial = pendingInitialMissingItem;
+        pendingInitialMissingItem = null;
+        for (String item : availableMissingItems) {
+            if (normalized(item).equals(normalized(initial))) {
+                selectedMissingItems.add(item);
+                return;
+            }
+        }
+        selectedMissingItems.add(initial);
+    }
+
+    private void rebuildAvailableMissingItems() {
+        missingFieldLabelsByRow.clear();
+        missingDocumentLabelsByRow.clear();
+        for (EmployeeRecordDao.MissingEmployeeRow row : allRows) {
+            missingFieldLabelsByRow.put(row, missingFieldSet(row));
+            missingDocumentLabelsByRow.put(row, missingDocumentSet(row));
+        }
+
+        availableMissingItems = requiredManagementLabels(activeMissingType == MissingDataType.DOCUMENTS);
+        selectedMissingItems.retainAll(new LinkedHashSet<>(availableMissingItems));
+        applyPendingInitialSelection();
+        updateMissingItemFilterButton();
+    }
+
+    private String cleanInitialMissingItem(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private List<String> requiredManagementLabels(boolean documentField) {
+        List<EmployeeFieldDefinition> definitions = new ArrayList<>(EmployeeFieldDefinitionCache.fields());
+        definitions.sort((left, right) -> {
+            int heading = compareText(left.heading(), right.heading());
+            if (heading != 0) {
+                return heading;
+            }
+            int sort = Integer.compare(left.sortOrder(), right.sortOrder());
+            if (sort != 0) {
+                return sort;
+            }
+            return compareText(left.label(), right.label());
+        });
+
+        List<String> labels = new ArrayList<>();
+        for (EmployeeFieldDefinition definition : definitions) {
+            if (definition.documentField() != documentField
+                    || !definition.requiredField()
+                    || "ID".equalsIgnoreCase(definition.columnName())) {
+                continue;
+            }
+            String label = definition.label() == null ? "" : definition.label().trim();
+            if (!label.isBlank() && labels.stream().noneMatch(existing -> existing.equalsIgnoreCase(label))) {
+                labels.add(label);
+            }
+        }
+        return labels;
+    }
+
+    private int compareText(String left, String right) {
+        String cleanLeft = left == null ? "" : left;
+        String cleanRight = right == null ? "" : right;
+        return String.CASE_INSENSITIVE_ORDER.compare(cleanLeft, cleanRight);
+    }
+
+    private Set<String> missingFieldSet(EmployeeRecordDao.MissingEmployeeRow row) {
+        return missingItemSet(row == null ? null : row.missingFieldItems());
+    }
+
+    private Set<String> missingDocumentSet(EmployeeRecordDao.MissingEmployeeRow row) {
+        return missingItemSet(row == null ? null : row.missingDocumentItems());
+    }
+
+    private Set<String> missingItemSet(String missingItems) {
+        Set<String> items = new LinkedHashSet<>();
+        if (missingItems == null || missingItems.isBlank()) {
+            return items;
+        }
+
+        for (String part : missingItems.split(",")) {
+            String label = part == null ? "" : part.trim();
+            if (!label.isBlank()) {
+                items.add(label);
+            }
+        }
+        return items;
+    }
+
+    private void updateMissingItemFilterButton() {
+        if (missingItemFilterButton == null) {
+            return;
+        }
+
+        missingItemFilterButton.setEnabled(!availableMissingItems.isEmpty());
+        missingItemFilterButton.setVisible(true);
+        String text;
+        if (selectedMissingItems.isEmpty()) {
+            text = "Missing " + activeMissingType.plural;
+        } else if (selectedMissingItems.size() == 1) {
+            text = firstSelectedMissingItem();
+        } else {
+            text = selectedMissingItems.size() + " " + activeMissingType.plural + " selected";
+        }
+        missingItemFilterButton.setText(compactButtonText(text) + " v");
+        missingItemFilterButton.setToolTipText(selectedMissingItems.isEmpty()
+                ? "Filter by missing " + activeMissingType.singular
+                : String.join(", ", selectedMissingItems));
+    }
+
+    private String firstSelectedMissingItem() {
+        for (String selected : selectedMissingItems) {
+            return selected;
+        }
+        return "Missing " + activeMissingType.plural;
+    }
+
     private String searchQuery() {
         return normalized(employeeCodeSearchField == null ? "" : employeeCodeSearchField.getText());
     }
@@ -419,9 +735,22 @@ public class MissingDataView extends JFrame {
 
     private String emptyTableText(String query) {
         String typeLabel = activeMissingType == null ? "data" : activeMissingType.plural;
+        if (!selectedMissingItems.isEmpty()) {
+            return query.isBlank()
+                    ? "No employees match the selected missing " + activeMissingType.plural
+                    : "No employees match this Employee ID and selected missing " + activeMissingType.plural;
+        }
         return query.isBlank()
                 ? "No employees with missing required " + typeLabel
                 : "No missing required " + typeLabel + " match this Employee ID";
+    }
+
+    private String compactButtonText(String value) {
+        String text = value == null ? "" : value.trim();
+        if (text.length() <= 22) {
+            return text;
+        }
+        return text.substring(0, 19) + "...";
     }
 
     private void updateSearchStatus(int visibleRows, int totalRows, String query) {
@@ -526,6 +855,100 @@ public class MissingDataView extends JFrame {
 
         public boolean getScrollableTracksViewportHeight() {
             return false;
+        }
+    }
+
+    private class DropdownCheckRow extends JPanel {
+        private final String labelText;
+        private final JLabel check = new JLabel("");
+        private final JLabel label = new JLabel();
+
+        private DropdownCheckRow(String labelText) {
+            super(new BorderLayout(10, 0));
+            this.labelText = labelText;
+            setOpaque(true);
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            setAlignmentX(Component.LEFT_ALIGNMENT);
+            setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+            setBorder(BorderFactory.createEmptyBorder(7, 10, 7, 10));
+
+            check.setHorizontalAlignment(SwingConstants.CENTER);
+            check.setPreferredSize(new Dimension(18, 18));
+            check.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
+            check.setForeground(CONTROL_PRIMARY);
+
+            label.setText(labelText);
+            label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            label.setForeground(CONTROL_TEXT);
+
+            add(check, BorderLayout.WEST);
+            add(label, BorderLayout.CENTER);
+            refresh(false);
+
+            addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseEntered(java.awt.event.MouseEvent event) {
+                    refresh(true);
+                }
+
+                @Override
+                public void mouseExited(java.awt.event.MouseEvent event) {
+                    refresh(false);
+                }
+
+                @Override
+                public void mouseClicked(java.awt.event.MouseEvent event) {
+                    toggle();
+                }
+            });
+        }
+
+        private void toggle() {
+            if (selectedMissingItems.contains(labelText)) {
+                selectedMissingItems.remove(labelText);
+            } else {
+                selectedMissingItems.add(labelText);
+            }
+            refresh(true);
+            updateMissingItemFilterButton();
+            applyEmployeeCodeFilter();
+        }
+
+        private void refresh(boolean hover) {
+            boolean selected = selectedMissingItems.contains(labelText);
+            setBackground(selected ? CONTROL_SELECTED : hover ? CONTROL_HOVER : Color.WHITE);
+            check.setText(selected ? "✓" : "");
+            label.setFont(new Font("Segoe UI", selected ? Font.BOLD : Font.PLAIN, 13));
+        }
+    }
+
+    private static class RoundedLineBorder extends AbstractBorder {
+        private final Color color;
+        private final int radius;
+
+        private RoundedLineBorder(Color color, int radius) {
+            this.color = color;
+            this.radius = radius;
+        }
+
+        @Override
+        public void paintBorder(Component component, Graphics graphics, int x, int y, int width, int height) {
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
+            g2.dispose();
+        }
+
+        @Override
+        public Insets getBorderInsets(Component component) {
+            return new Insets(1, 1, 1, 1);
+        }
+
+        @Override
+        public Insets getBorderInsets(Component component, Insets insets) {
+            insets.set(1, 1, 1, 1);
+            return insets;
         }
     }
 }
