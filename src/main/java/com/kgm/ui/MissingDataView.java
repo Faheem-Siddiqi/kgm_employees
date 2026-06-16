@@ -326,14 +326,13 @@ public class MissingDataView extends JFrame {
         missingItemFilterButton.setFocusPainted(false);
         missingItemFilterButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         missingItemFilterButton.setPreferredSize(new Dimension(240, 36));
-        missingItemFilterButton.setHorizontalAlignment(SwingConstants.LEFT);
-        missingItemFilterButton.setIcon(new ChevronDownIcon());
-        missingItemFilterButton.setHorizontalTextPosition(SwingConstants.LEFT);
-        missingItemFilterButton.setIconTextGap(10);
+        missingItemFilterButton.setHorizontalAlignment(SwingConstants.LEADING);
+        missingItemFilterButton.setLayout(new BorderLayout());
         missingItemFilterButton.setBorder(BorderFactory.createCompoundBorder(
                 new RoundedLineBorder(CONTROL_BORDER, SEARCH_RADIUS),
                 BorderFactory.createEmptyBorder(0, 12, 0, 12)
         ));
+        missingItemFilterButton.add(new JLabel(new ChevronDownIcon()), BorderLayout.EAST);
     }
 
     private void showMissingItemFilterMenu() {
@@ -712,7 +711,7 @@ public class MissingDataView extends JFrame {
         } else {
             text = selectedMissingItems.size() + " " + activeMissingType.plural + " selected";
         }
-        missingItemFilterButton.setText(compactButtonText(text) + " v");
+        missingItemFilterButton.setText(compactButtonText(text));
         missingItemFilterButton.setToolTipText(selectedMissingItems.isEmpty()
                 ? "Filter by missing " + activeMissingType.singular
                 : String.join(", ", selectedMissingItems));
@@ -860,7 +859,7 @@ public class MissingDataView extends JFrame {
 
     private class DropdownCheckRow extends JPanel {
         private final String labelText;
-        private final JLabel check = new JLabel("");
+        private final JCheckBox checkbox = new JCheckBox();
         private final JLabel label = new JLabel();
 
         private DropdownCheckRow(String labelText) {
@@ -872,16 +871,16 @@ public class MissingDataView extends JFrame {
             setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
             setBorder(BorderFactory.createEmptyBorder(7, 10, 7, 10));
 
-            check.setHorizontalAlignment(SwingConstants.CENTER);
-            check.setPreferredSize(new Dimension(18, 18));
-            check.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 13));
-            check.setForeground(CONTROL_PRIMARY);
+            checkbox.setOpaque(false);
+            checkbox.setFocusPainted(false);
+            checkbox.setPreferredSize(new Dimension(20, 20));
+            checkbox.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
             label.setText(labelText);
             label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
             label.setForeground(CONTROL_TEXT);
 
-            add(check, BorderLayout.WEST);
+            add(checkbox, BorderLayout.WEST);
             add(label, BorderLayout.CENTER);
             refresh(false);
 
@@ -901,6 +900,7 @@ public class MissingDataView extends JFrame {
                     toggle();
                 }
             });
+            checkbox.addActionListener(event -> toggle());
         }
 
         private void toggle() {
@@ -917,8 +917,32 @@ public class MissingDataView extends JFrame {
         private void refresh(boolean hover) {
             boolean selected = selectedMissingItems.contains(labelText);
             setBackground(selected ? CONTROL_SELECTED : hover ? CONTROL_HOVER : Color.WHITE);
-            check.setText(selected ? "✓" : "");
+            checkbox.setSelected(selected);
             label.setFont(new Font("Segoe UI", selected ? Font.BOLD : Font.PLAIN, 13));
+        }
+    }
+
+    private static class ChevronDownIcon implements Icon {
+        @Override
+        public int getIconWidth() {
+            return 12;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return 12;
+        }
+
+        @Override
+        public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            Graphics2D g2 = (Graphics2D) graphics.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(CONTROL_MUTED);
+            g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            int midY = y + 6;
+            g2.drawLine(x + 2, midY - 2, x + 6, midY + 2);
+            g2.drawLine(x + 6, midY + 2, x + 10, midY - 2);
+            g2.dispose();
         }
     }
 
