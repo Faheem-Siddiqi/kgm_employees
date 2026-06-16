@@ -294,7 +294,7 @@ public class FieldManagementView extends JFrame {
         stylePrimaryButton(add);
         styleNeutralButton(refresh);
         add.addActionListener(event -> addField());
-        refresh.addActionListener(event -> refreshFromCache("Field metadata refreshed from cache."));
+        refresh.addActionListener(event -> refreshFromDatabase("Field metadata refreshed from MySQL and cache updated."));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
@@ -349,7 +349,7 @@ public class FieldManagementView extends JFrame {
         styleNeutralButton(refresh);
         rename.addActionListener(event -> renameSelectedCategory());
         delete.addActionListener(event -> deleteSelectedCategory());
-        refresh.addActionListener(event -> refreshFromCache("Category metadata refreshed from cache."));
+        refresh.addActionListener(event -> refreshFromDatabase("Category metadata refreshed from MySQL and cache updated."));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
@@ -389,7 +389,7 @@ public class FieldManagementView extends JFrame {
 
         JButton refresh = new JButton("Refresh");
         styleNeutralButton(refresh);
-        refresh.addActionListener(event -> refreshFromCache("Required field metadata refreshed from cache."));
+        refresh.addActionListener(event -> refreshFromDatabase("Required field metadata refreshed from MySQL and cache updated."));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
@@ -599,13 +599,35 @@ public class FieldManagementView extends JFrame {
         }
     }
 
-    private void refreshFromCache(String successMessage) {
-        try {
-            loadData(EmployeeFieldDefinitionCache.fields());
-            DialogHelper.success(this, successMessage);
-        } catch (RuntimeException exception) {
-            DialogHelper.error(this, "Field Management Refresh Failed", rootMessage(exception));
-        }
+    private void refreshFromDatabase(String successMessage) {
+        LoadingOverlay.Handle loader = LoadingOverlay.show(
+                this,
+                "Refreshing Field Metadata",
+                "Reloading metadata from MySQL and updating cache..."
+        );
+        SwingWorker<List<EmployeeFieldDefinition>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected List<EmployeeFieldDefinition> doInBackground() {
+                return EmployeeFieldDefinitionCache.refreshFromDatabase();
+            }
+
+            @Override
+            protected void done() {
+                loader.close();
+                try {
+                    loadData(get());
+                    refreshOpenEmployeeForms();
+                    DialogHelper.success(FieldManagementView.this, successMessage);
+                } catch (Exception exception) {
+                    DialogHelper.error(
+                            FieldManagementView.this,
+                            "Field Management Refresh Failed",
+                            rootMessage(exception)
+                    );
+                }
+            }
+        };
+        worker.execute();
     }
 
     private void loadData(List<EmployeeFieldDefinition> definitions) {
