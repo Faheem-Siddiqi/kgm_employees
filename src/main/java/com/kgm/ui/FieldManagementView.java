@@ -123,8 +123,8 @@ public class FieldManagementView extends JFrame {
         add(pageScroll, BorderLayout.CENTER);
         add(new FooterPanel(), BorderLayout.SOUTH);
 
-        loadData();
         setVisible(true);
+        loadInitialDataFromCache();
     }
 
     @Override
@@ -294,7 +294,7 @@ public class FieldManagementView extends JFrame {
         stylePrimaryButton(add);
         styleNeutralButton(refresh);
         add.addActionListener(event -> addField());
-        refresh.addActionListener(event -> refreshMetadataWithLoader("Refreshing field metadata..."));
+        refresh.addActionListener(event -> refreshFromCache("Field metadata refreshed from cache."));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
@@ -349,7 +349,7 @@ public class FieldManagementView extends JFrame {
         styleNeutralButton(refresh);
         rename.addActionListener(event -> renameSelectedCategory());
         delete.addActionListener(event -> deleteSelectedCategory());
-        refresh.addActionListener(event -> refreshMetadataWithLoader("Refreshing category metadata..."));
+        refresh.addActionListener(event -> refreshFromCache("Category metadata refreshed from cache."));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
@@ -389,7 +389,7 @@ public class FieldManagementView extends JFrame {
 
         JButton refresh = new JButton("Refresh");
         styleNeutralButton(refresh);
-        refresh.addActionListener(event -> refreshMetadataWithLoader("Refreshing required field metadata..."));
+        refresh.addActionListener(event -> refreshFromCache("Required field metadata refreshed from cache."));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, ACTION_GAP, 0));
         actions.setBackground(Color.WHITE);
@@ -589,12 +589,22 @@ public class FieldManagementView extends JFrame {
         clear.setCursor(Cursor.getPredefinedCursor(active ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
     }
 
-    private void loadData() {
+    private void loadInitialDataFromCache() {
         try {
-            loadData(EmployeeFieldDefinitionCache.refreshFromDatabase());
+            loadData(EmployeeFieldDefinitionCache.fields());
         } catch (RuntimeException exception) {
-            exception.printStackTrace();
             DialogHelper.error(this, "Field Management Load Failed", rootMessage(exception));
+            new HomeView();
+            dispose();
+        }
+    }
+
+    private void refreshFromCache(String successMessage) {
+        try {
+            loadData(EmployeeFieldDefinitionCache.fields());
+            DialogHelper.success(this, successMessage);
+        } catch (RuntimeException exception) {
+            DialogHelper.error(this, "Field Management Refresh Failed", rootMessage(exception));
         }
     }
 
@@ -608,15 +618,6 @@ public class FieldManagementView extends JFrame {
         applyFieldSearch();
         refreshCategoryTable();
         refreshRequiredTable();
-    }
-
-    private void refreshMetadataWithLoader(String message) {
-        runMetadataOperation(
-                message,
-                () -> null,
-                ignored -> DialogHelper.success(this, "Field metadata refreshed."),
-                "Field Management Refresh Failed"
-        );
     }
 
     private void applyFieldSearch() {
