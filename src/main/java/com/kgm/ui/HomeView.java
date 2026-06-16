@@ -45,6 +45,7 @@ public class HomeView extends JFrame {
     private JScrollPane mainScrollPane;
     private JMenuItem excelBtn;
     private JMenuItem bulkDocumentBtn;
+    private JMenuItem settingsBtn;
     private JButton refreshBtn;
     private boolean bulkDocumentActionRunning;
     private boolean homeDataLoading;
@@ -155,11 +156,15 @@ public class HomeView extends JFrame {
             }
         });
 
-        JMenuItem settingsBtn = HomeViewHelper.createServicesMenuItem("Settings");
+        settingsBtn = HomeViewHelper.createServicesMenuItem("Settings");
         settingsBtn.addActionListener(e -> {
+            if (!ApplicationStartup.isReady()) {
+                return;
+            }
             new FieldManagementView();
             dispose();
         });
+        updateSettingsButtonState();
 
         JButton servicesBtn = HomeViewHelper.createServicesMenuButton();
         JPopupMenu servicesMenu = HomeViewHelper.createServicesMenu(excelBtn, bulkDocumentBtn, settingsBtn);
@@ -1374,9 +1379,11 @@ public class HomeView extends JFrame {
 
     private void loadHomeDataWhenReady(String title, String message) {
         if (ApplicationStartup.isReady()) {
+            setSettingsButtonReady(true);
             loadHomeDataAsync(title, message);
             return;
         }
+        setSettingsButtonReady(false);
         if (homeStartupWaitPending) {
             return;
         }
@@ -1393,12 +1400,14 @@ public class HomeView extends JFrame {
                 () -> {
                     homeStartupWaitPending = false;
                     if (isDisplayable()) {
+                        setSettingsButtonReady(true);
                         loadHomeDataAsync(title, message);
                     }
                 },
                 () -> {
                     homeStartupWaitPending = false;
                     if (isDisplayable()) {
+                        setSettingsButtonReady(false);
                         tablePanel.showLoadFailed("Database initialization did not complete. Dashboard queries were not run.");
                         if (refreshBtn != null) {
                             refreshBtn.setText("Refresh");
@@ -1415,6 +1424,7 @@ public class HomeView extends JFrame {
             loadHomeDataWhenReady(title, message);
             return;
         }
+        setSettingsButtonReady(true);
         if (homeDataWorker != null && !homeDataWorker.isDone()) {
             homeDataWorker.cancel(true);
         }
@@ -1526,6 +1536,20 @@ public class HomeView extends JFrame {
         };
         homeDataWorker = worker;
         worker.execute();
+    }
+
+    private void updateSettingsButtonState() {
+        setSettingsButtonReady(ApplicationStartup.isReady());
+    }
+
+    private void setSettingsButtonReady(boolean ready) {
+        if (settingsBtn == null) {
+            return;
+        }
+        HomeViewHelper.setServicesMenuItemEnabled(settingsBtn, ready);
+        settingsBtn.setToolTipText(ready
+                ? "Open Field Settings"
+                : "Field Settings will be available after startup finishes.");
     }
 
     private void loadDashboardStatsAsync() {

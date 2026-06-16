@@ -77,7 +77,6 @@ public class FieldManagementView extends JFrame {
             "Field", "DB Column", "Heading", "Category", "Required", "Action"
     };
 
-    private final EmployeeFieldDefinitionDao dao = new EmployeeFieldDefinitionDao();
     private final Map<String, EmployeeFieldDefinition> definitionsByColumn = new LinkedHashMap<>();
     private final List<EmployeeFieldDefinition> allFields = new ArrayList<>();
     private final List<EmployeeFieldDefinition> displayedFields = new ArrayList<>();
@@ -92,6 +91,7 @@ public class FieldManagementView extends JFrame {
     private JTextField requiredSearchField;
     private JComboBox<String> originFilter;
     private String selectedCategoryHeading;
+    private EmployeeFieldDefinitionDao dao;
 
     public FieldManagementView() {
         setTitle("Field Management");
@@ -781,7 +781,7 @@ public class FieldManagementView extends JFrame {
         }
         runMetadataOperation(
                 "Updating required field metadata...",
-                () -> dao.updateRequiredField(selected.columnName(), required),
+                () -> dao().updateRequiredField(selected.columnName(), required),
                 updated -> DialogHelper.success(this, "Required status updated.\nField: "
                         + updated.label()
                         + "\nRequired: "
@@ -906,7 +906,7 @@ public class FieldManagementView extends JFrame {
 
         runMetadataOperation(
                 "Deleting category metadata and field columns...",
-                () -> dao.deleteHeading(category.heading()),
+                () -> dao().deleteHeading(category.heading()),
                 deleted -> {
                     selectedCategoryHeading = null;
                     DialogHelper.success(this, "Category deleted.\nFields deleted: " + deleted);
@@ -955,7 +955,7 @@ public class FieldManagementView extends JFrame {
 
         runMetadataOperation(
                 "Updating category metadata...",
-                () -> dao.renameHeading(category.heading(), renamed),
+                () -> dao().renameHeading(category.heading(), renamed),
                 updated -> {
                     selectedCategoryHeading = renamed;
                     DialogHelper.success(this, "Category name updated.\nFields updated: " + updated);
@@ -1034,7 +1034,7 @@ public class FieldManagementView extends JFrame {
 
         runMetadataOperation(
                 "Adding field and refreshing application metadata...",
-                () -> dao.addField(
+                () -> dao().addField(
                         data.label(),
                         data.heading(),
                         data.documentField(),
@@ -1065,7 +1065,7 @@ public class FieldManagementView extends JFrame {
 
         runMetadataOperation(
                 "Updating field and refreshing application metadata...",
-                () -> dao.updateFieldSettings(
+                () -> dao().updateFieldSettings(
                         selected.columnName(),
                         data.label(),
                         data.heading(),
@@ -1108,7 +1108,7 @@ public class FieldManagementView extends JFrame {
         runMetadataOperation(
                 "Deleting field and refreshing application metadata...",
                 () -> {
-                    dao.deleteField(selected.columnName());
+                    dao().deleteField(selected.columnName());
                     return selected;
                 },
                 deleted -> DialogHelper.success(this, "Field deleted."),
@@ -1131,7 +1131,7 @@ public class FieldManagementView extends JFrame {
         JTextField column = new JTextField(current == null ? "" : current.columnName(), 24);
         column.setEditable(false);
         JTextField label = new JTextField(current == null ? "" : current.label(), 24);
-        List<String> headings = dao.listDetailHeadings();
+        List<String> headings = dao().listDetailHeadings();
         JComboBox<String> heading = new JComboBox<>(headings.toArray(new String[0]));
         heading.setEditable(true);
         if (current != null) {
@@ -1477,6 +1477,13 @@ public class FieldManagementView extends JFrame {
 
     private boolean contains(String value, String query) {
         return value != null && value.toLowerCase(Locale.ROOT).contains(query);
+    }
+
+    private EmployeeFieldDefinitionDao dao() {
+        if (dao == null) {
+            dao = new EmployeeFieldDefinitionDao();
+        }
+        return dao;
     }
 
     private String rootMessage(Throwable throwable) {

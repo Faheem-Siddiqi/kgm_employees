@@ -38,6 +38,7 @@ public final class HomeViewHelper {
     private static final Color ACTION_BLUE = new Color(30, 144, 255);
     private static final Color TEXT_PRIMARY = new Color(35, 43, 54);
     private static final Color TEXT_SECONDARY = new Color(99, 115, 129);
+    private static final Color TEXT_DISABLED = new Color(176, 184, 194);
     private static final Color BORDER = new Color(203, 213, 225);
     private static final Color MENU_SELECTION = new Color(239, 246, 255);
     private static final Color FIELD_BORDER = new Color(203, 213, 225);
@@ -249,7 +250,7 @@ public final class HomeViewHelper {
         item.setHorizontalAlignment(SwingConstants.LEFT);
         item.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         item.setOpaque(true);
-        item.setForeground(item.isEnabled() ? TEXT_PRIMARY : TEXT_SECONDARY);
+        item.setForeground(item.isEnabled() ? TEXT_PRIMARY : TEXT_DISABLED);
         item.setBackground(PAGE_BACKGROUND);
         item.setBorder(new EmptyBorder(9, 14, 9, 14));
         item.setCursor(Cursor.getPredefinedCursor(item.isEnabled() ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
@@ -259,9 +260,15 @@ public final class HomeViewHelper {
                 super.installDefaults();
                 selectionBackground = MENU_SELECTION;
                 selectionForeground = TEXT_PRIMARY;
-                disabledForeground = TEXT_SECONDARY;
+                disabledForeground = TEXT_DISABLED;
             }
         });
+    }
+
+    public static void setServicesMenuItemEnabled(JMenuItem item, boolean enabled) {
+        item.setEnabled(enabled);
+        item.setForeground(enabled ? TEXT_PRIMARY : TEXT_DISABLED);
+        item.setCursor(Cursor.getPredefinedCursor(enabled ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
     }
 
     public static JPanel createBodyPanel() {
@@ -790,4 +797,3 @@ public final class HomeViewHelper {
     private record CommandButtonStyle(Color background, Color hoverBackground, Color pressedBackground) {
     }
 }
-
