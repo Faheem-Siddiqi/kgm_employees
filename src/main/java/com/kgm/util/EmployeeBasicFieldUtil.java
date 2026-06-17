@@ -54,7 +54,7 @@ public final class EmployeeBasicFieldUtil {
 
     public static List<EmployeeFieldDefinition> loadBasicDefinitions() {
         try {
-            return basicDefinitions(EmployeeFieldDefinitionCache.fields());
+            return EmployeeFieldDefinitionCache.basicFields();
         } catch (RuntimeException exception) {
             return fallbackDefinitions();
         }

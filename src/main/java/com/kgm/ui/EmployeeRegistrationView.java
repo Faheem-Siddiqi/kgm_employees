@@ -3,7 +3,6 @@ package com.kgm.ui;
 import com.kgm.config.DatabaseConnection;
 import com.kgm.dao.EmployeeRegistrationDao;
 import com.kgm.model.Employee;
-import com.kgm.model.EmployeeFieldDefinition;
 import com.kgm.ui.component.EmployeeStorageStatusBanner;
 import com.kgm.ui.component.LoadingOverlay;
 import com.kgm.ui.panel.EmployeeDocumentUploadPanel;
@@ -13,8 +12,9 @@ import com.kgm.ui.panel.HeaderPanel;
 import com.kgm.ui.styling.AppTabsHelper;
 import com.kgm.ui.styling.DialogHelper;
 import com.kgm.ui.styling.EmployeeRegistrationViewHelper;
-import com.kgm.util.EmployeeBasicFieldUtil;
+import com.kgm.util.ApplicationStartup;
 import com.kgm.util.EmployeeDocumentUtil;
+import com.kgm.util.EmployeeFormMetadata;
 
 import javax.swing.*;
 import java.awt.*;
@@ -52,9 +52,17 @@ public class EmployeeRegistrationView extends JFrame {
         EmployeeRegistrationViewHelper.installPageWheelForwarding(pageScroll, centerWrapper);
         add(pageScroll, BorderLayout.CENTER);
         add(new FooterPanel(), BorderLayout.SOUTH);
-        setVisible(true);
 
-        SwingUtilities.invokeLater(this::loadRegistrationContentAsync);
+        if (ApplicationStartup.isReady()) {
+            try {
+                showRegistrationContent(EmployeeFormMetadata.snapshot());
+            } catch (RuntimeException exception) {
+                loadRegistrationContentAsync();
+            }
+        } else {
+            SwingUtilities.invokeLater(this::loadRegistrationContentAsync);
+        }
+        setVisible(true);
     }
 
     private JComponent createLoadingPanel() {
@@ -70,13 +78,10 @@ public class EmployeeRegistrationView extends JFrame {
     }
 
     private void loadRegistrationContentAsync() {
-        SwingWorker<RegistrationMetadata, Void> worker = new SwingWorker<>() {
+        SwingWorker<EmployeeFormMetadata, Void> worker = new SwingWorker<>() {
             @Override
-            protected RegistrationMetadata doInBackground() {
-                List<EmployeeFieldDefinition> definitions = EmployeeBasicFieldUtil.loadBasicDefinitions();
-                EmployeeDocumentUtil.documentTypes();
-                EmployeeDocumentUtil.requiredDocumentFlags();
-                return new RegistrationMetadata(definitions, EmployeeDocumentUtil.isProfileImageRequired());
+            protected EmployeeFormMetadata doInBackground() {
+                return EmployeeFormMetadata.snapshot();
             }
 
             @Override
@@ -87,10 +92,7 @@ public class EmployeeRegistrationView extends JFrame {
                 try {
                     showRegistrationContent(get());
                 } catch (Exception exception) {
-                    showRegistrationContent(new RegistrationMetadata(
-                            EmployeeBasicFieldUtil.fallbackDefinitions(),
-                            false
-                    ));
+                    showRegistrationContent(EmployeeFormMetadata.fallback());
                     DialogHelper.warning(
                             EmployeeRegistrationView.this,
                             "Employee Form",
@@ -102,12 +104,12 @@ public class EmployeeRegistrationView extends JFrame {
         worker.execute();
     }
 
-    private void showRegistrationContent(RegistrationMetadata metadata) {
+    private void showRegistrationContent(EmployeeFormMetadata metadata) {
         centerWrapper.removeAll();
         centerWrapper.add(EmployeeRegistrationViewHelper.screenHeader(onBack), EmployeeRegistrationViewHelper.pageConstraints(0));
 
         JTabbedPane tabs = new HugHeightTabbedPane();
-        formPanel = new EmployeeRegistrationFormPanel(metadata.definitions(), metadata.profileImageRequired());
+        formPanel = new EmployeeRegistrationFormPanel(metadata.basicDefinitions(), metadata.profileImageRequired());
         documentPanel = new EmployeeDocumentUploadPanel();
         documentPanel.setProfileImageUploadListener(formPanel::setSelectedImageFromDocumentUpload);
         formPanel.setSelectedImageListener(documentPanel::setProfileImageFromMainTab);
@@ -274,12 +276,6 @@ public class EmployeeRegistrationView extends JFrame {
             builder.append("- ").append(value);
         }
         return builder.toString();
-    }
-
-    private record RegistrationMetadata(
-            List<EmployeeFieldDefinition> definitions,
-            boolean profileImageRequired
-    ) {
     }
 
     private static class HugHeightTabbedPane extends JTabbedPane {

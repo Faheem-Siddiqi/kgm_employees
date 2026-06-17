@@ -22,6 +22,7 @@ public class EmployeeRecordDao implements AutoCloseable {
     private static final int FETCH_SIZE = 500;
 
     private final Connection con;
+    private Set<String> cachedEmployeeColumns;
 
     public EmployeeRecordDao() {
         try {
@@ -1005,6 +1006,9 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
     }
 
     private Set<String> employeeColumns() throws SQLException {
+        if (cachedEmployeeColumns != null) {
+            return cachedEmployeeColumns;
+        }
         Set<String> columns = new HashSet<>();
         DatabaseMetaData metaData = con.getMetaData();
         try (ResultSet rs = metaData.getColumns(con.getCatalog(), null, "employees", null)) {
@@ -1012,7 +1016,8 @@ public void updateEmployeeDynamic(Employee emp) throws Exception {
                 columns.add(rs.getString("COLUMN_NAME").toUpperCase(Locale.ROOT));
             }
         }
-        return columns;
+        cachedEmployeeColumns = Set.copyOf(columns);
+        return cachedEmployeeColumns;
     }
 
     private String normalizedColumnName(String columnName) {

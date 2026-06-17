@@ -19,7 +19,7 @@ import com.kgm.ui.styling.EmployeeDetailViewHelper;
 import com.kgm.ui.styling.UniversalDialogHelper;
 import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
-import com.kgm.util.EmployeeFieldDefinitionCache;
+import com.kgm.util.EmployeeFormMetadata;
 
 import javax.swing.*;
 import java.awt.*;
@@ -53,6 +53,13 @@ public class EmployeeDetailView extends JFrame {
     private boolean otherTabLoading;
     private boolean documentTabLoaded;
     private boolean documentTabLoading;
+    private SwingWorker<Employee, Void> basicTabWorker;
+    private SwingWorker<Employee, Void> otherTabWorker;
+    private SwingWorker<Employee, Void> documentTabWorker;
+    private Employee prefetchedBasicEmployee;
+    private Employee prefetchedOtherEmployee;
+    private Employee prefetchedDocumentEmployee;
+    private boolean prefetchDocumentsAfterOther;
 
     public EmployeeDetailView(String empCode) {
         this.empCode = (empCode != null) ? empCode.trim() : null;
@@ -75,10 +82,11 @@ public class EmployeeDetailView extends JFrame {
     }
 
     private void initializeUI(Employee emp, boolean isWithData) {
+        EmployeeFormMetadata metadata = loadFormMetadata();
         initializeUI(new DetailLoadResult(
                 emp,
-                EmployeeBasicFieldUtil.loadBasicDefinitions(),
-                loadDetailDefinitions()
+                metadata.basicDefinitions(),
+                metadata.detailDefinitions()
         ), isWithData);
     }
 
@@ -190,6 +198,7 @@ public class EmployeeDetailView extends JFrame {
 
     @Override
     public void dispose() {
+        cancelTabWorkers();
         if (storageStatusBanner != null) {
             storageStatusBanner.dispose();
             storageStatusBanner = null;
@@ -198,6 +207,7 @@ public class EmployeeDetailView extends JFrame {
     }
 
     private void resetLazyTabs() {
+        cancelTabWorkers();
         basicPanel = null;
         otherPanel = null;
         documentPanel = null;
@@ -207,6 +217,25 @@ public class EmployeeDetailView extends JFrame {
         otherTabLoading = false;
         documentTabLoaded = false;
         documentTabLoading = false;
+        prefetchedBasicEmployee = null;
+        prefetchedOtherEmployee = null;
+        prefetchedDocumentEmployee = null;
+        prefetchDocumentsAfterOther = false;
+    }
+
+    private void cancelTabWorkers() {
+        if (basicTabWorker != null && !basicTabWorker.isDone()) {
+            basicTabWorker.cancel(true);
+        }
+        if (otherTabWorker != null && !otherTabWorker.isDone()) {
+            otherTabWorker.cancel(true);
+        }
+        if (documentTabWorker != null && !documentTabWorker.isDone()) {
+            documentTabWorker.cancel(true);
+        }
+        basicTabWorker = null;
+        otherTabWorker = null;
+        documentTabWorker = null;
     }
 
     private JPanel createTabLoadingPanel(String title, String message) {
@@ -286,11 +315,21 @@ public class EmployeeDetailView extends JFrame {
         if (basicTabLoaded || basicTabLoading || tabs == null) {
             return;
         }
+        if (prefetchedBasicEmployee != null) {
+            renderBasicTab(prefetchedBasicEmployee);
+            return;
+        }
+        if (basicTabWorker != null && !basicTabWorker.isDone()) {
+            basicTabLoading = true;
+            tabs.setComponentAt(BASIC_TAB_INDEX, createTabLoadingPanel("Basic details", "Finishing Basic fields..."));
+            refreshAfterTabChange();
+            return;
+        }
         basicTabLoading = true;
         tabs.setComponentAt(BASIC_TAB_INDEX, createTabLoadingPanel("Basic details", "Fetching Basic fields from the database."));
         LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Loading Basic Details", "Fetching basic tab fields...");
 
-        SwingWorker<Employee, Void> worker = new SwingWorker<>() {
+        basicTabWorker = new SwingWorker<>() {
             @Override
             protected Employee doInBackground() {
                 try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
@@ -309,24 +348,8 @@ public class EmployeeDetailView extends JFrame {
                     return;
                 }
                 try {
-                    Employee loaded = get();
-                    if (loaded == null) {
-                        throw new IllegalStateException("Employee record was not found.");
-                    }
-                    employee = loaded;
-                    basicPanel = new EmployeeBasicDetailsPanel(loaded, basicDefinitions);
-                    basicPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
-                    if (documentPanel != null) {
-                        documentPanel.setProfileImageUploadListener(basicPanel::setSelectedImageFromDocumentUpload);
-                        basicPanel.setSelectedImageListener(documentPanel::setProfileImageFromMainTab);
-                        File pendingProfileImage = documentPanel.pendingProfileImageFile();
-                        if (pendingProfileImage != null) {
-                            basicPanel.setSelectedImageFromDocumentUpload(pendingProfileImage);
-                        }
-                    }
-                    tabs.setComponentAt(BASIC_TAB_INDEX, basicPanel);
-                    basicTabLoaded = true;
-                    refreshAfterTabChange();
+                    renderBasicTab(get());
+                    prefetchHiddenTabs();
                 } catch (Exception exception) {
                     exception.printStackTrace();
                     tabs.setComponentAt(BASIC_TAB_INDEX, createTabErrorPanel(
@@ -338,18 +361,28 @@ public class EmployeeDetailView extends JFrame {
                 }
             }
         };
-        worker.execute();
+        basicTabWorker.execute();
     }
 
     private void loadOtherTab() {
         if (otherTabLoaded || otherTabLoading || tabs == null) {
             return;
         }
+        if (prefetchedOtherEmployee != null) {
+            renderOtherTab(prefetchedOtherEmployee);
+            return;
+        }
+        if (otherTabWorker != null && !otherTabWorker.isDone()) {
+            otherTabLoading = true;
+            tabs.setComponentAt(OTHER_TAB_INDEX, createTabLoadingPanel("Other details", "Finishing additional fields..."));
+            refreshAfterTabChange();
+            return;
+        }
         otherTabLoading = true;
         tabs.setComponentAt(OTHER_TAB_INDEX, createTabLoadingPanel("Other details", "Fetching only additional fields."));
         LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Loading Other Details", "Fetching selected tab fields...");
 
-        SwingWorker<Employee, Void> worker = new SwingWorker<>() {
+        otherTabWorker = new SwingWorker<>() {
             @Override
             protected Employee doInBackground() {
                 try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
@@ -368,15 +401,7 @@ public class EmployeeDetailView extends JFrame {
                     return;
                 }
                 try {
-                    Employee loaded = get();
-                    if (loaded == null) {
-                        throw new IllegalStateException("Employee record was not found.");
-                    }
-                    otherPanel = new EmployeeAdditionalDetailsPanel(loaded, detailDefinitions);
-                    otherPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
-                    tabs.setComponentAt(OTHER_TAB_INDEX, otherPanel);
-                    otherTabLoaded = true;
-                    refreshAfterTabChange();
+                    renderOtherTab(get());
                 } catch (Exception exception) {
                     exception.printStackTrace();
                     tabs.setComponentAt(OTHER_TAB_INDEX, createTabErrorPanel(
@@ -388,18 +413,28 @@ public class EmployeeDetailView extends JFrame {
                 }
             }
         };
-        worker.execute();
+        otherTabWorker.execute();
     }
 
     private void loadDocumentTab() {
         if (documentTabLoaded || documentTabLoading || tabs == null) {
             return;
         }
+        if (prefetchedDocumentEmployee != null) {
+            renderDocumentTab(prefetchedDocumentEmployee);
+            return;
+        }
+        if (documentTabWorker != null && !documentTabWorker.isDone()) {
+            documentTabLoading = true;
+            tabs.setComponentAt(DOCUMENT_TAB_INDEX, createTabLoadingPanel("Documents", "Finishing document references..."));
+            refreshAfterTabChange();
+            return;
+        }
         documentTabLoading = true;
         tabs.setComponentAt(DOCUMENT_TAB_INDEX, createTabLoadingPanel("Documents", "Fetching saved document paths."));
         LoadingOverlay.Handle loader = LoadingOverlay.show(this, "Loading Documents", "Fetching document references...");
 
-        SwingWorker<Employee, Void> worker = new SwingWorker<>() {
+        documentTabWorker = new SwingWorker<>() {
             @Override
             protected Employee doInBackground() {
                 try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
@@ -415,19 +450,7 @@ public class EmployeeDetailView extends JFrame {
                     return;
                 }
                 try {
-                    Employee loaded = get();
-                    if (loaded == null) {
-                        throw new IllegalStateException("Employee record was not found.");
-                    }
-                    documentPanel = new EmployeeDocumentViewPanel(loaded);
-                    documentPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
-                    if (basicPanel != null) {
-                        documentPanel.setProfileImageUploadListener(basicPanel::setSelectedImageFromDocumentUpload);
-                        basicPanel.setSelectedImageListener(documentPanel::setProfileImageFromMainTab);
-                    }
-                    tabs.setComponentAt(DOCUMENT_TAB_INDEX, documentPanel);
-                    documentTabLoaded = true;
-                    refreshAfterTabChange();
+                    renderDocumentTab(get());
                 } catch (Exception exception) {
                     exception.printStackTrace();
                     tabs.setComponentAt(DOCUMENT_TAB_INDEX, createTabErrorPanel(
@@ -439,7 +462,155 @@ public class EmployeeDetailView extends JFrame {
                 }
             }
         };
-        worker.execute();
+        documentTabWorker.execute();
+    }
+
+    private void prefetchHiddenTabs() {
+        if (!isDisplayable() || tabs == null || empCode == null || empCode.isBlank()) {
+            return;
+        }
+        prefetchDocumentsAfterOther = true;
+        prefetchOtherTab();
+        if (otherTabLoaded || prefetchedOtherEmployee != null) {
+            prefetchDocumentsAfterOther = false;
+            prefetchDocumentTab();
+        }
+    }
+
+    private void prefetchOtherTab() {
+        if (otherTabLoaded || prefetchedOtherEmployee != null || otherTabWorker != null && !otherTabWorker.isDone()) {
+            return;
+        }
+        otherTabWorker = new SwingWorker<>() {
+            @Override
+            protected Employee doInBackground() {
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    return dao.getEmployeeSectionByCode(empCode, columnsForDefinitions(detailDefinitions, false));
+                }
+            }
+
+            @Override
+            protected void done() {
+                otherTabLoading = false;
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    prefetchedOtherEmployee = get();
+                    if (tabs != null && !otherTabLoaded) {
+                        renderOtherTab(prefetchedOtherEmployee);
+                    }
+                } catch (Exception exception) {
+                    prefetchedOtherEmployee = null;
+                    if (tabs != null && tabs.getSelectedIndex() == OTHER_TAB_INDEX && !otherTabLoaded) {
+                        tabs.setComponentAt(OTHER_TAB_INDEX, createTabErrorPanel(
+                                "Other details could not load",
+                                "Check the database connection and try again.",
+                                EmployeeDetailView.this::loadOtherTab
+                        ));
+                        refreshAfterTabChange();
+                    }
+                } finally {
+                    if (prefetchDocumentsAfterOther) {
+                        prefetchDocumentsAfterOther = false;
+                        prefetchDocumentTab();
+                    }
+                }
+            }
+        };
+        otherTabWorker.execute();
+    }
+
+    private void prefetchDocumentTab() {
+        if (documentTabLoaded || prefetchedDocumentEmployee != null
+                || documentTabWorker != null && !documentTabWorker.isDone()) {
+            return;
+        }
+        documentTabWorker = new SwingWorker<>() {
+            @Override
+            protected Employee doInBackground() {
+                try (EmployeeRecordDao dao = new EmployeeRecordDao()) {
+                    return dao.getEmployeeDocumentsByCode(empCode);
+                }
+            }
+
+            @Override
+            protected void done() {
+                documentTabLoading = false;
+                if (!isDisplayable()) {
+                    return;
+                }
+                try {
+                    prefetchedDocumentEmployee = get();
+                    if (tabs != null && !documentTabLoaded) {
+                        renderDocumentTab(prefetchedDocumentEmployee);
+                    }
+                } catch (Exception exception) {
+                    prefetchedDocumentEmployee = null;
+                    if (tabs != null && tabs.getSelectedIndex() == DOCUMENT_TAB_INDEX && !documentTabLoaded) {
+                        tabs.setComponentAt(DOCUMENT_TAB_INDEX, createTabErrorPanel(
+                                "Documents could not load",
+                                "Check the database connection and try again.",
+                                EmployeeDetailView.this::loadDocumentTab
+                        ));
+                        refreshAfterTabChange();
+                    }
+                }
+            }
+        };
+        documentTabWorker.execute();
+    }
+
+    private void renderBasicTab(Employee loaded) {
+        if (loaded == null) {
+            throw new IllegalStateException("Employee record was not found.");
+        }
+        employee = loaded;
+        prefetchedBasicEmployee = loaded;
+        basicPanel = new EmployeeBasicDetailsPanel(loaded, basicDefinitions);
+        basicPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
+        if (documentPanel != null) {
+            documentPanel.setProfileImageUploadListener(basicPanel::setSelectedImageFromDocumentUpload);
+            basicPanel.setSelectedImageListener(documentPanel::setProfileImageFromMainTab);
+            File pendingProfileImage = documentPanel.pendingProfileImageFile();
+            if (pendingProfileImage != null) {
+                basicPanel.setSelectedImageFromDocumentUpload(pendingProfileImage);
+            }
+        }
+        tabs.setComponentAt(BASIC_TAB_INDEX, basicPanel);
+        basicTabLoaded = true;
+        basicTabLoading = false;
+        refreshAfterTabChange();
+    }
+
+    private void renderOtherTab(Employee loaded) {
+        if (loaded == null) {
+            throw new IllegalStateException("Employee record was not found.");
+        }
+        prefetchedOtherEmployee = loaded;
+        otherPanel = new EmployeeAdditionalDetailsPanel(loaded, detailDefinitions);
+        otherPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
+        tabs.setComponentAt(OTHER_TAB_INDEX, otherPanel);
+        otherTabLoaded = true;
+        otherTabLoading = false;
+        refreshAfterTabChange();
+    }
+
+    private void renderDocumentTab(Employee loaded) {
+        if (loaded == null) {
+            throw new IllegalStateException("Employee record was not found.");
+        }
+        prefetchedDocumentEmployee = loaded;
+        documentPanel = new EmployeeDocumentViewPanel(loaded);
+        documentPanel.setPendingChangesListener(EmployeeDetailView.this::refreshUpdateButtonState);
+        if (basicPanel != null) {
+            documentPanel.setProfileImageUploadListener(basicPanel::setSelectedImageFromDocumentUpload);
+            basicPanel.setSelectedImageListener(documentPanel::setProfileImageFromMainTab);
+        }
+        tabs.setComponentAt(DOCUMENT_TAB_INDEX, documentPanel);
+        documentTabLoaded = true;
+        documentTabLoading = false;
+        refreshAfterTabChange();
     }
 
     private List<String> columnsForDefinitions(List<EmployeeFieldDefinition> definitions, boolean includeProfileImage) {
@@ -589,6 +760,11 @@ public class EmployeeDetailView extends JFrame {
     }
 
     private void invalidateDocumentTab() {
+        if (documentTabWorker != null && !documentTabWorker.isDone()) {
+            documentTabWorker.cancel(true);
+        }
+        documentTabWorker = null;
+        prefetchedDocumentEmployee = null;
         documentPanel = null;
         documentTabLoaded = false;
         documentTabLoading = false;
@@ -662,10 +838,11 @@ public class EmployeeDetailView extends JFrame {
                 if (loadedEmployee == null) {
                     return new DetailLoadResult(null, List.of(), List.of());
                 }
+                EmployeeFormMetadata metadata = loadFormMetadata();
                 return new DetailLoadResult(
                         loadedEmployee,
-                        EmployeeBasicFieldUtil.loadBasicDefinitions(),
-                        loadDetailDefinitions()
+                        metadata.basicDefinitions(),
+                        metadata.detailDefinitions()
                 );
             }
 
@@ -701,12 +878,12 @@ public class EmployeeDetailView extends JFrame {
         worker.execute();
     }
 
-    private List<EmployeeFieldDefinition> loadDetailDefinitions() {
+    private EmployeeFormMetadata loadFormMetadata() {
         try {
-            return EmployeeFieldDefinitionCache.detailFields();
+            return EmployeeFormMetadata.snapshot();
         } catch (RuntimeException exception) {
             exception.printStackTrace();
-            return List.of();
+            return EmployeeFormMetadata.fallback();
         }
     }
 

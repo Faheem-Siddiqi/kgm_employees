@@ -9,6 +9,9 @@ import java.util.List;
 
 public final class EmployeeFieldDefinitionCache {
     private static volatile List<EmployeeFieldDefinition> cachedFields;
+    private static volatile List<EmployeeFieldDefinition> cachedBasicFields;
+    private static volatile List<EmployeeFieldDefinition> cachedDetailFields;
+    private static volatile List<EmployeeFieldDefinition> cachedDocumentFields;
 
     private EmployeeFieldDefinitionCache() {
     }
@@ -37,6 +40,7 @@ public final class EmployeeFieldDefinitionCache {
     private static List<EmployeeFieldDefinition> refreshFromDatabase(boolean syncWithDatabase) {
         synchronized (EmployeeFieldDefinitionCache.class) {
             cachedFields = loadFromDatabase(syncWithDatabase);
+            clearDerivedCaches();
             EmployeeDocumentUtil.refreshDocumentTypes();
             return cachedFields;
         }
@@ -45,11 +49,51 @@ public final class EmployeeFieldDefinitionCache {
     public static void invalidate() {
         synchronized (EmployeeFieldDefinitionCache.class) {
             cachedFields = null;
+            clearDerivedCaches();
             EmployeeDocumentUtil.refreshDocumentTypes();
         }
     }
 
+    public static List<EmployeeFieldDefinition> basicFields() {
+        List<EmployeeFieldDefinition> current = cachedBasicFields;
+        if (current != null) {
+            return current;
+        }
+        synchronized (EmployeeFieldDefinitionCache.class) {
+            if (cachedBasicFields == null) {
+                cachedBasicFields = EmployeeBasicFieldUtil.basicDefinitions(fields());
+            }
+            return cachedBasicFields;
+        }
+    }
+
     public static List<EmployeeFieldDefinition> detailFields() {
+        List<EmployeeFieldDefinition> current = cachedDetailFields;
+        if (current != null) {
+            return current;
+        }
+        synchronized (EmployeeFieldDefinitionCache.class) {
+            if (cachedDetailFields == null) {
+                cachedDetailFields = loadDetailFields();
+            }
+            return cachedDetailFields;
+        }
+    }
+
+    public static List<EmployeeFieldDefinition> documentFields() {
+        List<EmployeeFieldDefinition> current = cachedDocumentFields;
+        if (current != null) {
+            return current;
+        }
+        synchronized (EmployeeFieldDefinitionCache.class) {
+            if (cachedDocumentFields == null) {
+                cachedDocumentFields = loadDocumentFields();
+            }
+            return cachedDocumentFields;
+        }
+    }
+
+    private static List<EmployeeFieldDefinition> loadDetailFields() {
         List<EmployeeFieldDefinition> definitions = new ArrayList<>();
         for (EmployeeFieldDefinition definition : fields()) {
             if (!definition.documentField()
@@ -63,7 +107,7 @@ public final class EmployeeFieldDefinitionCache {
         return List.copyOf(definitions);
     }
 
-    public static List<EmployeeFieldDefinition> documentFields() {
+    private static List<EmployeeFieldDefinition> loadDocumentFields() {
         List<EmployeeFieldDefinition> definitions = new ArrayList<>();
         for (EmployeeFieldDefinition definition : fields()) {
             if (definition.documentField()) {
@@ -72,6 +116,12 @@ public final class EmployeeFieldDefinitionCache {
         }
         definitions.sort(fieldOrder());
         return List.copyOf(definitions);
+    }
+
+    private static void clearDerivedCaches() {
+        cachedBasicFields = null;
+        cachedDetailFields = null;
+        cachedDocumentFields = null;
     }
 
     private static List<EmployeeFieldDefinition> loadFromDatabase(boolean syncWithDatabase) {

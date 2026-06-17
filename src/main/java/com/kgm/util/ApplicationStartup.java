@@ -133,8 +133,7 @@ public final class ApplicationStartup {
         DatabaseInitializer.init();
         setStartupPhase(StartupPhase.LOADING_METADATA);
         EmployeeFieldDefinitionCache.refreshPreparedMetadata();
-        EmployeeDocumentUtil.documentTypes();
-        EmployeeDocumentUtil.requiredDocumentFlags();
+        EmployeeFormMetadata.snapshot();
     }
 
     public static void showConnectionFailure(Throwable failure) {

@@ -38,6 +38,7 @@ public final class EmployeeDocumentUtil {
     private static final float QUALITY_PRECISION = 0.01f;
     private static volatile List<DocumentType> cachedDocumentTypes;
     private static volatile Set<String> cachedRequiredDocumentColumns;
+    private static volatile boolean[] cachedRequiredDocumentFlags;
     private static final Set<String> DEFAULT_REQUIRED_DOCUMENT_COLUMNS = Set.of(
             "CNIC_FRONT",
             "CNIC_BACK",
@@ -97,13 +98,25 @@ public final class EmployeeDocumentUtil {
     }
 
     public static void refreshDocumentTypes() {
-        synchronized (EmployeeDocumentUtil.class) {
-            cachedDocumentTypes = null;
-            cachedRequiredDocumentColumns = null;
-        }
+        cachedDocumentTypes = null;
+        cachedRequiredDocumentColumns = null;
+        cachedRequiredDocumentFlags = null;
     }
 
     public static boolean[] requiredDocumentFlags() {
+        boolean[] cached = cachedRequiredDocumentFlags;
+        if (cached != null) {
+            return cached.clone();
+        }
+        synchronized (EmployeeDocumentUtil.class) {
+            if (cachedRequiredDocumentFlags == null) {
+                cachedRequiredDocumentFlags = loadRequiredDocumentFlags();
+            }
+            return cachedRequiredDocumentFlags.clone();
+        }
+    }
+
+    private static boolean[] loadRequiredDocumentFlags() {
         Set<String> requiredColumns = requiredDocumentColumns();
         List<DocumentType> types = documentTypes();
         boolean[] flags = new boolean[types.size()];

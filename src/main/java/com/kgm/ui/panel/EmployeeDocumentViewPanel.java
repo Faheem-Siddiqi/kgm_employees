@@ -18,8 +18,6 @@ import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.Dialog;
 import java.awt.Window;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.event.MouseWheelEvent;
@@ -972,33 +970,17 @@ public class EmployeeDocumentViewPanel extends JPanel {
             button.setBorderPainted(false);
             button.setOpaque(true);
             button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            button.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseEntered(MouseEvent event) {
-                    if (button.isEnabled()) {
-                        button.setBackground(hover);
-                    }
+            button.getModel().addChangeListener(event -> {
+                ButtonModel model = button.getModel();
+                if (!button.isEnabled()) {
+                    return;
                 }
-
-                @Override
-                public void mouseExited(MouseEvent event) {
-                    if (button.isEnabled()) {
-                        button.setBackground(normal);
-                    }
-                }
-
-                @Override
-                public void mousePressed(MouseEvent event) {
-                    if (button.isEnabled()) {
-                        button.setBackground(pressed);
-                    }
-                }
-
-                @Override
-                public void mouseReleased(MouseEvent event) {
-                    if (button.isEnabled()) {
-                        button.setBackground(button.contains(event.getPoint()) ? hover : normal);
-                    }
+                if (model.isPressed()) {
+                    button.setBackground(pressed);
+                } else if (model.isRollover()) {
+                    button.setBackground(hover);
+                } else {
+                    button.setBackground(normal);
                 }
             });
             return button;
