@@ -32,6 +32,10 @@ public class ChartsPanel extends JPanel {
         chartsPanel.setShowInTableHandler(handler);
     }
 
+    public void focusChart(String chartKey) {
+        chartsPanel.focusChart(chartKey);
+    }
+
     public void setRepository(EmployeeRecordDao repo) {
         this.repo = repo;
         chartsPanel.setRepository(repo);

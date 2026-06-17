@@ -7,6 +7,7 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -588,7 +589,15 @@ public class UniversalTablePanel extends JPanel {
             if (widthLimit != null) {
                 width = Math.min(width, widthLimit);
             }
-            table.getColumnModel().getColumn(column).setPreferredWidth(width);
+            TableColumn tableColumn = table.getColumnModel().getColumn(column);
+            tableColumn.setPreferredWidth(width);
+            if (hugColumns.contains(column)) {
+                tableColumn.setMinWidth(width);
+                tableColumn.setMaxWidth(width);
+            } else {
+                tableColumn.setMinWidth(15);
+                tableColumn.setMaxWidth(Integer.MAX_VALUE);
+            }
             totalWidth += width;
         }
 
@@ -629,16 +638,16 @@ public class UniversalTablePanel extends JPanel {
         FontMetrics cellMetrics = table.getFontMetrics(table.getFont());
         int width = headerMetrics.stringWidth(table.getColumnName(column)) + padding;
 
-        for (Object[] row : rowsForWidthMeasurement()) {
+        int start = widthMeasurementStart();
+        int end = widthMeasurementEnd(start);
+        for (int rowIndex = start; rowIndex < end; rowIndex++) {
+            Object[] row = rows.get(rowIndex);
             Object value = row[column];
-            int cellWidth = cellMetrics.stringWidth(value == null ? "" : String.valueOf(value)) + padding;
+            int cellWidth = column == statusColumn
+                    ? measuredStatusCellWidth(value, rowIndex)
+                    : cellMetrics.stringWidth(value == null ? "" : String.valueOf(value)) + padding;
             if (wrappedTextColumns.contains(column)) {
                 cellWidth = Math.min(cellWidth, Math.max(260, availableTableWidth() / 2));
-            }
-
-            if (column == statusColumn && statusDeleteAction != null && statusDeletePredicate != null) {
-                int deleteWidth = cellMetrics.stringWidth("Delete") + 12;
-                cellWidth += deleteWidth;
             }
 
             width = Math.max(width, cellWidth);
@@ -647,16 +656,44 @@ public class UniversalTablePanel extends JPanel {
         return Math.max(72, width);
     }
 
-    private List<Object[]> rowsForWidthMeasurement() {
+    private int measuredStatusCellWidth(Object value, int absoluteRow) {
+        String text = value == null ? "" : String.valueOf(value);
+        Font badgeFont = new Font("Segoe UI Semibold", Font.PLAIN, 12);
+        Font actionFont = new Font("Segoe UI Semibold", Font.PLAIN, 13);
+        FontMetrics badgeMetrics = table.getFontMetrics(badgeFont);
+        FontMetrics actionMetrics = table.getFontMetrics(actionFont);
+
+        int cellBorderInsets = 30;
+        int flowLayoutGaps = 24;
+        int badgeHorizontalInsets = 18;
+        int width = cellBorderInsets + flowLayoutGaps + badgeMetrics.stringWidth(text) + badgeHorizontalInsets;
+        if (statusDeleteAction != null
+                && statusDeletePredicate != null
+                && statusDeletePredicate.test(absoluteRow)) {
+            int itemGap = 12;
+            width += itemGap + actionMetrics.stringWidth("Delete");
+        }
+        return Math.max(146, width);
+    }
+
+    private int widthMeasurementStart() {
         if (rows.isEmpty()) {
-            return rows;
+            return 0;
         }
         if (!paginationEnabled) {
-            return rows.subList(0, Math.min(rows.size(), PAGE_SIZE));
+            return 0;
         }
-        int start = Math.max(0, Math.min(currentPage * PAGE_SIZE, rows.size()));
-        int end = Math.min(start + PAGE_SIZE, rows.size());
-        return rows.subList(start, end);
+        return Math.max(0, Math.min(currentPage * PAGE_SIZE, rows.size()));
+    }
+
+    private int widthMeasurementEnd(int start) {
+        if (rows.isEmpty()) {
+            return 0;
+        }
+        if (!paginationEnabled) {
+            return rows.size();
+        }
+        return Math.min(start + PAGE_SIZE, rows.size());
     }
 
     private int wrappedTextHeight(String text, int columnWidth) {

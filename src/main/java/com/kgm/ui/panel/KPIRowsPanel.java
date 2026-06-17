@@ -4,6 +4,7 @@ import com.kgm.dao.EmployeeRecordDao;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.function.Consumer;
 
 /**
  * KPI Rows Panel - Displays key performance indicators (KPIs) as metric cards.
@@ -34,6 +35,10 @@ public class KPIRowsPanel extends JPanel {
 
     public void setStats(EmployeeRecordDao.DashboardStats stats) {
         kpiPanel.setStats(stats);
+    }
+
+    public void setChartTargetHandler(Consumer<String> handler) {
+        kpiPanel.setChartTargetHandler(handler);
     }
 
     public void reload() {

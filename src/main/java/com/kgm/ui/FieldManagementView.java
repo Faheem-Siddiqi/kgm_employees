@@ -37,6 +37,7 @@ public class FieldManagementView extends JFrame {
     private static final int ACTION_GAP = 10;
     private static final int DIALOG_FORM_INSET = 12;
     private static final int DIALOG_FORM_GAP = 8;
+    private static final int INPUT_RADIUS = 3;
     private static final int BUTTON_RADIUS = 10;
     private static final Color NEUTRAL_BUTTON_TEXT = new Color(99, 115, 129);
     private static final Color NEUTRAL_BUTTON_BORDER = new Color(198, 207, 216);
@@ -155,15 +156,7 @@ public class FieldManagementView extends JFrame {
         titleBlock.add(Box.createVerticalStrut(3));
         titleBlock.add(subtitle);
 
-        JButton dashboard = new JButton("Dashboard");
-        styleNeutralButton(dashboard);
-        dashboard.addActionListener(event -> {
-            new HomeView();
-            dispose();
-        });
-
         row.add(titleBlock, BorderLayout.WEST);
-        row.add(dashboard, BorderLayout.EAST);
         return row;
     }
 
@@ -483,9 +476,7 @@ public class FieldManagementView extends JFrame {
         JPanel searchBox = new JPanel(new BorderLayout(6, 0));
         searchBox.setBackground(Color.WHITE);
         searchBox.setPreferredSize(new Dimension(320, 34));
-        searchBox.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200)),
-                BorderFactory.createEmptyBorder(6, 8, 6, 8)));
+        searchBox.setBorder(inputBorder(PASSWORD_BORDER, new Insets(6, 8, 6, 8)));
         searchBox.add(searchField, BorderLayout.CENTER);
         searchBox.add(clear, BorderLayout.EAST);
 
@@ -538,9 +529,7 @@ public class FieldManagementView extends JFrame {
         JPanel searchBox = new JPanel(new BorderLayout(6, 0));
         searchBox.setBackground(Color.WHITE);
         searchBox.setPreferredSize(new Dimension(320, 34));
-        searchBox.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200)),
-                BorderFactory.createEmptyBorder(6, 8, 6, 8)));
+        searchBox.setBorder(inputBorder(PASSWORD_BORDER, new Insets(6, 8, 6, 8)));
         searchBox.add(requiredSearchField, BorderLayout.CENTER);
         searchBox.add(clear, BorderLayout.EAST);
 
@@ -1461,9 +1450,13 @@ public class FieldManagementView extends JFrame {
     }
 
     private static javax.swing.border.Border passwordInputBorder(Color color) {
+        return inputBorder(color, new Insets(0, 10, 0, 6));
+    }
+
+    private static javax.swing.border.Border inputBorder(Color color, Insets padding) {
         return BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(color),
-                BorderFactory.createEmptyBorder(0, 10, 0, 6)
+                new RoundedButtonBorder(color, INPUT_RADIUS),
+                BorderFactory.createEmptyBorder(padding.top, padding.left, padding.bottom, padding.right)
         );
     }
 

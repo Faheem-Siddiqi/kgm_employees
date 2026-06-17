@@ -7,7 +7,10 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 /**
  * KPI Panel - Displays key performance indicators as metric cards.
@@ -29,6 +32,7 @@ public class HomeStatsKPIPanel extends JPanel {
     private EmployeeRecordDao repo;
     private final ResponsiveMetricGrid metricRow = new ResponsiveMetricGrid(CARD_GAP, CARD_HEIGHT, CARD_MIN_WIDTH);
     private EmployeeRecordDao.DashboardStats stats;
+    private Consumer<String> chartTargetHandler;
 
     public HomeStatsKPIPanel(EmployeeRecordDao repo) {
         this.repo = repo;
@@ -70,6 +74,10 @@ public class HomeStatsKPIPanel extends JPanel {
         rebuildMetrics();
     }
 
+    public void setChartTargetHandler(Consumer<String> handler) {
+        this.chartTargetHandler = handler;
+    }
+
     public void reload() {
         if (repo != null) {
             setStats(repo.dashboardStats());
@@ -79,11 +87,11 @@ public class HomeStatsKPIPanel extends JPanel {
     private void rebuildMetrics() {
         metricRow.removeAll();
         if (stats == null) {
-            metricRow.add(metricCard("Total Ex-Employees", "-", TOTAL_THEME));
-            metricRow.add(metricCard("Departments", "-", DEPARTMENT_THEME));
-            metricRow.add(metricCard("Grades", "-", GRADE_THEME));
-            metricRow.add(metricCard("Designations", "-", DESIGNATION_THEME));
-            metricRow.add(metricCard("Missing Data", "-", MISSING_THEME));
+            metricRow.add(metricCard("Total Ex-Employees", "-", TOTAL_THEME, "exitReasons"));
+            metricRow.add(metricCard("Departments", "-", DEPARTMENT_THEME, "department"));
+            metricRow.add(metricCard("Grades", "-", GRADE_THEME, "grade"));
+            metricRow.add(metricCard("Designations", "-", DESIGNATION_THEME, "designation"));
+            metricRow.add(metricCard("Missing Data", "-", MISSING_THEME, "missing"));
             metricRow.revalidate();
             metricRow.repaint();
             return;
@@ -93,22 +101,31 @@ public class HomeStatsKPIPanel extends JPanel {
         int grades = stats.employeesByGrade().size();
         int designations = stats.employeesByDesignation().size();
 
-        metricRow.add(metricCard("Total Ex-Employees", formatNumber(stats.totalEmployees()), TOTAL_THEME));
-        metricRow.add(metricCard("Departments", formatNumber(departments), DEPARTMENT_THEME));
-        metricRow.add(metricCard("Grades", formatNumber(grades), GRADE_THEME));
-        metricRow.add(metricCard("Designations", formatNumber(designations), DESIGNATION_THEME));
-        metricRow.add(metricCard("Missing Data", formatNumber(missingEmployees()), MISSING_THEME));
+        metricRow.add(metricCard("Total Ex-Employees", formatNumber(stats.totalEmployees()), TOTAL_THEME, "exitReasons"));
+        metricRow.add(metricCard("Departments", formatNumber(departments), DEPARTMENT_THEME, "department"));
+        metricRow.add(metricCard("Grades", formatNumber(grades), GRADE_THEME, "grade"));
+        metricRow.add(metricCard("Designations", formatNumber(designations), DESIGNATION_THEME, "designation"));
+        metricRow.add(metricCard("Missing Data", formatNumber(missingEmployees()), MISSING_THEME, "missing"));
 
         metricRow.revalidate();
         metricRow.repaint();
     }
 
-    private JPanel metricCard(String title, String value, MetricTheme theme) {
+    private JPanel metricCard(String title, String value, MetricTheme theme, String chartKey) {
         JPanel card = new GradientMetricCard(theme.start(), theme.end());
         card.setLayout(new BorderLayout(0, 8));
         card.setBorder(new EmptyBorder(16, 16, 15, 16));
         card.setPreferredSize(new Dimension(CARD_MIN_WIDTH, CARD_HEIGHT));
         card.setMinimumSize(new Dimension(150, CARD_HEIGHT));
+        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        card.setToolTipText("Open related chart");
+        card.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent event) {
+                if (chartTargetHandler != null) {
+                    chartTargetHandler.accept(chartKey);
+                }
+            }
+        });
 
         JLabel titleLabel = new JLabel(title);
         titleLabel.setFont(new Font("Segoe UI Semibold", Font.PLAIN, 12));

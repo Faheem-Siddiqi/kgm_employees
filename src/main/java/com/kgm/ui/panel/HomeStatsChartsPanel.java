@@ -51,6 +51,7 @@ public class HomeStatsChartsPanel extends JPanel {
     private final DashboardPieChart exitTrendChart = new DashboardPieChart();
 
     private EmployeeRecordDao.DashboardStats stats;
+    private final Map<String, JComponent> chartCardsByKey = new LinkedHashMap<>();
     private String selectedDepartment;
     private String selectedMissingGroup;
     private String selectedGrade;
@@ -116,6 +117,28 @@ public class HomeStatsChartsPanel extends JPanel {
         rebuildCharts();
     }
 
+    public void focusChart(String chartKey) {
+        if (chartKey == null || chartKey.isBlank()) {
+            return;
+        }
+        fullRowChartKey = chartKey;
+        rebuildCharts();
+        SwingUtilities.invokeLater(() -> {
+            JComponent card = chartCardsByKey.get(chartKey);
+            if (card == null) {
+                return;
+            }
+            Rectangle bounds = SwingUtilities.convertRectangle(
+                    card.getParent(),
+                    card.getBounds(),
+                    this
+            );
+            bounds.y = Math.max(0, bounds.y - 12);
+            scrollRectToVisible(bounds);
+            card.requestFocusInWindow();
+        });
+    }
+
     public void reload() {
         if (repo != null) {
             setStats(repo.dashboardStats());
@@ -124,6 +147,7 @@ public class HomeStatsChartsPanel extends JPanel {
 
     private void rebuildCharts() {
         chartsPanel.removeAll();
+        chartCardsByKey.clear();
         if (stats == null) {
             chartsPanel.revalidate();
             chartsPanel.repaint();
@@ -154,6 +178,9 @@ public class HomeStatsChartsPanel extends JPanel {
                         "exitReasons"
                 ), exitTrendChart)
         );
+        for (ChartCardSpec card : cards) {
+            chartCardsByKey.put(card.key(), card.component());
+        }
 
         addResponsiveChartCards(cards);
 

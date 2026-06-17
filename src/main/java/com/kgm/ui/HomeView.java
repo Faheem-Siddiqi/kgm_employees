@@ -66,6 +66,7 @@ public class HomeView extends JFrame {
 
         // Wire "Show in Table" from chart cards to the table filtering
         chartsPanel.setShowInTableHandler(this::handleShowInTable);
+        kpiPanel.setChartTargetHandler(chartsPanel::focusChart);
 
         // Wire table filter callback to toggle Refresh / Clear Filter button text
         tablePanel.setOnFilterChanged(filterLabel -> {
