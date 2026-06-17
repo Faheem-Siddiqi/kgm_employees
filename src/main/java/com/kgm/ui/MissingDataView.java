@@ -93,6 +93,8 @@ public class MissingDataView extends JFrame {
     private List<String> availableMissingItems = new ArrayList<>();
     private String pendingInitialMissingItem;
     private SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> loadWorker;
+    private LoadingOverlay.Handle loadOverlay;
+    private boolean returningHomeAfterStop;
 
     public MissingDataView() {
         this(false);
@@ -130,6 +132,7 @@ public class MissingDataView extends JFrame {
             storageStatusBanner.dispose();
             storageStatusBanner = null;
         }
+        cancelActiveLoad();
         super.dispose();
     }
 
@@ -485,10 +488,11 @@ public class MissingDataView extends JFrame {
         }
 
         showLoading("Loading employees with missing required data...");
-        LoadingOverlay.Handle loader = LoadingOverlay.show(
+        loadOverlay = LoadingOverlay.show(
                 this,
-                "Loading Missing Data",
-                "Reading field settings cache and employee rows..."
+                "Fetching Missing Data",
+                "Fetching employees with missing required data...",
+                this::stopLoadingAndReturnHome
         );
 
         SwingWorker<List<EmployeeRecordDao.MissingEmployeeRow>, Void> worker = new SwingWorker<>() {
@@ -501,7 +505,7 @@ public class MissingDataView extends JFrame {
 
             @Override
             protected void done() {
-                loader.close();
+                closeLoadOverlay();
                 if (isCancelled()) {
                     return;
                 }
@@ -531,7 +535,33 @@ public class MissingDataView extends JFrame {
         worker.execute();
     }
 
+    private void stopLoadingAndReturnHome() {
+        returningHomeAfterStop = true;
+        cancelActiveLoad();
+        SwingUtilities.invokeLater(() -> {
+            new HomeView();
+            dispose();
+        });
+    }
+
+    private void cancelActiveLoad() {
+        if (loadWorker != null && !loadWorker.isDone()) {
+            loadWorker.cancel(true);
+        }
+        closeLoadOverlay();
+    }
+
+    private void closeLoadOverlay() {
+        if (loadOverlay != null) {
+            loadOverlay.close();
+            loadOverlay = null;
+        }
+    }
+
     private void showLoadFailed(String message) {
+        if (returningHomeAfterStop) {
+            return;
+        }
         allRows.clear();
         tablePanel.setEmptyText(message == null || message.isBlank()
                 ? "Missing required data could not be loaded."

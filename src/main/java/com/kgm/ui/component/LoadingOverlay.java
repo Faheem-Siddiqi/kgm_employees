@@ -1,5 +1,8 @@
 package com.kgm.ui.component;
 
+import com.kgm.ui.styling.ButtonStateHelper;
+import com.kgm.ui.styling.UniversalDialogHelper;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
@@ -15,8 +18,13 @@ public class LoadingOverlay extends JPanel {
     private final JLabel titleLabel;
     private final JTextArea messageArea;
     private final JProgressBar progressBar;
+    private final JButton stopButton;
 
     private LoadingOverlay(String title, String message) {
+        this(title, message, null);
+    }
+
+    private LoadingOverlay(String title, String message, Runnable onStop) {
         setOpaque(false);
         setLayout(new GridBagLayout());
         setFocusable(true);
@@ -75,15 +83,25 @@ public class LoadingOverlay extends JPanel {
         progressBar.setMaximumSize(new Dimension(CONTENT_WIDTH, PROGRESS_HEIGHT));
         progressBar.setAlignmentX(Component.CENTER_ALIGNMENT);
 
+        stopButton = createStopButton(onStop);
+
         card.add(titleLabel);
         card.add(Box.createVerticalStrut(8));
         card.add(messageArea);
         card.add(Box.createVerticalStrut(18));
         card.add(progressBar);
+        if (stopButton != null) {
+            card.add(Box.createVerticalStrut(18));
+            card.add(stopButton);
+        }
         add(card, new GridBagConstraints());
     }
 
     public static Handle show(Component parent, String title, String message) {
+        return show(parent, title, message, null);
+    }
+
+    public static Handle show(Component parent, String title, String message, Runnable onStop) {
         Window window = parent instanceof Window
                 ? (Window) parent
                 : SwingUtilities.getWindowAncestor(parent);
@@ -94,11 +112,43 @@ public class LoadingOverlay extends JPanel {
         JRootPane rootPane = container.getRootPane();
         Component previousGlassPane = rootPane.getGlassPane();
         boolean previousVisible = previousGlassPane != null && previousGlassPane.isVisible();
-        LoadingOverlay overlay = new LoadingOverlay(title, message);
+        LoadingOverlay overlay = new LoadingOverlay(title, message, onStop);
         rootPane.setGlassPane(overlay);
         overlay.setVisible(true);
         overlay.requestFocusInWindow();
         return new Handle(rootPane, previousGlassPane, previousVisible, overlay);
+    }
+
+    private JButton createStopButton(Runnable onStop) {
+        if (onStop == null) {
+            return null;
+        }
+        JButton button = new JButton("Stop");
+        button.setAlignmentX(Component.CENTER_ALIGNMENT);
+        button.setFont(UniversalDialogHelper.mediumFont(13));
+        button.setForeground(Color.WHITE);
+        button.setBackground(UniversalDialogHelper.ERROR_ACCENT);
+        button.setFocusPainted(false);
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        button.setPreferredSize(new Dimension(110, 36));
+        button.setMaximumSize(new Dimension(110, 36));
+        button.setBorder(BorderFactory.createCompoundBorder(
+                UniversalDialogHelper.roundedBorder(UniversalDialogHelper.ERROR_ACCENT, 6, 1),
+                BorderFactory.createEmptyBorder(8, 18, 8, 18)
+        ));
+        ButtonStateHelper.installRounded(button, 6);
+        ButtonStateHelper.setHoverBackground(
+                button,
+                UniversalDialogHelper.ERROR_ACCENT.darker(),
+                UniversalDialogHelper.ERROR_ACCENT.darker()
+        );
+        ButtonStateHelper.setDisabledColors(button, UniversalDialogHelper.ERROR_ACCENT, Color.WHITE);
+        button.addActionListener(event -> {
+            button.setText("Stopping...");
+            button.setEnabled(false);
+            onStop.run();
+        });
+        return button;
     }
 
     private void setMessageText(String message) {

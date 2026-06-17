@@ -785,10 +785,10 @@ public class HomeStatsChartsPanel extends JPanel {
 
     private void openMissingDataView(String missingGroup, String initialMissingItem) {
         Window window = SwingUtilities.getWindowAncestor(this);
-        if (window != null) {
-            window.dispose();
-        }
         new MissingDataView("Documents".equals(missingGroup), initialMissingItem);
+        if (window != null) {
+            SwingUtilities.invokeLater(window::dispose);
+        }
     }
 
     private JPanel chartCard(String title, JComponent chart) {
