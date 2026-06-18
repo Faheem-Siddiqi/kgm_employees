@@ -2,6 +2,7 @@ package com.kgm.service;
 
 import com.kgm.config.DatabaseConnection;
 import com.kgm.model.EmployeeFieldDefinition;
+import com.kgm.util.EmployeeBasicFieldUtil;
 import com.kgm.util.EmployeeDocumentUtil;
 import com.kgm.util.EmployeeFieldDefinitionCache;
 
@@ -30,7 +31,10 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -41,6 +45,27 @@ import java.util.Set;
 
 public final class ExcelExportService {
     private static final String EMPLOYEE_TABLE = "employees";
+    private static final String EXPORT_DATE_FORMAT = "MM/dd/yyyy HH:mm:ss";
+    private static final List<String> EXPORT_DATE_READ_FORMATS = List.of(
+            "dd/MM/yyyy HH:mm:ss",
+            "dd/MM/yyyy H:mm:ss",
+            "MM/dd/yyyy HH:mm:ss",
+            "M/d/yyyy HH:mm:ss",
+            "M/d/yyyy H:mm:ss",
+            "M/d/yy HH:mm:ss",
+            "M/d/yy H:mm:ss",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd H:mm:ss",
+            "yyyy/MM/dd HH:mm:ss",
+            "yyyy/MM/dd H:mm:ss",
+            "yyyy-MM-dd",
+            "yyyy/MM/dd",
+            "dd-MM-yyyy",
+            "dd/MM/yyyy",
+            "MM/dd/yyyy",
+            "M/d/yyyy",
+            "M/d/yy"
+    );
     private static final List<String> FIXED_HEADERS = List.of(
             "UNT_CODE",
             "DESCR",
@@ -288,6 +313,7 @@ public final class ExcelExportService {
                     for (int index = 0; index < columns.size(); index++) {
                         ExportColumn column = columns.get(index);
                         String value = valueFor(rs, resultColumns, column.sourceColumn());
+                        value = formatExportValue(column, value);
                         updateWidth(widths, index, value);
                         textCell(row, index, value, column.dynamic() ? dynamicCellStyle : normalCellStyle);
                     }
@@ -422,6 +448,72 @@ public final class ExcelExportService {
         }
         String value = rs.getString(index);
         return isBlankExportValue(value) ? "" : value.trim();
+    }
+
+    private String formatExportValue(ExportColumn column, String value) {
+        if (!isExportDateColumn(column)) {
+            return value;
+        }
+        return formatExportDateValue(value);
+    }
+
+    private boolean isExportDateColumn(ExportColumn column) {
+        if (column == null) {
+            return false;
+        }
+        String sourceColumn = normalizeColumn(column.sourceColumn());
+        String header = normalizeColumn(column.header());
+        return isDateColumnName(sourceColumn) || isDateColumnName(header) || isMetadataDateColumn(sourceColumn);
+    }
+
+    private boolean isMetadataDateColumn(String sourceColumn) {
+        if (sourceColumn == null || sourceColumn.isBlank()) {
+            return false;
+        }
+        try {
+            for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.fields()) {
+                if (sourceColumn.equals(normalizeColumn(definition.columnName()))
+                        && EmployeeBasicFieldUtil.isDateField(definition)) {
+                    return true;
+                }
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return false;
+    }
+
+    private static boolean isDateColumnName(String column) {
+        String normalized = normalizeColumn(column);
+        return "DOB".equals(normalized)
+                || normalized.endsWith("_DATE")
+                || normalized.endsWith("DATE");
+    }
+
+    static String formatExportDateValue(String value) {
+        if (isBlankExportValue(value)) {
+            return "";
+        }
+        String text = value.trim();
+        for (String pattern : EXPORT_DATE_READ_FORMATS) {
+            Date parsed = parseDate(text, pattern);
+            if (parsed != null) {
+                return dateFormatter(EXPORT_DATE_FORMAT).format(parsed);
+            }
+        }
+        return text;
+    }
+
+    private static Date parseDate(String value, String pattern) {
+        SimpleDateFormat format = dateFormatter(pattern);
+        ParsePosition position = new ParsePosition(0);
+        Date parsed = format.parse(value, position);
+        return parsed != null && position.getIndex() == value.length() ? parsed : null;
+    }
+
+    private static SimpleDateFormat dateFormatter(String pattern) {
+        SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.ENGLISH);
+        format.setLenient(false);
+        return format;
     }
 
     private int[] initialWidths(List<ExportColumn> columns) {
