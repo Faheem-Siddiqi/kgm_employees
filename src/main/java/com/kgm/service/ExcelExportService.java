@@ -278,6 +278,7 @@ public final class ExcelExportService {
         Map<String, String> dbColumns = employeeColumns(connection);
         Set<String> documentColumns = documentColumns(connection);
         List<ExportColumn> columns = exportColumns(dbColumns, documentColumns);
+        boolean[] dateColumns = exportDateColumns(columns, metadataDateColumns());
         int[] widths = initialWidths(columns);
         int totalRows = employeeCount(connection);
 
@@ -313,7 +314,7 @@ public final class ExcelExportService {
                     for (int index = 0; index < columns.size(); index++) {
                         ExportColumn column = columns.get(index);
                         String value = valueFor(rs, resultColumns, column.sourceColumn());
-                        value = formatExportValue(column, value);
+                        value = formatExportValue(dateColumns[index], value);
                         updateWidth(widths, index, value);
                         textCell(row, index, value, column.dynamic() ? dynamicCellStyle : normalCellStyle);
                     }
@@ -450,36 +451,43 @@ public final class ExcelExportService {
         return isBlankExportValue(value) ? "" : value.trim();
     }
 
-    private String formatExportValue(ExportColumn column, String value) {
-        if (!isExportDateColumn(column)) {
+    private String formatExportValue(boolean dateColumn, String value) {
+        if (!dateColumn) {
             return value;
         }
         return formatExportDateValue(value);
     }
 
-    private boolean isExportDateColumn(ExportColumn column) {
+    private boolean[] exportDateColumns(List<ExportColumn> columns, Set<String> metadataDateColumns) {
+        boolean[] dateColumns = new boolean[columns.size()];
+        for (int index = 0; index < columns.size(); index++) {
+            dateColumns[index] = isExportDateColumn(columns.get(index), metadataDateColumns);
+        }
+        return dateColumns;
+    }
+
+    private boolean isExportDateColumn(ExportColumn column, Set<String> metadataDateColumns) {
         if (column == null) {
             return false;
         }
         String sourceColumn = normalizeColumn(column.sourceColumn());
         String header = normalizeColumn(column.header());
-        return isDateColumnName(sourceColumn) || isDateColumnName(header) || isMetadataDateColumn(sourceColumn);
+        return isDateColumnName(sourceColumn)
+                || isDateColumnName(header)
+                || metadataDateColumns.contains(sourceColumn);
     }
 
-    private boolean isMetadataDateColumn(String sourceColumn) {
-        if (sourceColumn == null || sourceColumn.isBlank()) {
-            return false;
-        }
+    private Set<String> metadataDateColumns() {
+        Set<String> dateColumns = new LinkedHashSet<>();
         try {
             for (EmployeeFieldDefinition definition : EmployeeFieldDefinitionCache.fields()) {
-                if (sourceColumn.equals(normalizeColumn(definition.columnName()))
-                        && EmployeeBasicFieldUtil.isDateField(definition)) {
-                    return true;
+                if (EmployeeBasicFieldUtil.isDateField(definition)) {
+                    dateColumns.add(normalizeColumn(definition.columnName()));
                 }
             }
         } catch (RuntimeException ignored) {
         }
-        return false;
+        return dateColumns;
     }
 
     private static boolean isDateColumnName(String column) {
